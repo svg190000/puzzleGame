@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Jigsaw Puzzle Game",
+    "slug": "jigsaw-puzzle-game",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#F8FAFC"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jigsawpuzzle.game"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F8FAFC"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
+      "package": "com.jigsawpuzzle.game"
+    },
+    "web": {
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to create puzzles.",
+          "cameraPermission": "The app accesses your camera to take photos for puzzles."
+        }
+      ]
+    ]
+  }
+}
