@@ -98,52 +98,34 @@ export const PuzzlePieceHolder = ({
     setScrollContentWidth(width);
     previousContentWidth.current = width;
     
-    // Scroll to center on new game/reset
+    // Scroll to left on new game/reset
     if (resetScrollKey !== undefined && resetScrollKey !== lastResetScrollKey.current) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (scrollViewRef.current) {
-            const scrollableWidth = Math.max(0, width - scrollIndicatorWidth);
-            if (scrollableWidth > 0) {
-              const centerPosition = scrollableWidth / 2;
-              actualScrollPosition.current = centerPosition;
-              setScrollPosition(centerPosition);
-              scrollViewRef.current.scrollTo({ x: centerPosition, animated: false });
-              lastResetScrollKey.current = resetScrollKey;
-            }
+            actualScrollPosition.current = 0;
+            setScrollPosition(0);
+            scrollViewRef.current.scrollTo({ x: 0, animated: false });
+            lastResetScrollKey.current = resetScrollKey;
           }
         });
       });
     }
   };
 
-  // Reset scroll position to center when resetScrollKey changes
+  // Reset scroll position to left when resetScrollKey changes
   useEffect(() => {
     if (resetScrollKey !== undefined && resetScrollKey !== lastResetScrollKey.current) {
       // Use requestAnimationFrame to ensure DOM is ready
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (scrollViewRef.current) {
-            // Use current scrollContentWidth or calculate from totalContentWidth
-            const contentWidth = scrollContentWidth > 0 ? scrollContentWidth : totalContentWidth;
-            const scrollableWidth = Math.max(0, contentWidth - scrollIndicatorWidth);
-            if (scrollableWidth > 0) {
-              const centerPosition = scrollableWidth / 2;
-              // Update ref immediately for accurate tracking
-              actualScrollPosition.current = centerPosition;
-              // Set state first to ensure thumb position is correct
-              setScrollPosition(centerPosition);
-              // Then scroll the view
-              scrollViewRef.current.scrollTo({ x: centerPosition, animated: false });
-              // Mark that we've handled this resetScrollKey
-              lastResetScrollKey.current = resetScrollKey;
-            } else {
-              // If no scrollable width, reset to 0
-              actualScrollPosition.current = 0;
-              setScrollPosition(0);
-              scrollViewRef.current.scrollTo({ x: 0, animated: false });
-              lastResetScrollKey.current = resetScrollKey;
-            }
+            // Always scroll to left (position 0)
+            actualScrollPosition.current = 0;
+            setScrollPosition(0);
+            scrollViewRef.current.scrollTo({ x: 0, animated: false });
+            // Mark that we've handled this resetScrollKey
+            lastResetScrollKey.current = resetScrollKey;
           }
         });
       });
