@@ -152,20 +152,20 @@ export default function App() {
     return isCorrectCol && isCorrectRow;
   };
 
-  const swapPieces = () => {
-    if (!selectedPiece || !selectedPiece2) return;
+  const swapPieces = (piece1 = selectedPiece, piece2 = selectedPiece2) => {
+    if (!piece1 || !piece2) return;
     
     // Don't swap if either piece is locked
-    if (isPieceLocked(selectedPiece) || isPieceLocked(selectedPiece2)) return;
+    if (isPieceLocked(piece1) || isPieceLocked(piece2)) return;
     
-    const isSelectedOnBoard = boardPieces.some((p) => p.id === selectedPiece.id);
-    const isSelected2OnBoard = boardPieces.some((p) => p.id === selectedPiece2.id);
+    const isSelectedOnBoard = boardPieces.some((p) => p.id === piece1.id);
+    const isSelected2OnBoard = boardPieces.some((p) => p.id === piece2.id);
     
     if (!isSelectedOnBoard || !isSelected2OnBoard) return;
     
     setBoardPieces((prev) => {
-      const piece1FromPrev = prev.find((p) => p.id === selectedPiece.id);
-      const piece2FromPrev = prev.find((p) => p.id === selectedPiece2.id);
+      const piece1FromPrev = prev.find((p) => p.id === piece1.id);
+      const piece2FromPrev = prev.find((p) => p.id === piece2.id);
       
       if (!piece1FromPrev || !piece2FromPrev || !piece1FromPrev.imageUri || !piece2FromPrev.imageUri) {
         return prev;
@@ -177,13 +177,13 @@ export default function App() {
       const piece2Y = piece2FromPrev.boardY;
       
       return prev.map((piece) => {
-        if (piece.id === selectedPiece.id) {
+        if (piece.id === piece1.id) {
           return {
             ...piece1FromPrev,
             boardX: piece2X,
             boardY: piece2Y,
           };
-        } else if (piece.id === selectedPiece2.id) {
+        } else if (piece.id === piece2.id) {
           return {
             ...piece2FromPrev,
             boardX: piece1X,
@@ -254,7 +254,16 @@ export default function App() {
     } else if (fullPiece.id === selectedPiece2?.id) {
       setSelectedPiece2(null);
     } else if (!selectedPiece2) {
-      setSelectedPiece2(fullPiece);
+      // Setting the second piece - check if both are board pieces and swap immediately
+      const isSelectedPieceFromBoard = boardPieces.some((p) => p.id === selectedPiece.id);
+      if (isSelectedPieceFromBoard && isPieceFromBoard) {
+        // Both are board pieces - swap immediately using the pieces directly
+        setSelectedPiece2(fullPiece);
+        swapPieces(selectedPiece, fullPiece);
+      } else {
+        // Not both board pieces, just set the second piece normally
+        setSelectedPiece2(fullPiece);
+      }
     } else {
       setSelectedPiece(fullPiece);
       setSelectedPiece2(null);
