@@ -7,7 +7,6 @@ import {
   TouchableWithoutFeedback,
   Dimensions,
   Alert,
-  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -17,7 +16,6 @@ import { DifficultyModal } from './src/components/DifficultyModal';
 import { PaperBackground } from './src/components/PaperBackground';
 import { GameBoard } from './src/components/GameBoard';
 import { PuzzlePieceHolder } from './src/components/PuzzlePieceHolder';
-import { PuzzlePiece } from './src/components/PuzzlePiece';
 import { GameStats } from './src/components/GameStats';
 import { generatePuzzle, shuffleArray } from './src/utils/puzzleUtils';
 import { COLORS } from './src/constants/colors';
@@ -37,7 +35,7 @@ export default function App() {
   const [selectedPiece, setSelectedPiece] = useState(null);
   const [selectedPiece2, setSelectedPiece2] = useState(null);
   const [scrollResetKey, setScrollResetKey] = useState(0);
-  const boardLayoutRef = useRef(null);
+  const originalHolderOrderRef = useRef([]);
 
   useEffect(() => {
     if (showGameScreen) {
@@ -105,6 +103,7 @@ export default function App() {
       const shuffledPieces = shuffleArray(puzzle.pieces);
       setPuzzleData(puzzle);
       setHolderPieces(shuffledPieces);
+      originalHolderOrderRef.current = shuffledPieces.map((p, index) => ({ id: p.id, index }));
       setShowGameScreen(true);
       setMoveCount(0);
       setTimer(0);
@@ -126,73 +125,53 @@ export default function App() {
     setBoardPieces([]);
     setSelectedPiece(null);
     setSelectedPiece2(null);
+    originalHolderOrderRef.current = [];
   };
 
-  // Check if a piece is in its correct position (locked)
+  const getPieceDimensions = () => {
+    if (!puzzleData) return { width: boardWidth / difficulty.cols, height: boardHeight / difficulty.rows };
+    return { width: boardWidth / puzzleData.cols, height: boardHeight / puzzleData.rows };
+  };
+
   const isPieceLocked = (piece) => {
     if (!piece || !puzzleData) return false;
     
     const pieceOnBoard = boardPieces.find((p) => p.id === piece.id);
-    if (!pieceOnBoard) return false; // Pieces not on board can't be locked
+    if (!pieceOnBoard) return false;
     
-    const correctRow = piece.correctRow !== undefined ? piece.correctRow : piece.row;
-    const correctCol = piece.correctCol !== undefined ? piece.correctCol : piece.col;
-    
+    const correctRow = piece.correctRow ?? piece.row;
+    const correctCol = piece.correctCol ?? piece.col;
     if (correctRow === undefined || correctCol === undefined) return false;
     
-    // Calculate piece dimensions to perfectly match grid cells
-    const currentPieceWidth = boardWidth / puzzleData.cols;
-    const currentPieceHeight = boardHeight / puzzleData.rows;
-    
-    // Check if piece is in correct position (with small tolerance for grid alignment)
+    const { width: pieceWidth, height: pieceHeight } = getPieceDimensions();
     const tolerance = 2;
-    const isCorrectCol = Math.abs((pieceOnBoard.boardX || 0) - (correctCol * currentPieceWidth)) <= tolerance;
-    const isCorrectRow = Math.abs((pieceOnBoard.boardY || 0) - (correctRow * currentPieceHeight)) <= tolerance;
+    const isCorrectCol = Math.abs((pieceOnBoard.boardX || 0) - (correctCol * pieceWidth)) <= tolerance;
+    const isCorrectRow = Math.abs((pieceOnBoard.boardY || 0) - (correctRow * pieceHeight)) <= tolerance;
     
     return isCorrectCol && isCorrectRow;
   };
 
   const swapPieces = (piece1 = selectedPiece, piece2 = selectedPiece2) => {
     if (!piece1 || !piece2) return;
-    
-    // Don't swap if either piece is locked
     if (isPieceLocked(piece1) || isPieceLocked(piece2)) return;
     
-    const isSelectedOnBoard = boardPieces.some((p) => p.id === piece1.id);
-    const isSelected2OnBoard = boardPieces.some((p) => p.id === piece2.id);
-    
-    if (!isSelectedOnBoard || !isSelected2OnBoard) return;
+    const isBothOnBoard = boardPieces.some((p) => p.id === piece1.id) && 
+                         boardPieces.some((p) => p.id === piece2.id);
+    if (!isBothOnBoard) return;
     
     setBoardPieces((prev) => {
-      const piece1FromPrev = prev.find((p) => p.id === piece1.id);
-      const piece2FromPrev = prev.find((p) => p.id === piece2.id);
+      const p1 = prev.find((p) => p.id === piece1.id);
+      const p2 = prev.find((p) => p.id === piece2.id);
       
-      if (!piece1FromPrev || !piece2FromPrev || !piece1FromPrev.imageUri || !piece2FromPrev.imageUri) {
-        return prev;
-      }
-      
-      const piece1X = piece1FromPrev.boardX;
-      const piece1Y = piece1FromPrev.boardY;
-      const piece2X = piece2FromPrev.boardX;
-      const piece2Y = piece2FromPrev.boardY;
+      if (!p1 || !p2 || !p1.imageUri || !p2.imageUri) return prev;
       
       return prev.map((piece) => {
-        if (piece.id === piece1.id) {
-          return {
-            ...piece1FromPrev,
-            boardX: piece2X,
-            boardY: piece2Y,
-          };
-        } else if (piece.id === piece2.id) {
-          return {
-            ...piece2FromPrev,
-            boardX: piece1X,
-            boardY: piece1Y,
-          };
-        }
+        if (piece.id === piece1.id) return { ...p1, boardX: p2.boardX, boardY: p2.boardY };
+        if (piece.id === piece2.id) return { ...p2, boardX: p1.boardX, boardY: p1.boardY };
         return piece;
       });
     });
+    
     setSelectedPiece(null);
     setSelectedPiece2(null);
     setMoveCount((prev) => prev + 1);
@@ -205,64 +184,45 @@ export default function App() {
                       holderPieces.find((p) => p.id === piece.id) || 
                       piece;
     
-    if (!fullPiece || !fullPiece.imageUri) return;
+    if (!fullPiece?.imageUri || isPieceLocked(fullPiece)) return;
     
-    // Don't allow selection of locked pieces
-    if (isPieceLocked(fullPiece)) return;
-    
-    // Determine if pieces are from holder or board
     const isPieceFromBoard = boardPieces.some((p) => p.id === fullPiece.id);
-    const isPieceFromHolder = holderPieces.some((p) => p.id === fullPiece.id);
+    const isSelectedFromBoard = selectedPiece ? boardPieces.some((p) => p.id === selectedPiece.id) : false;
+    const isSelectedFromHolder = selectedPiece ? holderPieces.some((p) => p.id === selectedPiece.id) : false;
     
-    // Check current selection status
-    const isSelectedPieceFromBoard = selectedPiece ? boardPieces.some((p) => p.id === selectedPiece.id) : false;
-    const isSelectedPieceFromHolder = selectedPiece ? holderPieces.some((p) => p.id === selectedPiece.id) : false;
-    
-    // Rule 1: If selectedPiece is from holder, cannot select another piece
-    if (isSelectedPieceFromHolder) {
-      // Allow deselection by clicking the same piece
+    // Rule 1: If selected piece is from holder, cannot select another piece
+    if (isSelectedFromHolder) {
       if (fullPiece.id === selectedPiece.id) {
         setSelectedPiece(null);
         setSelectedPiece2(null);
       }
-      // Otherwise, ignore selection attempts
       return;
     }
     
-    // Rule 2: If selectedPiece is from board, can only select another board piece
-    if (isSelectedPieceFromBoard && !isPieceFromBoard) {
-      // Trying to select a holder piece when a board piece is selected - ignore
+    // Rule 2: If selected piece is from board, can only select another board piece
+    if (isSelectedFromBoard && !isPieceFromBoard) return;
+    
+    // Handle deselection
+    if (fullPiece.id === selectedPiece?.id) {
+      setSelectedPiece(null);
+      setSelectedPiece2(null);
       return;
     }
     
-    if (selectedPiece && selectedPiece2) {
-      const isSelectedOnBoard = boardPieces.some((p) => p.id === selectedPiece.id);
-      const isSelected2OnBoard = boardPieces.some((p) => p.id === selectedPiece2.id);
-      
-      if (isSelectedOnBoard && isSelected2OnBoard) {
-        swapPieces();
-        return;
-      }
+    if (fullPiece.id === selectedPiece2?.id) {
+      setSelectedPiece2(null);
+      return;
     }
     
+    // Handle selection
     if (!selectedPiece) {
       setSelectedPiece(fullPiece);
       setSelectedPiece2(null);
-    } else if (fullPiece.id === selectedPiece.id) {
-      setSelectedPiece(null);
-      setSelectedPiece2(null);
-    } else if (fullPiece.id === selectedPiece2?.id) {
-      setSelectedPiece2(null);
     } else if (!selectedPiece2) {
-      // Setting the second piece - check if both are board pieces and swap immediately
-      const isSelectedPieceFromBoard = boardPieces.some((p) => p.id === selectedPiece.id);
-      if (isSelectedPieceFromBoard && isPieceFromBoard) {
-        // Both are board pieces - swap immediately using the pieces directly
-        setSelectedPiece2(fullPiece);
+      // Setting the second piece - swap immediately if both are board pieces
+      setSelectedPiece2(fullPiece);
+      if (isSelectedFromBoard && isPieceFromBoard) {
         swapPieces(selectedPiece, fullPiece);
-      } else {
-        // Not both board pieces, just set the second piece normally
-        setSelectedPiece2(fullPiece);
       }
     } else {
       setSelectedPiece(fullPiece);
@@ -270,210 +230,121 @@ export default function App() {
     }
   };
 
+  const restoreHolderOrder = (pieces) => {
+    const piecesMap = new Map(pieces.map((p) => [p.id, p]));
+    return originalHolderOrderRef.current
+      .map((orderItem) => {
+        const piece = piecesMap.get(orderItem.id);
+        if (!piece) return null;
+        const { boardX, boardY, ...pieceWithoutPosition } = piece;
+        return pieceWithoutPosition;
+      })
+      .filter((piece) => piece !== null);
+  };
+
   const handleBoardTap = (event) => {
     const { locationX, locationY } = event.nativeEvent;
+    const { width: currentPieceWidth, height: currentPieceHeight } = getPieceDimensions();
     
-    // Calculate piece dimensions to perfectly match grid cells
-    const currentPieceWidth = puzzleData ? boardWidth / puzzleData.cols : boardWidth / difficulty.cols;
-    const currentPieceHeight = puzzleData ? boardHeight / puzzleData.rows : boardHeight / difficulty.rows;
-    
-    // Check if tap is on a locked piece first - prevents piece movement
-    const tappedLockedPiece = boardPieces.find((piece) => {
-      if (!isPieceLocked(piece)) return false;
-      const pieceX = piece.boardX || 0;
-      const pieceY = piece.boardY || 0;
-      return locationX >= pieceX && locationX <= pieceX + currentPieceWidth &&
-             locationY >= pieceY && locationY <= pieceY + currentPieceHeight;
-    });
-    
-    if (tappedLockedPiece) {
-      if (selectedPiece || selectedPiece2) {
-        setSelectedPiece(null);
-        setSelectedPiece2(null);
-      }
-      return;
-    }
-    
-    // Check if tap is on any piece
+    // Check if tap is on a piece
     const tappedPiece = boardPieces.find((piece) => {
       const pieceX = piece.boardX || 0;
       const pieceY = piece.boardY || 0;
       return locationX >= pieceX && locationX <= pieceX + currentPieceWidth &&
              locationY >= pieceY && locationY <= pieceY + currentPieceHeight;
     });
-
-    if (selectedPiece && selectedPiece2) {
-      swapPieces();
-      return;
-    }
-
+    
     if (tappedPiece) {
+      if (isPieceLocked(tappedPiece)) {
+        if (selectedPiece || selectedPiece2) {
+          setSelectedPiece(null);
+          setSelectedPiece2(null);
+        }
+        return;
+      }
+      
+      if (selectedPiece && selectedPiece2) {
+        swapPieces();
+        return;
+      }
+      
       if (selectedPiece && tappedPiece.id !== selectedPiece.id && tappedPiece.id !== selectedPiece2?.id) {
         const fullTappedPiece = boardPieces.find((p) => p.id === tappedPiece.id);
-        if (fullTappedPiece && fullTappedPiece.imageUri) {
+        if (fullTappedPiece?.imageUri) {
           setSelectedPiece2(fullTappedPiece);
         }
       }
       return;
     }
 
-    if (!selectedPiece) {
-      return;
-    }
+    if (!selectedPiece) return;
 
-    // Calculate initial drop position (free placement)
+    // Calculate initial drop position
     let newBoardX = Math.max(0, Math.min(locationX - (currentPieceWidth / 2), boardWidth - currentPieceWidth));
     let newBoardY = Math.max(0, Math.min(locationY - (currentPieceHeight / 2), boardHeight - currentPieceHeight));
 
-    // Snap to grid cell that piece covers the most
-    const rows = puzzleData ? puzzleData.rows : difficulty.rows;
-    const cols = puzzleData ? puzzleData.cols : difficulty.cols;
+    // Snap to grid cell with maximum overlap
+    const rows = puzzleData?.rows ?? difficulty.rows;
+    const cols = puzzleData?.cols ?? difficulty.cols;
+    const tolerance = 2;
     
-    // Calculate piece bounding box at drop location
-    const pieceLeft = newBoardX;
-    const pieceTop = newBoardY;
-    const pieceRight = pieceLeft + currentPieceWidth;
-    const pieceBottom = pieceTop + currentPieceHeight;
+    const isCellOccupied = (cellX, cellY) => {
+      return boardPieces.some((p) => {
+        if (p.id === selectedPiece.id) return false;
+        const pX = p.boardX || 0;
+        const pY = p.boardY || 0;
+        return !(cellX + currentPieceWidth <= pX + tolerance || 
+                 cellX >= pX + currentPieceWidth - tolerance ||
+                 cellY + currentPieceHeight <= pY + tolerance ||
+                 cellY >= pY + currentPieceHeight - tolerance);
+      });
+    };
     
-    // Find the grid cell with maximum overlap
-    let maxOverlapArea = 0;
-    let bestGridCell = null;
+    const calculateOverlap = (cellX, cellY) => {
+      const pieceRight = newBoardX + currentPieceWidth;
+      const pieceBottom = newBoardY + currentPieceHeight;
+      const cellRight = cellX + currentPieceWidth;
+      const cellBottom = cellY + currentPieceHeight;
+      
+      const overlapWidth = Math.max(0, Math.min(pieceRight, cellRight) - Math.max(newBoardX, cellX));
+      const overlapHeight = Math.max(0, Math.min(pieceBottom, cellBottom) - Math.max(newBoardY, cellY));
+      return overlapWidth * overlapHeight;
+    };
     
-    // Check all grid cells to find the one with most overlap
+    // Find best grid cell
+    let bestCell = null;
+    let maxOverlap = 0;
+    
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         const cellX = col * currentPieceWidth;
         const cellY = row * currentPieceHeight;
-        const cellLeft = cellX;
-        const cellTop = cellY;
-        const cellRight = cellLeft + currentPieceWidth;
-        const cellBottom = cellTop + currentPieceHeight;
         
-        // Calculate overlap area (intersection of piece and grid cell)
-        const overlapLeft = Math.max(pieceLeft, cellLeft);
-        const overlapTop = Math.max(pieceTop, cellTop);
-        const overlapRight = Math.min(pieceRight, cellRight);
-        const overlapBottom = Math.min(pieceBottom, cellBottom);
-        
-        // Calculate overlap area
-        const overlapWidth = Math.max(0, overlapRight - overlapLeft);
-        const overlapHeight = Math.max(0, overlapBottom - overlapTop);
-        const overlapArea = overlapWidth * overlapHeight;
-        
-        // Track the grid cell with maximum overlap
-        if (overlapArea > maxOverlapArea) {
-          maxOverlapArea = overlapArea;
-          bestGridCell = { x: cellX, y: cellY, col, row };
+        if (!isCellOccupied(cellX, cellY)) {
+          const overlap = calculateOverlap(cellX, cellY);
+          if (overlap > maxOverlap) {
+            maxOverlap = overlap;
+            bestCell = { x: cellX, y: cellY };
+          }
         }
       }
     }
     
-    // If we found a grid cell with overlap, snap to it
-    if (bestGridCell && maxOverlapArea > 0) {
-      // Check if this grid cell is available (not occupied by another piece)
-      const isGridCellOccupied = boardPieces.some((p) => {
-        if (p.id === selectedPiece.id) return false; // Don't check against self
-        const pX = p.boardX || 0;
-        const pY = p.boardY || 0;
-        // Check if positions overlap (with small tolerance for grid alignment)
-        const tolerance = 2;
-        return !(bestGridCell.x + currentPieceWidth <= pX + tolerance || 
-                 bestGridCell.x >= pX + currentPieceWidth - tolerance ||
-                 bestGridCell.y + currentPieceHeight <= pY + tolerance ||
-                 bestGridCell.y >= pY + currentPieceHeight - tolerance);
-      });
-      
-      if (!isGridCellOccupied) {
-        // Snap to the grid cell with most overlap
-        newBoardX = bestGridCell.x;
-        newBoardY = bestGridCell.y;
-      } else {
-        // Best cell is occupied - find nearest available cell with overlap
-        let bestAvailableCell = null;
-        let bestAvailableOverlap = 0;
-        
-        // Check all available grid cells and find the one with most overlap
-        for (let row = 0; row < rows; row++) {
-          for (let col = 0; col < cols; col++) {
-            const cellX = col * currentPieceWidth;
-            const cellY = row * currentPieceHeight;
-            
-            // Check if this cell is occupied
-            const isOccupied = boardPieces.some((p) => {
-              if (p.id === selectedPiece.id) return false;
-              const pX = p.boardX || 0;
-              const pY = p.boardY || 0;
-              const tolerance = 2;
-              return !(cellX + currentPieceWidth <= pX + tolerance || 
-                       cellX >= pX + currentPieceWidth - tolerance ||
-                       cellY + currentPieceHeight <= pY + tolerance ||
-                       cellY >= pY + currentPieceHeight - tolerance);
-            });
-            
-            if (!isOccupied) {
-              // Calculate overlap with this cell
-              const cellLeft = cellX;
-              const cellTop = cellY;
-              const cellRight = cellLeft + currentPieceWidth;
-              const cellBottom = cellTop + currentPieceHeight;
-              
-              const overlapLeft = Math.max(pieceLeft, cellLeft);
-              const overlapTop = Math.max(pieceTop, cellTop);
-              const overlapRight = Math.min(pieceRight, cellRight);
-              const overlapBottom = Math.min(pieceBottom, cellBottom);
-              
-              const overlapWidth = Math.max(0, overlapRight - overlapLeft);
-              const overlapHeight = Math.max(0, overlapBottom - overlapTop);
-              const overlapArea = overlapWidth * overlapHeight;
-              
-              if (overlapArea > bestAvailableOverlap) {
-                bestAvailableOverlap = overlapArea;
-                bestAvailableCell = { x: cellX, y: cellY };
-              }
-            }
-          }
-        }
-        
-        // Snap to best available cell if found
-        if (bestAvailableCell && bestAvailableOverlap > 0) {
-          newBoardX = bestAvailableCell.x;
-          newBoardY = bestAvailableCell.y;
-        }
-      }
+    if (bestCell && maxOverlap > 0) {
+      newBoardX = bestCell.x;
+      newBoardY = bestCell.y;
     }
 
     const isPieceOnBoard = boardPieces.some((p) => p.id === selectedPiece.id);
 
     if (isPieceOnBoard) {
-      setBoardPieces((prev) => {
-        const pieceToMove = prev.find((p) => p.id === selectedPiece.id);
-        
-        if (!pieceToMove || !pieceToMove.imageUri) {
-          return prev;
-        }
-        
-        return prev.map((piece) => {
-          if (piece.id === selectedPiece.id) {
-            return {
-              ...pieceToMove,
-              boardX: newBoardX,
-              boardY: newBoardY,
-            };
-          }
-          return piece;
-        });
-      });
+      setBoardPieces((prev) => prev.map((p) => 
+        p.id === selectedPiece.id ? { ...p, boardX: newBoardX, boardY: newBoardY } : p
+      ));
     } else {
-      if (!selectedPiece || !selectedPiece.imageUri) {
-        return;
-      }
+      if (!selectedPiece?.imageUri) return;
       
-      setBoardPieces((prev) => [...prev, {
-        ...selectedPiece,
-        boardX: newBoardX,
-        boardY: newBoardY,
-      }]);
-
+      setBoardPieces((prev) => [...prev, { ...selectedPiece, boardX: newBoardX, boardY: newBoardY }]);
       setHolderPieces((prev) => prev.filter((p) => p.id !== selectedPiece.id));
     }
 
@@ -490,25 +361,19 @@ export default function App() {
   };
 
   const handleHolderTap = () => {
-    if (!selectedPiece) {
-      return;
-    }
+    if (!selectedPiece) return;
 
     const isPieceOnBoard = boardPieces.some((p) => p.id === selectedPiece.id);
+    if (!isPieceOnBoard) return;
     
-    if (isPieceOnBoard) {
-      setBoardPieces((prev) => prev.filter((p) => p.id !== selectedPiece.id));
-      setHolderPieces((prev) => {
-        const alreadyInHolder = prev.some((p) => p.id === selectedPiece.id);
-        if (alreadyInHolder) {
-          return prev;
-        }
-        return [...prev, { ...selectedPiece }].sort((a, b) => {
-          if (a.row !== b.row) return a.row - b.row;
-          return a.col - b.col;
-        });
-      });
-    }
+    setBoardPieces((prev) => prev.filter((p) => p.id !== selectedPiece.id));
+    setHolderPieces((prev) => {
+      if (prev.some((p) => p.id === selectedPiece.id)) return prev;
+      
+      const { boardX, boardY, ...pieceWithoutPosition } = selectedPiece;
+      const allPieces = [...prev, pieceWithoutPosition];
+      return restoreHolderOrder(allPieces);
+    });
     
     setSelectedPiece(null);
     setSelectedPiece2(null);
@@ -517,49 +382,29 @@ export default function App() {
   const handleHint = () => {
     if (!puzzleData) return;
     
-    // Calculate piece dimensions to perfectly match grid cells
-    const currentPieceWidth = boardWidth / puzzleData.cols;
-    const currentPieceHeight = boardHeight / puzzleData.rows;
-    
-    // Check for unlocked pieces on the board
+    const { width: pieceWidth, height: pieceHeight } = getPieceDimensions();
     const unlockedPieces = boardPieces.filter((piece) => !isPieceLocked(piece));
     
     if (unlockedPieces.length > 0) {
-      // Move one unlocked piece to its correct position
       const pieceToHint = unlockedPieces[0];
-      const correctRow = pieceToHint.correctRow !== undefined ? pieceToHint.correctRow : pieceToHint.row;
-      const correctCol = pieceToHint.correctCol !== undefined ? pieceToHint.correctCol : pieceToHint.col;
+      const correctRow = pieceToHint.correctRow ?? pieceToHint.row;
+      const correctCol = pieceToHint.correctCol ?? pieceToHint.col;
       
-      const correctBoardX = correctCol * currentPieceWidth;
-      const correctBoardY = correctRow * currentPieceHeight;
-      
-      setBoardPieces((prev) => {
-        return prev.map((piece) => {
-          if (piece.id === pieceToHint.id) {
-            return {
-              ...piece,
-              boardX: correctBoardX,
-              boardY: correctBoardY,
-            };
-          }
-          return piece;
-        });
-      });
+      setBoardPieces((prev) => prev.map((piece) => 
+        piece.id === pieceToHint.id
+          ? { ...piece, boardX: correctCol * pieceWidth, boardY: correctRow * pieceHeight }
+          : piece
+      ));
     } else if (holderPieces.length > 0) {
-      // Move one piece from holder to its correct position on the board
       const pieceToHint = holderPieces[0];
-      const correctRow = pieceToHint.correctRow !== undefined ? pieceToHint.correctRow : pieceToHint.row;
-      const correctCol = pieceToHint.correctCol !== undefined ? pieceToHint.correctCol : pieceToHint.col;
+      const correctRow = pieceToHint.correctRow ?? pieceToHint.row;
+      const correctCol = pieceToHint.correctCol ?? pieceToHint.col;
       
-      const correctBoardX = correctCol * currentPieceWidth;
-      const correctBoardY = correctRow * currentPieceHeight;
-      
-      // Remove from holder and add to board
       setHolderPieces((prev) => prev.filter((p) => p.id !== pieceToHint.id));
       setBoardPieces((prev) => [...prev, {
         ...pieceToHint,
-        boardX: correctBoardX,
-        boardY: correctBoardY,
+        boardX: correctCol * pieceWidth,
+        boardY: correctRow * pieceHeight,
       }]);
     }
     
@@ -569,30 +414,9 @@ export default function App() {
   };
 
   const handleReset = () => {
-    // Move all pieces from board back to holder
-    setBoardPieces((prev) => {
-      // Prepare pieces to move (remove boardX and boardY)
-      const piecesToMove = prev.map((piece) => {
-        const { boardX, boardY, ...pieceWithoutPosition } = piece;
-        return pieceWithoutPosition;
-      });
-      
-      // Update holder pieces
-      setHolderPieces((currentHolder) => {
-        const newHolderPieces = [...currentHolder];
-        const existingIds = new Set(newHolderPieces.map((p) => p.id));
-        
-        piecesToMove.forEach((piece) => {
-          if (!existingIds.has(piece.id)) {
-            newHolderPieces.push(piece);
-          }
-        });
-        
-        // Shuffle pieces in holder
-        return shuffleArray(newHolderPieces);
-      });
-      
-      // Clear board
+    setBoardPieces((prevBoardPieces) => {
+      const allPieces = [...holderPieces, ...prevBoardPieces];
+      setHolderPieces(restoreHolderOrder(allPieces));
       return [];
     });
     
@@ -603,32 +427,16 @@ export default function App() {
     setScrollResetKey((prev) => prev + 1);
   };
 
-  const handleBoardLayout = (layout) => {
-    boardLayoutRef.current = layout;
-  };
-
   const headerHeight = 100;
   const holderHeight = 150;
   const actionButtonsHeight = 70;
-  const equalSpacing = 16; // Even spacing between all elements
+  const equalSpacing = 16;
   
   const availableHeight = SCREEN_HEIGHT - headerHeight - holderHeight - actionButtonsHeight - (equalSpacing * 3);
   const boardWidth = SCREEN_WIDTH - 40;
   const boardHeight = Math.max(availableHeight * 0.9, boardWidth * 0.8);
   
-  // Calculate piece dimensions to perfectly fill the board grid
-  // Grid cells must exactly divide the board dimensions
-  let pieceWidth = 0;
-  let pieceHeight = 0;
-  
-  if (puzzleData) {
-    // Calculate exact grid cell dimensions that perfectly divide the board
-    pieceWidth = boardWidth / puzzleData.cols;
-    pieceHeight = boardHeight / puzzleData.rows;
-  } else {
-    pieceWidth = boardWidth / difficulty.cols;
-    pieceHeight = boardHeight / difficulty.rows;
-  }
+  const { width: pieceWidth, height: pieceHeight } = getPieceDimensions();
 
   return (
     <GestureHandlerRootView style={styles.container}>
@@ -672,7 +480,6 @@ export default function App() {
               <GameBoard
                 boardWidth={boardWidth}
                 boardHeight={boardHeight}
-                onLayout={handleBoardLayout}
                 boardPieces={boardPieces}
                 pieceWidth={pieceWidth}
                 pieceHeight={pieceHeight}
@@ -680,8 +487,8 @@ export default function App() {
                 selectedPieceId2={selectedPiece2?.id}
                 onTap={handleBoardTap}
                 onPieceSelect={handlePieceSelect}
-                rows={puzzleData ? puzzleData.rows : difficulty.rows}
-                cols={puzzleData ? puzzleData.cols : difficulty.cols}
+                rows={puzzleData?.rows ?? difficulty.rows}
+                cols={puzzleData?.cols ?? difficulty.cols}
               />
             </View>
 
