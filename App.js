@@ -55,7 +55,7 @@ export default function App() {
 
   const requestPermissions = async () => {
     const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
+
     if (libraryStatus !== 'granted') {
       Alert.alert(
         'Permissions Required',
@@ -91,7 +91,7 @@ export default function App() {
   const handleDifficultySelected = async (selectedDifficulty) => {
     setDifficulty(selectedDifficulty);
     setShowDifficultyModal(false);
-    
+
     const imageUri = await pickImageFromGallery();
     if (!imageUri) {
       return;
@@ -131,15 +131,20 @@ export default function App() {
   const handleBackButton = resetGameState;
 
   const getPieceDimensions = (actualBoardWidth, actualBoardHeight) => {
+    // Subtract board border from dimensions since border is included in the board's width/height
+    // This gives us the actual content area where pieces need to fit
+    const contentWidth = actualBoardWidth - (2 * BOARD_BORDER_WIDTH);
+    const contentHeight = actualBoardHeight - (2 * BOARD_BORDER_WIDTH);
+    
     if (!puzzleData) {
-      return { 
-        width: actualBoardWidth / difficulty.cols, 
-        height: actualBoardHeight / difficulty.rows 
+      return {
+        width: contentWidth / difficulty.cols,
+        height: contentHeight / difficulty.rows
       };
     }
-    return { 
-      width: actualBoardWidth / puzzleData.cols, 
-      height: actualBoardHeight / puzzleData.rows 
+    return {
+      width: contentWidth / puzzleData.cols,
+      height: contentHeight / puzzleData.rows
     };
   };
 
@@ -148,16 +153,17 @@ export default function App() {
   const ACTION_BUTTONS_HEIGHT = 70;
   const EQUAL_SPACING = 16;
   const HORIZONTAL_PADDING = 40;
+  const BOARD_BORDER_WIDTH = 2; // Must match borderWidth in GameBoard styles
 
   const getBoardDimensions = () => {
     const availableHeight = SCREEN_HEIGHT - HEADER_HEIGHT - HOLDER_HEIGHT - ACTION_BUTTONS_HEIGHT - (EQUAL_SPACING * 3);
     const maxBoardWidth = SCREEN_WIDTH - HORIZONTAL_PADDING;
     const maxBoardHeight = Math.max(availableHeight * 0.9, maxBoardWidth * 0.8);
-    
+
     if (!puzzleData) {
       return { width: maxBoardWidth, height: maxBoardHeight };
     }
-    
+
     const calculatedPieceWidth = Math.floor(maxBoardWidth / puzzleData.cols);
     const calculatedPieceHeight = Math.floor(maxBoardHeight / puzzleData.rows);
     return {
@@ -168,44 +174,44 @@ export default function App() {
 
   const isPieceLocked = (piece) => {
     if (!piece || !puzzleData) return false;
-    
+
     const pieceOnBoard = boardPieces.find((p) => p.id === piece.id);
     if (!pieceOnBoard) return false;
-    
+
     const correctRow = piece.correctRow ?? piece.row;
     const correctCol = piece.correctCol ?? piece.col;
     if (correctRow === undefined || correctCol === undefined) return false;
-    
+
     const { width: boardW, height: boardH } = getBoardDimensions();
     const { width: pieceWidth, height: pieceHeight } = getPieceDimensions(boardW, boardH);
     const POSITION_TOLERANCE = 2;
     const isCorrectCol = Math.abs((pieceOnBoard.boardX || 0) - (correctCol * pieceWidth)) <= POSITION_TOLERANCE;
     const isCorrectRow = Math.abs((pieceOnBoard.boardY || 0) - (correctRow * pieceHeight)) <= POSITION_TOLERANCE;
-    
+
     return isCorrectCol && isCorrectRow;
   };
 
   const swapPieces = (piece1 = selectedPiece, piece2 = selectedPiece2) => {
     if (!piece1 || !piece2) return;
     if (isPieceLocked(piece1) || isPieceLocked(piece2)) return;
-    
-    const isBothOnBoard = boardPieces.some((p) => p.id === piece1.id) && 
-                         boardPieces.some((p) => p.id === piece2.id);
+
+    const isBothOnBoard = boardPieces.some((p) => p.id === piece1.id) &&
+      boardPieces.some((p) => p.id === piece2.id);
     if (!isBothOnBoard) return;
-    
+
     setBoardPieces((prev) => {
       const p1 = prev.find((p) => p.id === piece1.id);
       const p2 = prev.find((p) => p.id === piece2.id);
-      
+
       if (!p1 || !p2 || !p1.imageUri || !p2.imageUri) return prev;
-      
+
       return prev.map((piece) => {
         if (piece.id === piece1.id) return { ...p1, boardX: p2.boardX, boardY: p2.boardY };
         if (piece.id === piece2.id) return { ...p2, boardX: p1.boardX, boardY: p1.boardY };
         return piece;
       });
     });
-    
+
     setSelectedPiece(null);
     setSelectedPiece2(null);
     setMoveCount((prev) => prev + 1);
@@ -213,17 +219,17 @@ export default function App() {
 
   const handlePieceSelect = (piece) => {
     if (!piece) return;
-    
-    const fullPiece = boardPieces.find((p) => p.id === piece.id) || 
-                      holderPieces.find((p) => p.id === piece.id) || 
-                      piece;
-    
+
+    const fullPiece = boardPieces.find((p) => p.id === piece.id) ||
+      holderPieces.find((p) => p.id === piece.id) ||
+      piece;
+
     if (!fullPiece?.imageUri || isPieceLocked(fullPiece)) return;
-    
+
     const isPieceFromBoard = boardPieces.some((p) => p.id === fullPiece.id);
     const isSelectedFromBoard = selectedPiece ? boardPieces.some((p) => p.id === selectedPiece.id) : false;
     const isSelectedFromHolder = selectedPiece ? holderPieces.some((p) => p.id === selectedPiece.id) : false;
-    
+
     // Rule 1: If selected piece is from holder, cannot select another piece
     if (isSelectedFromHolder) {
       if (fullPiece.id === selectedPiece.id) {
@@ -232,22 +238,22 @@ export default function App() {
       }
       return;
     }
-    
+
     // Rule 2: If selected piece is from board, can only select another board piece
     if (isSelectedFromBoard && !isPieceFromBoard) return;
-    
+
     // Handle deselection
     if (fullPiece.id === selectedPiece?.id) {
       setSelectedPiece(null);
       setSelectedPiece2(null);
       return;
     }
-    
+
     if (fullPiece.id === selectedPiece2?.id) {
       setSelectedPiece2(null);
       return;
     }
-    
+
     // Handle selection
     if (!selectedPiece) {
       setSelectedPiece(fullPiece);
@@ -280,14 +286,14 @@ export default function App() {
     const { locationX, locationY } = event.nativeEvent;
     const { width: boardW, height: boardH } = getBoardDimensions();
     const { width: pieceWidth, height: pieceHeight } = getPieceDimensions(boardW, boardH);
-    
+
     const tappedPiece = boardPieces.find((piece) => {
       const pieceX = piece.boardX || 0;
       const pieceY = piece.boardY || 0;
       return locationX >= pieceX && locationX <= pieceX + pieceWidth &&
-             locationY >= pieceY && locationY <= pieceY + pieceHeight;
+        locationY >= pieceY && locationY <= pieceY + pieceHeight;
     });
-    
+
     if (tappedPiece) {
       if (isPieceLocked(tappedPiece)) {
         if (selectedPiece || selectedPiece2) {
@@ -296,12 +302,12 @@ export default function App() {
         }
         return;
       }
-      
+
       if (selectedPiece && selectedPiece2) {
         swapPieces();
         return;
       }
-      
+
       if (selectedPiece && tappedPiece.id !== selectedPiece.id && tappedPiece.id !== selectedPiece2?.id) {
         const fullTappedPiece = boardPieces.find((p) => p.id === tappedPiece.id);
         if (fullTappedPiece?.imageUri) {
@@ -319,38 +325,38 @@ export default function App() {
     const rows = puzzleData?.rows ?? difficulty.rows;
     const cols = puzzleData?.cols ?? difficulty.cols;
     const POSITION_TOLERANCE = 2;
-    
+
     const isCellOccupied = (cellX, cellY) => {
       return boardPieces.some((p) => {
         if (p.id === selectedPiece.id) return false;
         const pX = p.boardX || 0;
         const pY = p.boardY || 0;
-        return !(cellX + pieceWidth <= pX + POSITION_TOLERANCE || 
-                 cellX >= pX + pieceWidth - POSITION_TOLERANCE ||
-                 cellY + pieceHeight <= pY + POSITION_TOLERANCE ||
-                 cellY >= pY + pieceHeight - POSITION_TOLERANCE);
+        return !(cellX + pieceWidth <= pX + POSITION_TOLERANCE ||
+          cellX >= pX + pieceWidth - POSITION_TOLERANCE ||
+          cellY + pieceHeight <= pY + POSITION_TOLERANCE ||
+          cellY >= pY + pieceHeight - POSITION_TOLERANCE);
       });
     };
-    
+
     const calculateOverlap = (cellX, cellY) => {
       const pieceRight = newBoardX + pieceWidth;
       const pieceBottom = newBoardY + pieceHeight;
       const cellRight = cellX + pieceWidth;
       const cellBottom = cellY + pieceHeight;
-      
+
       const overlapWidth = Math.max(0, Math.min(pieceRight, cellRight) - Math.max(newBoardX, cellX));
       const overlapHeight = Math.max(0, Math.min(pieceBottom, cellBottom) - Math.max(newBoardY, cellY));
       return overlapWidth * overlapHeight;
     };
-    
+
     let bestCell = null;
     let maxOverlap = 0;
-    
+
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         const cellX = col * pieceWidth;
         const cellY = row * pieceHeight;
-        
+
         if (!isCellOccupied(cellX, cellY)) {
           const overlap = calculateOverlap(cellX, cellY);
           if (overlap > maxOverlap) {
@@ -360,7 +366,7 @@ export default function App() {
         }
       }
     }
-    
+
     if (bestCell && maxOverlap > 0) {
       newBoardX = bestCell.x;
       newBoardY = bestCell.y;
@@ -369,12 +375,12 @@ export default function App() {
     const isPieceOnBoard = boardPieces.some((p) => p.id === selectedPiece.id);
 
     if (isPieceOnBoard) {
-      setBoardPieces((prev) => prev.map((p) => 
+      setBoardPieces((prev) => prev.map((p) =>
         p.id === selectedPiece.id ? { ...p, boardX: newBoardX, boardY: newBoardY } : p
       ));
     } else {
       if (!selectedPiece?.imageUri) return;
-      
+
       setBoardPieces((prev) => [...prev, { ...selectedPiece, boardX: newBoardX, boardY: newBoardY }]);
       setHolderPieces((prev) => prev.filter((p) => p.id !== selectedPiece.id));
     }
@@ -396,33 +402,33 @@ export default function App() {
 
     const isPieceOnBoard = boardPieces.some((p) => p.id === selectedPiece.id);
     if (!isPieceOnBoard) return;
-    
+
     setBoardPieces((prev) => prev.filter((p) => p.id !== selectedPiece.id));
     setHolderPieces((prev) => {
       if (prev.some((p) => p.id === selectedPiece.id)) return prev;
-      
+
       const { boardX, boardY, ...pieceWithoutPosition } = selectedPiece;
       const allPieces = [...prev, pieceWithoutPosition];
       return restoreHolderOrder(allPieces);
     });
-    
+
     setSelectedPiece(null);
     setSelectedPiece2(null);
   };
 
   const handleHint = () => {
     if (!puzzleData) return;
-    
+
     const { width: boardW, height: boardH } = getBoardDimensions();
     const { width: pieceWidth, height: pieceHeight } = getPieceDimensions(boardW, boardH);
     const unlockedPieces = boardPieces.filter((piece) => !isPieceLocked(piece));
-    
+
     if (unlockedPieces.length > 0) {
       const pieceToHint = unlockedPieces[0];
       const correctRow = pieceToHint.correctRow ?? pieceToHint.row;
       const correctCol = pieceToHint.correctCol ?? pieceToHint.col;
-      
-      setBoardPieces((prev) => prev.map((piece) => 
+
+      setBoardPieces((prev) => prev.map((piece) =>
         piece.id === pieceToHint.id
           ? { ...piece, boardX: correctCol * pieceWidth, boardY: correctRow * pieceHeight }
           : piece
@@ -431,7 +437,7 @@ export default function App() {
       const pieceToHint = holderPieces[0];
       const correctRow = pieceToHint.correctRow ?? pieceToHint.row;
       const correctCol = pieceToHint.correctCol ?? pieceToHint.col;
-      
+
       setHolderPieces((prev) => prev.filter((p) => p.id !== pieceToHint.id));
       setBoardPieces((prev) => [...prev, {
         ...pieceToHint,
@@ -439,7 +445,7 @@ export default function App() {
         boardY: correctRow * pieceHeight,
       }]);
     }
-    
+
     setSelectedPiece(null);
     setSelectedPiece2(null);
     setMoveCount((prev) => prev + 1);
@@ -451,7 +457,7 @@ export default function App() {
       setHolderPieces(restoreHolderOrder(allPieces));
       return [];
     });
-    
+
     setSelectedPiece(null);
     setSelectedPiece2(null);
     setMoveCount(0);
@@ -482,70 +488,70 @@ export default function App() {
         ) : (
           <TouchableWithoutFeedback onPress={handleOutsideTap}>
             <View style={styles.gameScreen}>
-            {isGeneratingPuzzle && (
-              <View style={styles.loadingOverlay}>
-                <Text style={styles.loadingText}>Generating puzzle...</Text>
+              {isGeneratingPuzzle && (
+                <View style={styles.loadingOverlay}>
+                  <Text style={styles.loadingText}>Generating puzzle...</Text>
+                </View>
+              )}
+
+              <View style={styles.headerSection}>
+                <TouchableOpacity
+                  style={styles.backButton}
+                  onPress={handleBackButton}
+                >
+                  <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+                </TouchableOpacity>
+                <GameStats timer={timer} moveCount={moveCount} />
               </View>
-            )}
-            
-            <View style={styles.headerSection}>
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={handleBackButton}
-              >
-                <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-              </TouchableOpacity>
-              <GameStats timer={timer} moveCount={moveCount} />
-            </View>
 
-            <View style={styles.gameContainer}>
-              <GameBoard
-                boardWidth={boardWidth}
-                boardHeight={boardHeight}
-                boardPieces={boardPieces}
-                pieceWidth={pieceWidth}
-                pieceHeight={pieceHeight}
-                selectedPieceId={selectedPiece?.id}
-                selectedPieceId2={selectedPiece2?.id}
-                onTap={handleBoardTap}
-                onPieceSelect={handlePieceSelect}
-                rows={puzzleData?.rows ?? difficulty.rows}
-                cols={puzzleData?.cols ?? difficulty.cols}
-              />
-            </View>
-
-            {puzzleData && (
-              <View style={{ marginBottom: 16 }}>
-                <PuzzlePieceHolder 
+              <View style={styles.gameContainer}>
+                <GameBoard
                   boardWidth={boardWidth}
-                  pieces={holderPieces}
+                  boardHeight={boardHeight}
+                  boardPieces={boardPieces}
                   pieceWidth={pieceWidth}
                   pieceHeight={pieceHeight}
                   selectedPieceId={selectedPiece?.id}
                   selectedPieceId2={selectedPiece2?.id}
+                  onTap={handleBoardTap}
                   onPieceSelect={handlePieceSelect}
-                  onHolderTap={handleHolderTap}
-                  resetScrollKey={scrollResetKey}
+                  rows={puzzleData?.rows ?? difficulty.rows}
+                  cols={puzzleData?.cols ?? difficulty.cols}
                 />
               </View>
-            )}
 
-            <View style={styles.actionButtonsContainer}>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={handleHint}
-              >
-                <Ionicons name="bulb" size={18} color={COLORS.buttonText} />
-                <Text style={styles.actionButtonText}>Hint</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={handleReset}
-              >
-                <Ionicons name="refresh" size={18} color={COLORS.buttonText} />
-                <Text style={styles.actionButtonText}>Reset</Text>
-              </TouchableOpacity>
-            </View>
+              {puzzleData && (
+                <View style={{ marginBottom: 16 }}>
+                  <PuzzlePieceHolder
+                    boardWidth={boardWidth}
+                    pieces={holderPieces}
+                    pieceWidth={pieceWidth}
+                    pieceHeight={pieceHeight}
+                    selectedPieceId={selectedPiece?.id}
+                    selectedPieceId2={selectedPiece2?.id}
+                    onPieceSelect={handlePieceSelect}
+                    onHolderTap={handleHolderTap}
+                    resetScrollKey={scrollResetKey}
+                  />
+                </View>
+              )}
+
+              <View style={styles.actionButtonsContainer}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={handleHint}
+                >
+                  <Ionicons name="bulb" size={18} color={COLORS.buttonText} />
+                  <Text style={styles.actionButtonText}>Hint</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={handleReset}
+                >
+                  <Ionicons name="refresh" size={18} color={COLORS.buttonText} />
+                  <Text style={styles.actionButtonText}>Reset</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </TouchableWithoutFeedback>
         )}

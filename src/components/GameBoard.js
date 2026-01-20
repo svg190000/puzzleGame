@@ -7,25 +7,29 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
 
   const isPieceInCorrectPosition = (piece) => {
     if (!piece || pieceWidth === 0 || pieceHeight === 0) return false;
-    
+
     const correctRow = piece.correctRow ?? piece.row;
     const correctCol = piece.correctCol ?? piece.col;
-    
+
     if (correctRow === undefined || correctCol === undefined) return false;
-    
+
     const isCorrectCol = Math.abs((piece.boardX || 0) - (correctCol * pieceWidth)) <= POSITION_TOLERANCE;
     const isCorrectRow = Math.abs((piece.boardY || 0) - (correctRow * pieceHeight)) <= POSITION_TOLERANCE;
-    
+
     return isCorrectCol && isCorrectRow;
   };
 
   const renderGrid = () => {
     if (rows === 0 || cols === 0 || pieceWidth === 0 || pieceHeight === 0) return null;
-    
+
     const gridLines = [];
-    
-    // Vertical lines
-    for (let col = 0; col <= cols; col++) {
+
+    // Calculate the actual grid dimensions (excluding outer border lines)
+    const gridWidth = cols * pieceWidth;
+    const gridHeight = rows * pieceHeight;
+
+    // Only draw interior vertical lines (skip first and last)
+    for (let col = 1; col < cols; col++) {
       const x = col * pieceWidth;
       gridLines.push(
         <View
@@ -36,15 +40,15 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
               left: x,
               top: 0,
               width: 1,
-              height: boardHeight,
+              height: gridHeight,
             }
           ]}
         />
       );
     }
-    
-    // Horizontal lines
-    for (let row = 0; row <= rows; row++) {
+
+    // Only draw interior horizontal lines (skip first and last)
+    for (let row = 1; row < rows; row++) {
       const y = row * pieceHeight;
       gridLines.push(
         <View
@@ -54,14 +58,14 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
             {
               left: 0,
               top: y,
-              width: boardWidth,
+              width: gridWidth,
               height: 1,
             }
           ]}
         />
       );
     }
-    
+
     return gridLines;
   };
 
@@ -82,21 +86,21 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
         if (!piece || !piece.imageUri) {
           return null;
         }
-        
+
         const isLocked = isPieceInCorrectPosition(piece);
         const isSelected = !isLocked && selectedPieceId === piece.id;
         const isSelected2 = !isLocked && selectedPieceId2 === piece.id;
         const isHighlighted = isSelected || isSelected2;
-        
+
         // Always reserve 3px border space to prevent layout shifts
         const borderStyle = isLocked
           ? { borderWidth: 3, borderColor: COLORS.success }
-          : isSelected 
-          ? { borderWidth: 3, borderColor: COLORS.accent }
-          : isSelected2 
-          ? { borderWidth: 3, borderColor: COLORS.pastelGreen }
-          : { borderWidth: 3, borderColor: 'transparent' };
-        
+          : isSelected
+            ? { borderWidth: 3, borderColor: COLORS.accent }
+            : isSelected2
+              ? { borderWidth: 3, borderColor: COLORS.pastelGreen }
+              : { borderWidth: 3, borderColor: 'transparent' };
+
         if (isLocked) {
           return (
             <TouchableWithoutFeedback
@@ -128,7 +132,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
             </TouchableWithoutFeedback>
           );
         }
-        
+
         return (
           <TouchableOpacity
             key={`${piece.id}-${piece.boardX}-${piece.boardY}`}
