@@ -116,7 +116,7 @@ export default function App() {
     }
   };
 
-  const handleBackButton = () => {
+  const resetGameState = () => {
     setShowGameScreen(false);
     setTimer(0);
     setMoveCount(0);
@@ -128,9 +128,42 @@ export default function App() {
     originalHolderOrderRef.current = [];
   };
 
-  const getPieceDimensions = () => {
-    if (!puzzleData) return { width: boardWidth / difficulty.cols, height: boardHeight / difficulty.rows };
-    return { width: boardWidth / puzzleData.cols, height: boardHeight / puzzleData.rows };
+  const handleBackButton = resetGameState;
+
+  const getPieceDimensions = (actualBoardWidth, actualBoardHeight) => {
+    if (!puzzleData) {
+      return { 
+        width: actualBoardWidth / difficulty.cols, 
+        height: actualBoardHeight / difficulty.rows 
+      };
+    }
+    return { 
+      width: actualBoardWidth / puzzleData.cols, 
+      height: actualBoardHeight / puzzleData.rows 
+    };
+  };
+
+  const HEADER_HEIGHT = 100;
+  const HOLDER_HEIGHT = 150;
+  const ACTION_BUTTONS_HEIGHT = 70;
+  const EQUAL_SPACING = 16;
+  const HORIZONTAL_PADDING = 40;
+
+  const getBoardDimensions = () => {
+    const availableHeight = SCREEN_HEIGHT - HEADER_HEIGHT - HOLDER_HEIGHT - ACTION_BUTTONS_HEIGHT - (EQUAL_SPACING * 3);
+    const maxBoardWidth = SCREEN_WIDTH - HORIZONTAL_PADDING;
+    const maxBoardHeight = Math.max(availableHeight * 0.9, maxBoardWidth * 0.8);
+    
+    if (!puzzleData) {
+      return { width: maxBoardWidth, height: maxBoardHeight };
+    }
+    
+    const calculatedPieceWidth = Math.floor(maxBoardWidth / puzzleData.cols);
+    const calculatedPieceHeight = Math.floor(maxBoardHeight / puzzleData.rows);
+    return {
+      width: calculatedPieceWidth * puzzleData.cols,
+      height: calculatedPieceHeight * puzzleData.rows
+    };
   };
 
   const isPieceLocked = (piece) => {
@@ -143,10 +176,11 @@ export default function App() {
     const correctCol = piece.correctCol ?? piece.col;
     if (correctRow === undefined || correctCol === undefined) return false;
     
-    const { width: pieceWidth, height: pieceHeight } = getPieceDimensions();
-    const tolerance = 2;
-    const isCorrectCol = Math.abs((pieceOnBoard.boardX || 0) - (correctCol * pieceWidth)) <= tolerance;
-    const isCorrectRow = Math.abs((pieceOnBoard.boardY || 0) - (correctRow * pieceHeight)) <= tolerance;
+    const { width: boardW, height: boardH } = getBoardDimensions();
+    const { width: pieceWidth, height: pieceHeight } = getPieceDimensions(boardW, boardH);
+    const POSITION_TOLERANCE = 2;
+    const isCorrectCol = Math.abs((pieceOnBoard.boardX || 0) - (correctCol * pieceWidth)) <= POSITION_TOLERANCE;
+    const isCorrectRow = Math.abs((pieceOnBoard.boardY || 0) - (correctRow * pieceHeight)) <= POSITION_TOLERANCE;
     
     return isCorrectCol && isCorrectRow;
   };
@@ -244,14 +278,14 @@ export default function App() {
 
   const handleBoardTap = (event) => {
     const { locationX, locationY } = event.nativeEvent;
-    const { width: currentPieceWidth, height: currentPieceHeight } = getPieceDimensions();
+    const { width: boardW, height: boardH } = getBoardDimensions();
+    const { width: pieceWidth, height: pieceHeight } = getPieceDimensions(boardW, boardH);
     
-    // Check if tap is on a piece
     const tappedPiece = boardPieces.find((piece) => {
       const pieceX = piece.boardX || 0;
       const pieceY = piece.boardY || 0;
-      return locationX >= pieceX && locationX <= pieceX + currentPieceWidth &&
-             locationY >= pieceY && locationY <= pieceY + currentPieceHeight;
+      return locationX >= pieceX && locationX <= pieceX + pieceWidth &&
+             locationY >= pieceY && locationY <= pieceY + pieceHeight;
     });
     
     if (tappedPiece) {
@@ -279,46 +313,43 @@ export default function App() {
 
     if (!selectedPiece) return;
 
-    // Calculate initial drop position
-    let newBoardX = Math.max(0, Math.min(locationX - (currentPieceWidth / 2), boardWidth - currentPieceWidth));
-    let newBoardY = Math.max(0, Math.min(locationY - (currentPieceHeight / 2), boardHeight - currentPieceHeight));
+    let newBoardX = Math.max(0, Math.min(locationX - (pieceWidth / 2), boardW - pieceWidth));
+    let newBoardY = Math.max(0, Math.min(locationY - (pieceHeight / 2), boardH - pieceHeight));
 
-    // Snap to grid cell with maximum overlap
     const rows = puzzleData?.rows ?? difficulty.rows;
     const cols = puzzleData?.cols ?? difficulty.cols;
-    const tolerance = 2;
+    const POSITION_TOLERANCE = 2;
     
     const isCellOccupied = (cellX, cellY) => {
       return boardPieces.some((p) => {
         if (p.id === selectedPiece.id) return false;
         const pX = p.boardX || 0;
         const pY = p.boardY || 0;
-        return !(cellX + currentPieceWidth <= pX + tolerance || 
-                 cellX >= pX + currentPieceWidth - tolerance ||
-                 cellY + currentPieceHeight <= pY + tolerance ||
-                 cellY >= pY + currentPieceHeight - tolerance);
+        return !(cellX + pieceWidth <= pX + POSITION_TOLERANCE || 
+                 cellX >= pX + pieceWidth - POSITION_TOLERANCE ||
+                 cellY + pieceHeight <= pY + POSITION_TOLERANCE ||
+                 cellY >= pY + pieceHeight - POSITION_TOLERANCE);
       });
     };
     
     const calculateOverlap = (cellX, cellY) => {
-      const pieceRight = newBoardX + currentPieceWidth;
-      const pieceBottom = newBoardY + currentPieceHeight;
-      const cellRight = cellX + currentPieceWidth;
-      const cellBottom = cellY + currentPieceHeight;
+      const pieceRight = newBoardX + pieceWidth;
+      const pieceBottom = newBoardY + pieceHeight;
+      const cellRight = cellX + pieceWidth;
+      const cellBottom = cellY + pieceHeight;
       
       const overlapWidth = Math.max(0, Math.min(pieceRight, cellRight) - Math.max(newBoardX, cellX));
       const overlapHeight = Math.max(0, Math.min(pieceBottom, cellBottom) - Math.max(newBoardY, cellY));
       return overlapWidth * overlapHeight;
     };
     
-    // Find best grid cell
     let bestCell = null;
     let maxOverlap = 0;
     
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
-        const cellX = col * currentPieceWidth;
-        const cellY = row * currentPieceHeight;
+        const cellX = col * pieceWidth;
+        const cellY = row * pieceHeight;
         
         if (!isCellOccupied(cellX, cellY)) {
           const overlap = calculateOverlap(cellX, cellY);
@@ -382,7 +413,8 @@ export default function App() {
   const handleHint = () => {
     if (!puzzleData) return;
     
-    const { width: pieceWidth, height: pieceHeight } = getPieceDimensions();
+    const { width: boardW, height: boardH } = getBoardDimensions();
+    const { width: pieceWidth, height: pieceHeight } = getPieceDimensions(boardW, boardH);
     const unlockedPieces = boardPieces.filter((piece) => !isPieceLocked(piece));
     
     if (unlockedPieces.length > 0) {
@@ -427,16 +459,8 @@ export default function App() {
     setScrollResetKey((prev) => prev + 1);
   };
 
-  const headerHeight = 100;
-  const holderHeight = 150;
-  const actionButtonsHeight = 70;
-  const equalSpacing = 16;
-  
-  const availableHeight = SCREEN_HEIGHT - headerHeight - holderHeight - actionButtonsHeight - (equalSpacing * 3);
-  const boardWidth = SCREEN_WIDTH - 40;
-  const boardHeight = Math.max(availableHeight * 0.9, boardWidth * 0.8);
-  
-  const { width: pieceWidth, height: pieceHeight } = getPieceDimensions();
+  const { width: boardWidth, height: boardHeight } = getBoardDimensions();
+  const { width: pieceWidth, height: pieceHeight } = getPieceDimensions(boardWidth, boardHeight);
 
   return (
     <GestureHandlerRootView style={styles.container}>
@@ -471,9 +495,7 @@ export default function App() {
               >
                 <Ionicons name="arrow-back" size={24} color={COLORS.text} />
               </TouchableOpacity>
-              <View style={styles.statsContainer}>
-                <GameStats timer={timer} moveCount={moveCount} />
-              </View>
+              <GameStats timer={timer} moveCount={moveCount} />
             </View>
 
             <View style={styles.gameContainer}>
@@ -622,7 +644,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  statsContainer: {},
   gameContainer: {
     flex: 1,
     alignItems: 'center',

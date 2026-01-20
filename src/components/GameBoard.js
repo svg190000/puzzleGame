@@ -2,36 +2,23 @@ import React from 'react';
 import { View, StyleSheet, Image, TouchableOpacity, TouchableWithoutFeedback } from 'react-native';
 import { COLORS } from '../constants/colors';
 
-export const GameBoard = ({ boardWidth, boardHeight, onLayout, boardPieces = [], pieceWidth = 0, pieceHeight = 0, selectedPieceId, selectedPieceId2, onTap, onPieceSelect, rows = 0, cols = 0 }) => {
-  
-  // Check if a piece is in its correct position
+export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidth = 0, pieceHeight = 0, selectedPieceId, selectedPieceId2, onTap, onPieceSelect, rows = 0, cols = 0 }) => {
+  const POSITION_TOLERANCE = 2;
+
   const isPieceInCorrectPosition = (piece) => {
     if (!piece || pieceWidth === 0 || pieceHeight === 0) return false;
     
-    const correctRow = piece.correctRow !== undefined ? piece.correctRow : piece.row;
-    const correctCol = piece.correctCol !== undefined ? piece.correctCol : piece.col;
+    const correctRow = piece.correctRow ?? piece.row;
+    const correctCol = piece.correctCol ?? piece.col;
     
     if (correctRow === undefined || correctCol === undefined) return false;
     
-    // Calculate which grid cell the piece is currently in
-    const currentGridCol = Math.round((piece.boardX || 0) / pieceWidth);
-    const currentGridRow = Math.round((piece.boardY || 0) / pieceHeight);
-    
-    // Check if piece is in correct position (with small tolerance for grid alignment)
-    const tolerance = 2;
-    const isCorrectCol = Math.abs((piece.boardX || 0) - (correctCol * pieceWidth)) <= tolerance;
-    const isCorrectRow = Math.abs((piece.boardY || 0) - (correctRow * pieceHeight)) <= tolerance;
+    const isCorrectCol = Math.abs((piece.boardX || 0) - (correctCol * pieceWidth)) <= POSITION_TOLERANCE;
+    const isCorrectRow = Math.abs((piece.boardY || 0) - (correctRow * pieceHeight)) <= POSITION_TOLERANCE;
     
     return isCorrectCol && isCorrectRow;
   };
-  const handleLayout = (event) => {
-    const { x, y, width, height } = event.nativeEvent.layout;
-    if (onLayout) {
-      onLayout({ x, y, width, height });
-    }
-  };
 
-  // Generate grid lines for visual testing
   const renderGrid = () => {
     if (rows === 0 || cols === 0 || pieceWidth === 0 || pieceHeight === 0) return null;
     
@@ -89,7 +76,6 @@ export const GameBoard = ({ boardWidth, boardHeight, onLayout, boardPieces = [],
           height: boardHeight,
         }
       ]}
-      onLayout={handleLayout}
     >
       {renderGrid()}
       {boardPieces && boardPieces.map((piece) => {
