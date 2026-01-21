@@ -1,8 +1,54 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Text } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Text, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
 import { PuzzlePiece } from './PuzzlePiece';
+
+// Animated wrapper for pieces that were just returned to the holder
+const AnimatedHolderPiece = ({ piece, pieceWidth, pieceHeight, isSelected, isSelected2, onPieceSelect, isNewlyReturned }) => {
+  const wasNewlyReturnedOnMount = useRef(isNewlyReturned).current;
+  
+  const scaleAnim = useRef(new Animated.Value(wasNewlyReturnedOnMount ? 0.5 : 1)).current;
+  const opacityAnim = useRef(new Animated.Value(wasNewlyReturnedOnMount ? 0 : 1)).current;
+
+  useEffect(() => {
+    if (wasNewlyReturnedOnMount) {
+      requestAnimationFrame(() => {
+        Animated.parallel([
+          Animated.spring(scaleAnim, {
+            toValue: 1,
+            friction: 5,
+            tension: 45,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacityAnim, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    }
+  }, []);
+
+  return (
+    <Animated.View
+      style={{
+        transform: [{ scale: scaleAnim }],
+        opacity: opacityAnim,
+      }}
+    >
+      <PuzzlePiece
+        piece={piece}
+        pieceWidth={pieceWidth}
+        pieceHeight={pieceHeight}
+        isSelected={isSelected}
+        isSelected2={isSelected2}
+        onPress={onPieceSelect}
+      />
+    </Animated.View>
+  );
+};
 
 export const PuzzlePieceHolder = ({
   boardWidth,
@@ -28,6 +74,42 @@ export const PuzzlePieceHolder = ({
   const previousPiecesLength = useRef(pieces.length);
   const isUserScrolling = useRef(false);
   const scrollTimeoutRef = useRef(null);
+  
+  // Track known piece IDs to detect newly returned pieces
+  const knownPieceIdsRef = useRef(new Set());
+  const lastResetKeyForKnownPieces = useRef(undefined);
+  
+  // Detect newly returned pieces (pieces that appear in holder that we haven't seen)
+  const newlyReturnedIds = new Set();
+  pieces.forEach(piece => {
+    if (!knownPieceIdsRef.current.has(piece.id)) {
+      newlyReturnedIds.add(piece.id);
+    }
+  });
+  
+  // Update known pieces after render
+  useEffect(() => {
+    // Reset known pieces on new game
+    if (resetScrollKey !== undefined && resetScrollKey !== lastResetKeyForKnownPieces.current) {
+      knownPieceIdsRef.current = new Set(pieces.map(p => p.id));
+      lastResetKeyForKnownPieces.current = resetScrollKey;
+      return;
+    }
+    
+    const currentIds = new Set(pieces.map(p => p.id));
+    
+    // Remove IDs no longer in holder
+    knownPieceIdsRef.current.forEach(id => {
+      if (!currentIds.has(id)) {
+        knownPieceIdsRef.current.delete(id);
+      }
+    });
+    
+    // Add new pieces
+    pieces.forEach(piece => {
+      knownPieceIdsRef.current.add(piece.id);
+    });
+  }, [pieces, resetScrollKey]);
   
   const pieceAspectRatio = pieceHeight > 0 && pieceWidth > 0 ? pieceHeight / pieceWidth : 1;
   
@@ -245,6 +327,7 @@ export const PuzzlePieceHolder = ({
             >
               {pieces && pieces.length > 0 ? pieces.map((piece, index) => {
                 if (!piece || !piece.id) return null;
+                const isNewlyReturned = newlyReturnedIds.has(piece.id);
                 return (
                   <View
                     key={piece.id}
@@ -256,13 +339,14 @@ export const PuzzlePieceHolder = ({
                       }
                     ]}
                   >
-                    <PuzzlePiece
+                    <AnimatedHolderPiece
                       piece={piece}
                       pieceWidth={holderPieceWidth}
                       pieceHeight={holderPieceHeight}
                       isSelected={selectedPieceId === piece.id}
                       isSelected2={selectedPieceId2 === piece.id}
-                      onPress={onPieceSelect}
+                      onPieceSelect={onPieceSelect}
+                      isNewlyReturned={isNewlyReturned}
                     />
                   </View>
                 );
