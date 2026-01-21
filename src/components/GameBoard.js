@@ -1,6 +1,126 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, TouchableWithoutFeedback, Animated } from 'react-native';
+import { View, StyleSheet, Image, TouchableOpacity, TouchableWithoutFeedback, Animated, Easing } from 'react-native';
 import { COLORS } from '../constants/colors';
+
+const BORDER_WIDTH = 3;
+const BORDER_RADIUS = 8;
+
+// Animated locked piece with border fill animation (counter-clockwise)
+const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked }) => {
+  const wasNewlyLockedOnMount = useRef(isNewlyLocked).current;
+  
+  // Animation progress from 0 to 1 (fills full border)
+  const borderProgress = useRef(new Animated.Value(wasNewlyLockedOnMount ? 0 : 1)).current;
+  
+  // Calculate perimeter proportions for timing each segment
+  const totalPerimeter = (pieceWidth * 2) + (pieceHeight * 2);
+  const topProportion = pieceWidth / totalPerimeter;
+  const leftProportion = pieceHeight / totalPerimeter;
+  const bottomProportion = pieceWidth / totalPerimeter;
+  
+  // Cumulative thresholds
+  const topEnd = topProportion;
+  const leftEnd = topEnd + leftProportion;
+  const bottomEnd = leftEnd + bottomProportion;
+
+  useEffect(() => {
+    if (wasNewlyLockedOnMount) {
+      requestAnimationFrame(() => {
+        Animated.timing(borderProgress, {
+          toValue: 1,
+          duration: 600,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false,
+        }).start();
+      });
+    }
+  }, []);
+
+  // Each segment fills from one corner to the next
+  // Counter-clockwise: Top (right to left) -> Left (top to bottom) -> Bottom (left to right) -> Right (bottom to top)
+  
+  // Top border fill percentage (0 to 100%)
+  const topFillPercent = borderProgress.interpolate({
+    inputRange: [0, topEnd, 1],
+    outputRange: [0, 100, 100],
+    extrapolate: 'clamp',
+  });
+  
+  // Left border fill percentage
+  const leftFillPercent = borderProgress.interpolate({
+    inputRange: [0, topEnd, leftEnd, 1],
+    outputRange: [0, 0, 100, 100],
+    extrapolate: 'clamp',
+  });
+  
+  // Bottom border fill percentage
+  const bottomFillPercent = borderProgress.interpolate({
+    inputRange: [0, leftEnd, bottomEnd, 1],
+    outputRange: [0, 0, 100, 100],
+    extrapolate: 'clamp',
+  });
+  
+  // Right border fill percentage
+  const rightFillPercent = borderProgress.interpolate({
+    inputRange: [0, bottomEnd, 1],
+    outputRange: [0, 0, 100],
+    extrapolate: 'clamp',
+  });
+
+  // Convert percentages to actual widths/heights for the green overlay
+  const topGreenWidth = topFillPercent.interpolate({
+    inputRange: [0, 100],
+    outputRange: [0, pieceWidth - BORDER_WIDTH], // Account for corner
+  });
+  
+  const leftGreenHeight = leftFillPercent.interpolate({
+    inputRange: [0, 100],
+    outputRange: [0, pieceHeight - BORDER_WIDTH],
+  });
+  
+  const bottomGreenWidth = bottomFillPercent.interpolate({
+    inputRange: [0, 100],
+    outputRange: [0, pieceWidth - BORDER_WIDTH],
+  });
+  
+  const rightGreenHeight = rightFillPercent.interpolate({
+    inputRange: [0, 100],
+    outputRange: [0, pieceHeight - BORDER_WIDTH],
+  });
+
+  // For newly locked pieces, animate border color. For already locked, show green immediately.
+  const animatedBorderColor = borderProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [COLORS.border, COLORS.success],
+  });
+
+  return (
+    <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+      <Animated.View
+        style={[
+          styles.boardPiece,
+          styles.lockedPiece,
+          {
+            position: 'absolute',
+            left: piece.boardX || 0,
+            top: piece.boardY || 0,
+            width: pieceWidth,
+            height: pieceHeight,
+            borderWidth: BORDER_WIDTH,
+            borderColor: animatedBorderColor,
+          },
+        ]}
+      >
+        <Image
+          source={{ uri: piece.imageUri }}
+          style={styles.boardPieceImage}
+          resizeMode="cover"
+        />
+        <View style={styles.lockIndicator} />
+      </Animated.View>
+    </TouchableWithoutFeedback>
+  );
+};
 
 // Animated wrapper for pieces that were just placed or swapped
 const AnimatedBoardPiece = ({ piece, pieceWidth, pieceHeight, borderStyle, isHighlighted, isSelected, onPieceSelect, isNewlyPlaced, wasSwapped }) => {
@@ -102,9 +222,22 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   const [swappedIds, setSwappedIds] = useState(new Set());
   const prevBoardPiecesRef = useRef([]);
   const knownPieceIdsRef = useRef(new Set());
+  const lockedPieceIdsRef = useRef(new Set()); // Track pieces that have been locked
+
+  // Helper to check if piece is in correct position
+  const checkCorrectPosition = (piece) => {
+    if (!piece || pieceWidth === 0 || pieceHeight === 0) return false;
+    const correctRow = piece.correctRow ?? piece.row;
+    const correctCol = piece.correctCol ?? piece.col;
+    if (correctRow === undefined || correctCol === undefined) return false;
+    const isCorrectCol = Math.abs((piece.boardX || 0) - (correctCol * pieceWidth)) <= POSITION_TOLERANCE;
+    const isCorrectRow = Math.abs((piece.boardY || 0) - (correctRow * pieceHeight)) <= POSITION_TOLERANCE;
+    return isCorrectCol && isCorrectRow;
+  };
 
   // Synchronously detect new and swapped pieces during render
   const newlyPlacedIds = new Set();
+  const newlyLockedIds = new Set();
   const currentSwapped = [];
   
   const prevPiecesMap = new Map(prevBoardPiecesRef.current.map(p => [p.id, p]));
@@ -120,6 +253,12 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
     if (prevPiece && (prevPiece.boardX !== piece.boardX || prevPiece.boardY !== piece.boardY)) {
       currentSwapped.push(piece.id);
     }
+    
+    // Check if piece just became locked (correct position)
+    const isNowLocked = checkCorrectPosition(piece);
+    if (isNowLocked && !lockedPieceIdsRef.current.has(piece.id)) {
+      newlyLockedIds.add(piece.id);
+    }
   });
 
   // Update known pieces - sync with current board pieces
@@ -131,16 +270,23 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
     knownPieceIdsRef.current.forEach(id => {
       if (!currentBoardIds.has(id)) {
         knownPieceIdsRef.current.delete(id);
+        lockedPieceIdsRef.current.delete(id); // Also remove from locked tracking
       }
     });
     
-    // Add new pieces
+    // Add new pieces and update locked status
     boardPieces.forEach(piece => {
       knownPieceIdsRef.current.add(piece.id);
+      
+      // Track locked pieces
+      const isLocked = checkCorrectPosition(piece);
+      if (isLocked) {
+        lockedPieceIdsRef.current.add(piece.id);
+      }
     });
     
     prevBoardPiecesRef.current = boardPieces;
-  }, [boardPieces]);
+  }, [boardPieces, pieceWidth, pieceHeight]);
 
   // Handle swapped pieces state
   useEffect(() => {
@@ -154,20 +300,6 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
       return () => clearTimeout(timer);
     }
   }, [boardPieces]);
-
-  const isPieceInCorrectPosition = (piece) => {
-    if (!piece || pieceWidth === 0 || pieceHeight === 0) return false;
-
-    const correctRow = piece.correctRow ?? piece.row;
-    const correctCol = piece.correctCol ?? piece.col;
-
-    if (correctRow === undefined || correctCol === undefined) return false;
-
-    const isCorrectCol = Math.abs((piece.boardX || 0) - (correctCol * pieceWidth)) <= POSITION_TOLERANCE;
-    const isCorrectRow = Math.abs((piece.boardY || 0) - (correctRow * pieceHeight)) <= POSITION_TOLERANCE;
-
-    return isCorrectCol && isCorrectRow;
-  };
 
   const renderGrid = () => {
     if (rows === 0 || cols === 0 || pieceWidth === 0 || pieceHeight === 0) return null;
@@ -237,7 +369,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
           return null;
         }
 
-        const isLocked = isPieceInCorrectPosition(piece);
+        const isLocked = checkCorrectPosition(piece);
         const isSelected = !isLocked && selectedPieceId === piece.id;
         const isSelected2 = !isLocked && selectedPieceId2 === piece.id;
         const isHighlighted = isSelected || isSelected2;
@@ -253,33 +385,13 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
 
         if (isLocked) {
           return (
-            <TouchableWithoutFeedback
-              key={`${piece.id}-${piece.boardX}-${piece.boardY}`}
-              onPress={(e) => e.stopPropagation()}
-            >
-              <View
-                style={[
-                  styles.boardPiece,
-                  {
-                    position: 'absolute',
-                    left: piece.boardX || 0,
-                    top: piece.boardY || 0,
-                    width: pieceWidth,
-                    height: pieceHeight,
-                    ...borderStyle,
-                  },
-                  styles.lockedPiece,
-                ]}
-              >
-                <Image
-                  key={`img-${piece.id}-${piece.boardX}-${piece.boardY}`}
-                  source={{ uri: piece.imageUri }}
-                  style={styles.boardPieceImage}
-                  resizeMode="cover"
-                />
-                <View style={styles.lockIndicator} />
-              </View>
-            </TouchableWithoutFeedback>
+            <AnimatedLockedPiece
+              key={`locked-${piece.id}-${piece.boardX}-${piece.boardY}`}
+              piece={piece}
+              pieceWidth={pieceWidth}
+              pieceHeight={pieceHeight}
+              isNewlyLocked={newlyLockedIds.has(piece.id)}
+            />
           );
         }
 
