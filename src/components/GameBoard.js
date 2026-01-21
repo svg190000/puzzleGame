@@ -3,25 +3,13 @@ import { View, StyleSheet, Image, TouchableOpacity, TouchableWithoutFeedback, An
 import { COLORS } from '../constants/colors';
 
 const BORDER_WIDTH = 3;
-const BORDER_RADIUS = 8;
 
-// Animated locked piece with border fill animation (counter-clockwise)
+// Animated locked piece with border color animation
 const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked }) => {
   const wasNewlyLockedOnMount = useRef(isNewlyLocked).current;
   
-  // Animation progress from 0 to 1 (fills full border)
+  // Animation progress from 0 to 1
   const borderProgress = useRef(new Animated.Value(wasNewlyLockedOnMount ? 0 : 1)).current;
-  
-  // Calculate perimeter proportions for timing each segment
-  const totalPerimeter = (pieceWidth * 2) + (pieceHeight * 2);
-  const topProportion = pieceWidth / totalPerimeter;
-  const leftProportion = pieceHeight / totalPerimeter;
-  const bottomProportion = pieceWidth / totalPerimeter;
-  
-  // Cumulative thresholds
-  const topEnd = topProportion;
-  const leftEnd = topEnd + leftProportion;
-  const bottomEnd = leftEnd + bottomProportion;
 
   useEffect(() => {
     if (wasNewlyLockedOnMount) {
@@ -36,59 +24,7 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked }) 
     }
   }, []);
 
-  // Each segment fills from one corner to the next
-  // Counter-clockwise: Top (right to left) -> Left (top to bottom) -> Bottom (left to right) -> Right (bottom to top)
-  
-  // Top border fill percentage (0 to 100%)
-  const topFillPercent = borderProgress.interpolate({
-    inputRange: [0, topEnd, 1],
-    outputRange: [0, 100, 100],
-    extrapolate: 'clamp',
-  });
-  
-  // Left border fill percentage
-  const leftFillPercent = borderProgress.interpolate({
-    inputRange: [0, topEnd, leftEnd, 1],
-    outputRange: [0, 0, 100, 100],
-    extrapolate: 'clamp',
-  });
-  
-  // Bottom border fill percentage
-  const bottomFillPercent = borderProgress.interpolate({
-    inputRange: [0, leftEnd, bottomEnd, 1],
-    outputRange: [0, 0, 100, 100],
-    extrapolate: 'clamp',
-  });
-  
-  // Right border fill percentage
-  const rightFillPercent = borderProgress.interpolate({
-    inputRange: [0, bottomEnd, 1],
-    outputRange: [0, 0, 100],
-    extrapolate: 'clamp',
-  });
-
-  // Convert percentages to actual widths/heights for the green overlay
-  const topGreenWidth = topFillPercent.interpolate({
-    inputRange: [0, 100],
-    outputRange: [0, pieceWidth - BORDER_WIDTH], // Account for corner
-  });
-  
-  const leftGreenHeight = leftFillPercent.interpolate({
-    inputRange: [0, 100],
-    outputRange: [0, pieceHeight - BORDER_WIDTH],
-  });
-  
-  const bottomGreenWidth = bottomFillPercent.interpolate({
-    inputRange: [0, 100],
-    outputRange: [0, pieceWidth - BORDER_WIDTH],
-  });
-  
-  const rightGreenHeight = rightFillPercent.interpolate({
-    inputRange: [0, 100],
-    outputRange: [0, pieceHeight - BORDER_WIDTH],
-  });
-
-  // For newly locked pieces, animate border color. For already locked, show green immediately.
+  // Animate border color from border color to success color
   const animatedBorderColor = borderProgress.interpolate({
     inputRange: [0, 1],
     outputRange: [COLORS.border, COLORS.success],
