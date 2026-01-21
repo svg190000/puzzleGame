@@ -1,9 +1,119 @@
-import React from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, TouchableWithoutFeedback } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, StyleSheet, Image, TouchableOpacity, TouchableWithoutFeedback, Animated } from 'react-native';
 import { COLORS } from '../constants/colors';
+
+// Animated wrapper for pieces that were just placed or swapped
+const AnimatedBoardPiece = ({ piece, pieceWidth, pieceHeight, borderStyle, isHighlighted, isSelected, onPieceSelect, isNewlyPlaced, wasSwapped }) => {
+  const scaleAnim = useRef(new Animated.Value(isNewlyPlaced ? 0.3 : 1)).current;
+  const opacityAnim = useRef(new Animated.Value(isNewlyPlaced ? 0 : 1)).current;
+
+  useEffect(() => {
+    if (isNewlyPlaced || wasSwapped) {
+      // Reset to small scale for animation
+      scaleAnim.setValue(0.3);
+      opacityAnim.setValue(wasSwapped ? 1 : 0);
+      
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 3,
+          tension: 20,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isNewlyPlaced, wasSwapped, scaleAnim, opacityAnim, piece.boardX, piece.boardY]);
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={(e) => {
+        e.stopPropagation();
+        if (onPieceSelect) {
+          onPieceSelect(piece);
+        }
+      }}
+      style={[
+        styles.boardPiece,
+        {
+          position: 'absolute',
+          left: piece.boardX || 0,
+          top: piece.boardY || 0,
+          width: pieceWidth,
+          height: pieceHeight,
+          ...borderStyle,
+        },
+        isHighlighted && (isSelected ? styles.selectedBoardPiece : styles.selectedBoardPiece2),
+      ]}
+    >
+      <Animated.View
+        style={{
+          width: '100%',
+          height: '100%',
+          transform: [{ scale: scaleAnim }],
+          opacity: opacityAnim,
+        }}
+      >
+        <Image
+          key={`img-${piece.id}-${piece.boardX}-${piece.boardY}`}
+          source={{ uri: piece.imageUri }}
+          style={styles.boardPieceImage}
+          resizeMode="cover"
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
 
 export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidth = 0, pieceHeight = 0, selectedPieceId, selectedPieceId2, onTap, onPieceSelect, rows = 0, cols = 0 }) => {
   const POSITION_TOLERANCE = 2;
+  const [newlyPlacedIds, setNewlyPlacedIds] = useState(new Set());
+  const [swappedIds, setSwappedIds] = useState(new Set());
+  const prevBoardPiecesRef = useRef([]);
+
+  // Track newly placed and swapped pieces
+  useEffect(() => {
+    const prevPiecesMap = new Map(prevBoardPiecesRef.current.map(p => [p.id, p]));
+    
+    const newIds = [];
+    const swapped = [];
+    
+    boardPieces.forEach(piece => {
+      const prevPiece = prevPiecesMap.get(piece.id);
+      if (!prevPiece) {
+        // Newly placed piece
+        newIds.push(piece.id);
+      } else if (prevPiece.boardX !== piece.boardX || prevPiece.boardY !== piece.boardY) {
+        // Piece position changed (swapped)
+        swapped.push(piece.id);
+      }
+    });
+    
+    if (newIds.length > 0 || swapped.length > 0) {
+      if (newIds.length > 0) {
+        setNewlyPlacedIds(new Set(newIds));
+      }
+      if (swapped.length > 0) {
+        setSwappedIds(new Set(swapped));
+      }
+      
+      // Clear the status after animation completes
+      const timer = setTimeout(() => {
+        setNewlyPlacedIds(new Set());
+        setSwappedIds(new Set());
+      }, 400);
+      
+      prevBoardPiecesRef.current = boardPieces;
+      return () => clearTimeout(timer);
+    }
+    
+    prevBoardPiecesRef.current = boardPieces;
+  }, [boardPieces]);
 
   const isPieceInCorrectPosition = (piece) => {
     if (!piece || pieceWidth === 0 || pieceHeight === 0) return false;
@@ -134,35 +244,18 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
         }
 
         return (
-          <TouchableOpacity
+          <AnimatedBoardPiece
             key={`${piece.id}-${piece.boardX}-${piece.boardY}`}
-            activeOpacity={0.8}
-            onPress={(e) => {
-              e.stopPropagation();
-              if (onPieceSelect) {
-                onPieceSelect(piece);
-              }
-            }}
-            style={[
-              styles.boardPiece,
-              {
-                position: 'absolute',
-                left: piece.boardX || 0,
-                top: piece.boardY || 0,
-                width: pieceWidth,
-                height: pieceHeight,
-                ...borderStyle,
-              },
-              isHighlighted && (isSelected ? styles.selectedBoardPiece : styles.selectedBoardPiece2),
-            ]}
-          >
-            <Image
-              key={`img-${piece.id}-${piece.boardX}-${piece.boardY}`}
-              source={{ uri: piece.imageUri }}
-              style={styles.boardPieceImage}
-              resizeMode="cover"
-            />
-          </TouchableOpacity>
+            piece={piece}
+            pieceWidth={pieceWidth}
+            pieceHeight={pieceHeight}
+            borderStyle={borderStyle}
+            isHighlighted={isHighlighted}
+            isSelected={isSelected}
+            onPieceSelect={onPieceSelect}
+            isNewlyPlaced={newlyPlacedIds.has(piece.id)}
+            wasSwapped={swappedIds.has(piece.id)}
+          />
         );
       })}
     </TouchableOpacity>
