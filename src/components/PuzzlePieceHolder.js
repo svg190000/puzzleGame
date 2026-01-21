@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
 import { PuzzlePiece } from './PuzzlePiece';
 
@@ -15,9 +15,10 @@ export const PuzzlePieceHolder = ({
   onHolderTap,
   resetScrollKey,
 }) => {
-  const holderHeight = 150;
-  const holderPadding = 24;
-  const availableHeight = holderHeight - holderPadding - 20;
+  const holderHeight = 140;
+  const progressBarHeight = 18; // Space for progress bar at bottom
+  const verticalPadding = 24; // Top + bottom padding for pieces area
+  const availableHeight = holderHeight - progressBarHeight - verticalPadding;
   const scrollViewRef = useRef(null);
   const [scrollPosition, setScrollPosition] = useState(0);
   const [scrollContentWidth, setScrollContentWidth] = useState(0);
@@ -33,21 +34,26 @@ export const PuzzlePieceHolder = ({
   let holderPieceHeight = availableHeight;
   let holderPieceWidth = holderPieceHeight / pieceAspectRatio;
   
-  const maxWidth = 120;
+  const maxWidth = 85; // Smaller max for better fit
+  const maxHeight = 80; // Cap height as well
   if (holderPieceWidth > maxWidth) {
     holderPieceWidth = maxWidth;
     holderPieceHeight = holderPieceWidth * pieceAspectRatio;
   }
+  if (holderPieceHeight > maxHeight) {
+    holderPieceHeight = maxHeight;
+    holderPieceWidth = holderPieceHeight / pieceAspectRatio;
+  }
   
-  const pieceSpacing = 12;
-  const totalContentWidth = pieces.length * holderPieceWidth + (pieces.length - 1) * pieceSpacing + 24;
+  const pieceSpacing = 10;
+  const scrollIndicatorPadding = 28; // Space for scroll indicators
+  const totalContentWidth = pieces.length * holderPieceWidth + (pieces.length - 1) * pieceSpacing + (scrollIndicatorPadding * 2);
   
-  const scrollIndicatorWidth = boardWidth - 24;
-  const progressBarHeight = 12;
+  const scrollAreaWidth = boardWidth - (scrollIndicatorPadding * 2);
   const contentWidth = scrollContentWidth > 0 ? scrollContentWidth : totalContentWidth;
-  const scrollableWidth = Math.max(0, contentWidth - scrollIndicatorWidth);
+  const scrollableWidth = Math.max(0, contentWidth - scrollAreaWidth);
   
-  // Track initial pieces count for progress calculation
+  // Track initial pieces count for counter display
   const initialPiecesCount = useRef(pieces.length || 1);
   const lastInitialCountResetKey = useRef(undefined);
   
@@ -62,16 +68,19 @@ export const PuzzlePieceHolder = ({
     }
   }, [resetScrollKey, pieces.length]);
 
-  // Calculate progress: percentage of pieces removed
-  const currentPiecesCount = pieces.length;
+  // Pieces remaining count
+  const piecesRemaining = pieces.length;
+  
+  // Calculate progress: percentage of pieces placed
   const progress = initialPiecesCount.current > 0 
-    ? Math.min(1, (initialPiecesCount.current - currentPiecesCount) / initialPiecesCount.current)
+    ? Math.min(1, (initialPiecesCount.current - piecesRemaining) / initialPiecesCount.current)
     : 0;
   
-  // Progress bar grows from center as pieces are removed
-  const minProgressWidth = 8; // Minimum width when no progress
-  const progressBarWidth = minProgressWidth + (progress * (scrollIndicatorWidth - minProgressWidth));
-  const progressBarPosition = (scrollIndicatorWidth - progressBarWidth) / 2; // Center the progress bar
+  // Progress bar grows from center as pieces are placed
+  const progressTrackWidth = boardWidth - 48; // Padding on sides
+  const minProgressWidth = 8;
+  const progressBarWidth = minProgressWidth + (progress * (progressTrackWidth - minProgressWidth));
+  const progressBarPosition = (progressTrackWidth - progressBarWidth) / 2;
 
   const handleScroll = (event) => {
     const { contentOffset } = event.nativeEvent;
@@ -130,7 +139,7 @@ export const PuzzlePieceHolder = ({
         });
       });
     }
-  }, [resetScrollKey, scrollContentWidth, scrollIndicatorWidth, totalContentWidth]);
+  }, [resetScrollKey, scrollContentWidth, scrollAreaWidth, totalContentWidth]);
 
   // Auto-adjust scroll when pieces are removed (but not during user scrolling)
   useEffect(() => {
@@ -145,8 +154,8 @@ export const PuzzlePieceHolder = ({
           requestAnimationFrame(() => {
             if (scrollViewRef.current) {
               const currentContentWidth = scrollContentWidth || totalContentWidth;
-              const oldScrollableWidth = Math.max(0, oldContentWidth - scrollIndicatorWidth);
-              const newScrollableWidth = Math.max(0, currentContentWidth - scrollIndicatorWidth);
+              const oldScrollableWidth = Math.max(0, oldContentWidth - scrollAreaWidth);
+              const newScrollableWidth = Math.max(0, currentContentWidth - scrollAreaWidth);
               const currentScroll = actualScrollPosition.current;
               
               // Update previousContentWidth for next calculation
@@ -157,7 +166,7 @@ export const PuzzlePieceHolder = ({
                 
                 // Calculate viewport bounds
                 const viewportLeft = currentScroll;
-                const viewportRight = currentScroll + scrollIndicatorWidth;
+                const viewportRight = currentScroll + scrollAreaWidth;
                 
                 // Check if we're near an edge (within 1 piece width)
                 const edgeThreshold = pieceWidthWithSpacing;
@@ -168,7 +177,7 @@ export const PuzzlePieceHolder = ({
                 
                 if (isNearRightEdge) {
                   // Near right edge - scroll left to show more pieces
-                  newScrollPosition = Math.max(0, newScrollableWidth - scrollIndicatorWidth * 0.3);
+                  newScrollPosition = Math.max(0, newScrollableWidth - scrollAreaWidth * 0.3);
                 } else if (isNearLeftEdge) {
                   // Near left edge - stay near left but ensure we don't go negative
                   newScrollPosition = Math.min(currentScroll, newScrollableWidth);
@@ -179,7 +188,7 @@ export const PuzzlePieceHolder = ({
                   
                   // If we're now too far right after adjustment, pull back
                   if (newScrollPosition > newScrollableWidth - edgeThreshold) {
-                    newScrollPosition = Math.max(0, newScrollableWidth - scrollIndicatorWidth * 0.3);
+                    newScrollPosition = Math.max(0, newScrollableWidth - scrollAreaWidth * 0.3);
                   }
                 }
                 
@@ -200,17 +209,12 @@ export const PuzzlePieceHolder = ({
         });
       }
     }
-  }, [pieces.length, scrollContentWidth, scrollIndicatorWidth, totalContentWidth, holderPieceWidth, pieceSpacing]);
+  }, [pieces.length, scrollContentWidth, scrollAreaWidth, totalContentWidth, holderPieceWidth, pieceSpacing]);
 
-  // Calculate fade opacity based on scroll position
-  // Fade increases as pieces move out of view (stronger/faster fade)
-  const fadeWidth = 15; // Width of the fade gradient effect area
-  const leftFadeOpacity = scrollableWidth > 0 && scrollPosition > 0
-    ? Math.min(1, scrollPosition / fadeWidth)
-    : 0;
-  const rightFadeOpacity = scrollableWidth > 0 && scrollPosition < scrollableWidth
-    ? Math.min(1, (scrollableWidth - scrollPosition) / fadeWidth)
-    : 0;
+  // Calculate scroll indicator visibility - hide when no pieces remain
+  const hasPieces = pieces && pieces.length > 0;
+  const canScrollLeft = hasPieces && scrollableWidth > 0 && scrollPosition > 5;
+  const canScrollRight = hasPieces && scrollableWidth > 0 && scrollPosition < scrollableWidth - 5;
 
   return (
     <View style={[styles.container, { width: boardWidth }]}>
@@ -219,79 +223,74 @@ export const PuzzlePieceHolder = ({
         onPress={onHolderTap}
         style={styles.holder}
       >
-        <View style={styles.scrollViewContainer}>
-          {/* Left fade gradient */}
-          {leftFadeOpacity > 0 && (
-            <LinearGradient
-              colors={[COLORS.white, COLORS.white, 'rgba(255, 255, 255, 0.3)', 'rgba(255, 255, 255, 0)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              locations={[0, 0.3, 0.7, 1]}
-              style={[styles.fadeGradient, styles.leftFade]}
-              pointerEvents="none"
-            />
-          )}
+        <View style={styles.contentRow}>
+          {/* Left scroll indicator */}
+          <View style={[styles.scrollIndicator, styles.leftIndicator]}>
+            {canScrollLeft && (
+              <Ionicons name="chevron-back" size={18} color={COLORS.textLight} />
+            )}
+          </View>
           
-          <ScrollView
-            ref={scrollViewRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
-            style={styles.scrollView}
-            onScroll={handleScroll}
-            onContentSizeChange={handleContentSizeChange}
-            scrollEventThrottle={16}
-            scrollEnabled={true}
-          >
-            {pieces && pieces.length > 0 ? pieces.map((piece, index) => {
-              if (!piece || !piece.id) return null;
-              return (
-                <View
-                  key={piece.id}
-                  style={[
-                    styles.pieceWrapper,
-                    { 
-                      width: holderPieceWidth, 
-                      marginRight: index < pieces.length - 1 ? pieceSpacing : 0 
-                    }
-                  ]}
-                >
-                  <PuzzlePiece
-                    piece={piece}
-                    pieceWidth={holderPieceWidth}
-                    pieceHeight={holderPieceHeight}
-                    isSelected={selectedPieceId === piece.id}
-                    isSelected2={selectedPieceId2 === piece.id}
-                    onPress={onPieceSelect}
-                  />
+          <View style={styles.scrollViewContainer}>
+            <ScrollView
+              ref={scrollViewRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.scrollContent}
+              style={styles.scrollView}
+              onScroll={handleScroll}
+              onContentSizeChange={handleContentSizeChange}
+              scrollEventThrottle={16}
+              scrollEnabled={true}
+            >
+              {pieces && pieces.length > 0 ? pieces.map((piece, index) => {
+                if (!piece || !piece.id) return null;
+                return (
+                  <View
+                    key={piece.id}
+                    style={[
+                      styles.pieceWrapper,
+                      { 
+                        width: holderPieceWidth, 
+                        marginRight: index < pieces.length - 1 ? pieceSpacing : 0 
+                      }
+                    ]}
+                  >
+                    <PuzzlePiece
+                      piece={piece}
+                      pieceWidth={holderPieceWidth}
+                      pieceHeight={holderPieceHeight}
+                      isSelected={selectedPieceId === piece.id}
+                      isSelected2={selectedPieceId2 === piece.id}
+                      onPress={onPieceSelect}
+                    />
+                  </View>
+                );
+              }) : (
+                <View style={[styles.emptyState, { width: scrollAreaWidth }]}>
+                  <Ionicons name="checkmark-circle" size={48} color={COLORS.success} />
                 </View>
-              );
-            }) : null}
-          </ScrollView>
+              )}
+            </ScrollView>
+          </View>
           
-          {/* Right fade gradient */}
-          {rightFadeOpacity > 0 && (
-            <LinearGradient
-              colors={['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 0.3)', COLORS.white, COLORS.white]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              locations={[0, 0.3, 0.7, 1]}
-              style={[styles.fadeGradient, styles.rightFade]}
-              pointerEvents="none"
-            />
-          )}
+          {/* Right scroll indicator */}
+          <View style={[styles.scrollIndicator, styles.rightIndicator]}>
+            {canScrollRight && (
+              <Ionicons name="chevron-forward" size={18} color={COLORS.textLight} />
+            )}
+          </View>
         </View>
         
-        {/* Progress tracker - grows from center as pieces are removed */}
+        {/* Progress indicator */}
         <View style={styles.progressContainer}>
-          <View style={styles.progressTrack}>
+          <View style={[styles.progressTrack, { width: progressTrackWidth }]}>
             <View 
               style={[
                 styles.progressBar,
                 { 
                   left: progressBarPosition,
                   width: progressBarWidth,
-                  height: progressBarHeight,
                 }
               ]} 
             />
@@ -316,62 +315,63 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    height: 150,
-    paddingBottom: 8,
+    height: 140,
+    paddingVertical: 8,
+  },
+  contentRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  scrollIndicator: {
+    width: 24,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leftIndicator: {
+    paddingLeft: 4,
+  },
+  rightIndicator: {
+    paddingRight: 4,
   },
   scrollViewContainer: {
     flex: 1,
-    position: 'relative',
-    overflow: 'hidden',
-    borderRadius: 10, // Match holder border radius (12 - 2 for border)
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     alignItems: 'center',
-  },
-  fadeGradient: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 15,
-    zIndex: 10,
-    pointerEvents: 'none',
-    borderRadius: 10, // Match container border radius
-  },
-  leftFade: {
-    left: 0,
-    borderTopLeftRadius: 10,
-    borderBottomLeftRadius: 10,
-  },
-  rightFade: {
-    right: 0,
-    borderTopRightRadius: 10,
-    borderBottomRightRadius: 10,
   },
   pieceWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
   },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   progressContainer: {
-    paddingHorizontal: 12,
-    paddingBottom: 8,
+    paddingHorizontal: 24,
+    paddingTop: 6,
+    paddingBottom: 4,
     alignItems: 'center',
   },
   progressTrack: {
-    width: '100%',
-    height: 12,
+    height: 8,
     backgroundColor: COLORS.border,
-    borderRadius: 6,
+    borderRadius: 4,
     position: 'relative',
-    justifyContent: 'center',
   },
   progressBar: {
     position: 'absolute',
+    top: 0,
+    height: 8,
     backgroundColor: COLORS.accent,
-    borderRadius: 6,
+    borderRadius: 4,
   },
 });

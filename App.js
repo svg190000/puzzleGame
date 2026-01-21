@@ -149,7 +149,7 @@ export default function App() {
   };
 
   const HEADER_HEIGHT = 100;
-  const HOLDER_HEIGHT = 150;
+  const HOLDER_HEIGHT = 140; // Must match PuzzlePieceHolder height
   const ACTION_BUTTONS_HEIGHT = 70;
   const EQUAL_SPACING = 16;
   const HORIZONTAL_PADDING = 40;
@@ -230,17 +230,39 @@ export default function App() {
     const isSelectedFromBoard = selectedPiece ? boardPieces.some((p) => p.id === selectedPiece.id) : false;
     const isSelectedFromHolder = selectedPiece ? holderPieces.some((p) => p.id === selectedPiece.id) : false;
 
-    // Rule 1: If selected piece is from holder, cannot select another piece
+    // Rule 1: If selected piece is from holder
     if (isSelectedFromHolder) {
+      // Tapping the same piece deselects it
       if (fullPiece.id === selectedPiece.id) {
         setSelectedPiece(null);
         setSelectedPiece2(null);
+        return;
       }
+      // Tapping another holder piece swaps selection to that piece
+      if (!isPieceFromBoard) {
+        setSelectedPiece(fullPiece);
+        setSelectedPiece2(null);
+        return;
+      }
+      // Cannot select a board piece when holder piece is selected
       return;
     }
 
-    // Rule 2: If selected piece is from board, can only select another board piece
-    if (isSelectedFromBoard && !isPieceFromBoard) return;
+    // Rule 2: If selected piece is from board and tapping a holder piece,
+    // return the board piece to the holder (same as tapping the holder area)
+    if (isSelectedFromBoard && !isPieceFromBoard) {
+      // Return the selected board piece to the holder
+      setBoardPieces((prev) => prev.filter((p) => p.id !== selectedPiece.id));
+      setHolderPieces((prev) => {
+        if (prev.some((p) => p.id === selectedPiece.id)) return prev;
+        const { boardX, boardY, ...pieceWithoutPosition } = selectedPiece;
+        const allPieces = [...prev, pieceWithoutPosition];
+        return restoreHolderOrder(allPieces);
+      });
+      setSelectedPiece(null);
+      setSelectedPiece2(null);
+      return;
+    }
 
     // Handle deselection
     if (fullPiece.id === selectedPiece?.id) {

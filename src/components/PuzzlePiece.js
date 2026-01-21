@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { View, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useMemo, useRef, useEffect } from 'react';
+import { View, Image, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { COLORS } from '../constants/colors';
 
 export const PuzzlePiece = ({
@@ -11,6 +11,35 @@ export const PuzzlePiece = ({
   onPress,
   style,
 }) => {
+  // Animated values for smooth transitions
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  // Animate when selection state changes
+  useEffect(() => {
+    if (isSelected) {
+      Animated.spring(scaleAnim, {
+        toValue: 1.08,
+        friction: 8,
+        tension: 100,
+        useNativeDriver: true,
+      }).start();
+    } else if (isSelected2) {
+      Animated.spring(scaleAnim, {
+        toValue: 1.04,
+        friction: 8,
+        tension: 100,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 100,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isSelected, isSelected2, scaleAnim]);
+
   if (!piece || !piece.imageUri) {
     return null;
   }
@@ -28,13 +57,19 @@ export const PuzzlePiece = ({
     ? { borderWidth: 3, borderColor: COLORS.pastelGreen }
     : { borderWidth: 3, borderColor: 'transparent' };
 
+  // Animated transform style
+  const animatedStyle = {
+    transform: [{ scale: scaleAnim }],
+    zIndex: isSelected ? 100 : isSelected2 ? 50 : 1,
+  };
+
   return (
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={() => onPress && onPress(piece)}
       style={style}
     >
-      <View
+      <Animated.View
         style={[
           styles.pieceContainer,
           {
@@ -43,6 +78,7 @@ export const PuzzlePiece = ({
             ...borderStyle,
           },
           isHighlighted && (isSelected ? styles.selectedPiece : styles.selectedPiece2),
+          animatedStyle,
         ]}
       >
         <Image
@@ -51,7 +87,7 @@ export const PuzzlePiece = ({
           style={styles.pieceImage}
           resizeMode="cover"
         />
-      </View>
+      </Animated.View>
     </TouchableOpacity>
   );
 };
@@ -68,14 +104,18 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   selectedPiece: {
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowColor: COLORS.text,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 12,
   },
   selectedPiece2: {
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowColor: COLORS.text,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 10,
   },
   pieceImage: {
     width: '100%',
