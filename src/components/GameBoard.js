@@ -4,34 +4,55 @@ import { COLORS } from '../constants/colors';
 
 const BORDER_WIDTH = 3;
 
-// Animated locked piece with border color animation
+// Animated locked piece with entrance animation and border color animation
 const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked }) => {
   const wasNewlyLockedOnMount = useRef(isNewlyLocked).current;
-  
-  // Animation progress from 0 to 1
+
+  // Entrance animation (same as AnimatedBoardPiece) - uses native driver
+  const scaleAnim = useRef(new Animated.Value(wasNewlyLockedOnMount ? 0.5 : 1)).current;
+  const opacityAnim = useRef(new Animated.Value(wasNewlyLockedOnMount ? 0 : 1)).current;
+
+  // Border color animation progress from 0 to 1 - cannot use native driver
   const borderProgress = useRef(new Animated.Value(wasNewlyLockedOnMount ? 0 : 1)).current;
 
   useEffect(() => {
     if (wasNewlyLockedOnMount) {
+      // Entrance animation first, then border animation
       requestAnimationFrame(() => {
-        Animated.timing(borderProgress, {
-          toValue: 1,
-          duration: 600,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: false,
-        }).start();
+        Animated.parallel([
+          Animated.spring(scaleAnim, {
+            toValue: 1,
+            friction: 5,
+            tension: 45,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacityAnim, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          // After entrance animation completes, start border animation
+          Animated.timing(borderProgress, {
+            toValue: 1,
+            duration: 600,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: false,
+          }).start();
+        });
       });
     }
   }, []);
 
-  // Animate border color from border color to success color
+  // Animate border color from white to success color
   const animatedBorderColor = borderProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [COLORS.border, COLORS.success],
+    outputRange: [COLORS.white, COLORS.success],
   });
 
   return (
     <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+      {/* Outer Animated.View for border color animation (non-native driver) */}
       <Animated.View
         style={[
           styles.boardPiece,
@@ -47,12 +68,22 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked }) 
           },
         ]}
       >
-        <Image
-          source={{ uri: piece.imageUri }}
-          style={styles.boardPieceImage}
-          resizeMode="cover"
-        />
-        <View style={styles.lockIndicator} />
+        {/* Inner Animated.View for scale/opacity animation (native driver) */}
+        <Animated.View
+          style={{
+            width: '100%',
+            height: '100%',
+            transform: [{ scale: scaleAnim }],
+            opacity: opacityAnim,
+          }}
+        >
+          <Image
+            source={{ uri: piece.imageUri }}
+            style={styles.boardPieceImage}
+            resizeMode="cover"
+          />
+          <View style={styles.lockIndicator} />
+        </Animated.View>
       </Animated.View>
     </TouchableWithoutFeedback>
   );
@@ -62,7 +93,7 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked }) 
 const AnimatedBoardPiece = ({ piece, pieceWidth, pieceHeight, borderStyle, isHighlighted, isSelected, onPieceSelect, isNewlyPlaced, wasSwapped }) => {
   // Capture initial isNewlyPlaced value on mount (won't change even if prop changes)
   const wasNewlyPlacedOnMount = useRef(isNewlyPlaced).current;
-  
+
   // Start at smaller scale/hidden if newly placed, so there's no flash before animation
   const scaleAnim = useRef(new Animated.Value(wasNewlyPlacedOnMount ? 0.5 : 1)).current;
   const opacityAnim = useRef(new Animated.Value(wasNewlyPlacedOnMount ? 0 : 1)).current;
@@ -95,7 +126,7 @@ const AnimatedBoardPiece = ({ piece, pieceWidth, pieceHeight, borderStyle, isHig
       // Swapped piece - reset and animate with same effect as initial placement
       scaleAnim.setValue(0.5);
       opacityAnim.setValue(0);
-      
+
       Animated.parallel([
         Animated.spring(scaleAnim, {
           toValue: 1,
@@ -175,21 +206,21 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   const newlyPlacedIds = new Set();
   const newlyLockedIds = new Set();
   const currentSwapped = [];
-  
+
   const prevPiecesMap = new Map(prevBoardPiecesRef.current.map(p => [p.id, p]));
-  
+
   boardPieces.forEach(piece => {
     // Check if this is a brand new piece we've never seen
     if (!knownPieceIdsRef.current.has(piece.id)) {
       newlyPlacedIds.add(piece.id);
     }
-    
+
     // Check for position changes (swaps)
     const prevPiece = prevPiecesMap.get(piece.id);
     if (prevPiece && (prevPiece.boardX !== piece.boardX || prevPiece.boardY !== piece.boardY)) {
       currentSwapped.push(piece.id);
     }
-    
+
     // Check if piece just became locked (correct position)
     const isNowLocked = checkCorrectPosition(piece);
     if (isNowLocked && !lockedPieceIdsRef.current.has(piece.id)) {
@@ -201,7 +232,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   // Remove pieces that are no longer on the board (moved back to holder or reset)
   useEffect(() => {
     const currentBoardIds = new Set(boardPieces.map(p => p.id));
-    
+
     // Remove IDs that are no longer on the board
     knownPieceIdsRef.current.forEach(id => {
       if (!currentBoardIds.has(id)) {
@@ -209,18 +240,18 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
         lockedPieceIdsRef.current.delete(id); // Also remove from locked tracking
       }
     });
-    
+
     // Add new pieces and update locked status
     boardPieces.forEach(piece => {
       knownPieceIdsRef.current.add(piece.id);
-      
+
       // Track locked pieces
       const isLocked = checkCorrectPosition(piece);
       if (isLocked) {
         lockedPieceIdsRef.current.add(piece.id);
       }
     });
-    
+
     prevBoardPiecesRef.current = boardPieces;
   }, [boardPieces, pieceWidth, pieceHeight]);
 
@@ -228,11 +259,11 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   useEffect(() => {
     if (currentSwapped.length > 0) {
       setSwappedIds(new Set(currentSwapped));
-      
+
       const timer = setTimeout(() => {
         setSwappedIds(new Set());
       }, 400);
-      
+
       return () => clearTimeout(timer);
     }
   }, [boardPieces]);
