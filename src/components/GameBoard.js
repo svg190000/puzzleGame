@@ -4,20 +4,47 @@ import { COLORS } from '../constants/colors';
 
 // Animated wrapper for pieces that were just placed or swapped
 const AnimatedBoardPiece = ({ piece, pieceWidth, pieceHeight, borderStyle, isHighlighted, isSelected, onPieceSelect, isNewlyPlaced, wasSwapped }) => {
-  const scaleAnim = useRef(new Animated.Value(isNewlyPlaced ? 0.3 : 1)).current;
-  const opacityAnim = useRef(new Animated.Value(isNewlyPlaced ? 0 : 1)).current;
+  // Capture initial isNewlyPlaced value on mount (won't change even if prop changes)
+  const wasNewlyPlacedOnMount = useRef(isNewlyPlaced).current;
+  
+  // Start at smaller scale/hidden if newly placed, so there's no flash before animation
+  const scaleAnim = useRef(new Animated.Value(wasNewlyPlacedOnMount ? 0.5 : 1)).current;
+  const opacityAnim = useRef(new Animated.Value(wasNewlyPlacedOnMount ? 0 : 1)).current;
 
+  // Run entrance animation on mount if this was a newly placed piece
   useEffect(() => {
-    if (isNewlyPlaced || wasSwapped) {
-      // Reset to small scale for animation
-      scaleAnim.setValue(0.3);
-      opacityAnim.setValue(wasSwapped ? 1 : 0);
+    if (wasNewlyPlacedOnMount) {
+      // Small delay to ensure the component is fully mounted
+      requestAnimationFrame(() => {
+        Animated.parallel([
+          Animated.spring(scaleAnim, {
+            toValue: 1,
+            friction: 5,
+            tension: 45,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacityAnim, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    }
+  }, []); // Only run on mount
+
+  // Handle swap animation separately - same as initial placement
+  useEffect(() => {
+    if (wasSwapped) {
+      // Swapped piece - reset and animate with same effect as initial placement
+      scaleAnim.setValue(0.5);
+      opacityAnim.setValue(0);
       
       Animated.parallel([
         Animated.spring(scaleAnim, {
           toValue: 1,
-          friction: 3,
-          tension: 20,
+          friction: 5,
+          tension: 45,
           useNativeDriver: true,
         }),
         Animated.timing(opacityAnim, {
@@ -27,7 +54,7 @@ const AnimatedBoardPiece = ({ piece, pieceWidth, pieceHeight, borderStyle, isHig
         }),
       ]).start();
     }
-  }, [isNewlyPlaced, wasSwapped, scaleAnim, opacityAnim, piece.boardX, piece.boardY]);
+  }, [wasSwapped, piece.boardX, piece.boardY]);
 
   return (
     <TouchableOpacity
@@ -72,47 +99,60 @@ const AnimatedBoardPiece = ({ piece, pieceWidth, pieceHeight, borderStyle, isHig
 
 export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidth = 0, pieceHeight = 0, selectedPieceId, selectedPieceId2, onTap, onPieceSelect, rows = 0, cols = 0 }) => {
   const POSITION_TOLERANCE = 2;
-  const [newlyPlacedIds, setNewlyPlacedIds] = useState(new Set());
   const [swappedIds, setSwappedIds] = useState(new Set());
   const prevBoardPiecesRef = useRef([]);
+  const knownPieceIdsRef = useRef(new Set());
 
-  // Track newly placed and swapped pieces
+  // Synchronously detect new and swapped pieces during render
+  const newlyPlacedIds = new Set();
+  const currentSwapped = [];
+  
+  const prevPiecesMap = new Map(prevBoardPiecesRef.current.map(p => [p.id, p]));
+  
+  boardPieces.forEach(piece => {
+    // Check if this is a brand new piece we've never seen
+    if (!knownPieceIdsRef.current.has(piece.id)) {
+      newlyPlacedIds.add(piece.id);
+    }
+    
+    // Check for position changes (swaps)
+    const prevPiece = prevPiecesMap.get(piece.id);
+    if (prevPiece && (prevPiece.boardX !== piece.boardX || prevPiece.boardY !== piece.boardY)) {
+      currentSwapped.push(piece.id);
+    }
+  });
+
+  // Update known pieces - sync with current board pieces
+  // Remove pieces that are no longer on the board (moved back to holder or reset)
   useEffect(() => {
-    const prevPiecesMap = new Map(prevBoardPiecesRef.current.map(p => [p.id, p]));
+    const currentBoardIds = new Set(boardPieces.map(p => p.id));
     
-    const newIds = [];
-    const swapped = [];
-    
-    boardPieces.forEach(piece => {
-      const prevPiece = prevPiecesMap.get(piece.id);
-      if (!prevPiece) {
-        // Newly placed piece
-        newIds.push(piece.id);
-      } else if (prevPiece.boardX !== piece.boardX || prevPiece.boardY !== piece.boardY) {
-        // Piece position changed (swapped)
-        swapped.push(piece.id);
+    // Remove IDs that are no longer on the board
+    knownPieceIdsRef.current.forEach(id => {
+      if (!currentBoardIds.has(id)) {
+        knownPieceIdsRef.current.delete(id);
       }
     });
     
-    if (newIds.length > 0 || swapped.length > 0) {
-      if (newIds.length > 0) {
-        setNewlyPlacedIds(new Set(newIds));
-      }
-      if (swapped.length > 0) {
-        setSwappedIds(new Set(swapped));
-      }
+    // Add new pieces
+    boardPieces.forEach(piece => {
+      knownPieceIdsRef.current.add(piece.id);
+    });
+    
+    prevBoardPiecesRef.current = boardPieces;
+  }, [boardPieces]);
+
+  // Handle swapped pieces state
+  useEffect(() => {
+    if (currentSwapped.length > 0) {
+      setSwappedIds(new Set(currentSwapped));
       
-      // Clear the status after animation completes
       const timer = setTimeout(() => {
-        setNewlyPlacedIds(new Set());
         setSwappedIds(new Set());
       }, 400);
       
-      prevBoardPiecesRef.current = boardPieces;
       return () => clearTimeout(timer);
     }
-    
-    prevBoardPiecesRef.current = boardPieces;
   }, [boardPieces]);
 
   const isPieceInCorrectPosition = (piece) => {
