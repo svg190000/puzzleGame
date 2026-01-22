@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, Image, TouchableOpacity, TouchableWithoutFeedback, Animated, Easing } from 'react-native';
 import { COLORS } from '../constants/colors';
 import { Confetti } from './Confetti';
@@ -232,7 +232,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
     }
   }, [boardPieces]);
 
-  const handleConfettiComplete = useRef(() => {
+  const handleConfettiComplete = useCallback(() => {
     Animated.sequence([
       Animated.parallel([
         Animated.timing(piecesOpacity, {
@@ -263,18 +263,21 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
         }),
       ]),
     ]).start();
-  }).current;
+  }, [piecesOpacity, piecesScale, completeImageOpacity, completeImageScale]);
 
   useEffect(() => {
     let timeout1;
 
     if (isComplete && !prevIsCompleteRef.current) {
+      console.log('Puzzle complete! Starting confetti in 1 second...');
       // Wait 1 second for locked animation to finish
       timeout1 = setTimeout(() => {
+        console.log('Starting confetti animation');
         // Start confetti animation - transition will trigger when all confetti is done
         setShowConfetti(true);
       }, 1000);
     } else if (!isComplete && prevIsCompleteRef.current) {
+      console.log('Puzzle no longer complete, resetting confetti');
       setShowConfetti(false);
       piecesOpacity.setValue(1);
       piecesScale.setValue(1);
@@ -331,12 +334,6 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
         }
       ]}
     >
-      <Confetti 
-        isActive={showConfetti} 
-        boardWidth={boardWidth} 
-        boardHeight={boardHeight}
-        onAllComplete={handleConfettiComplete}
-      />
       {originalImageUri && (
         <Animated.View
           style={[
@@ -413,6 +410,12 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
           );
         })}
       </Animated.View>
+      <Confetti 
+        isActive={showConfetti} 
+        boardWidth={boardWidth} 
+        boardHeight={boardHeight}
+        onAllComplete={handleConfettiComplete}
+      />
     </TouchableOpacity>
   );
 };
