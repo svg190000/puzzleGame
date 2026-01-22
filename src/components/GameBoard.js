@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Image, TouchableOpacity, TouchableWithoutFeedback, Animated, Easing } from 'react-native';
 import { COLORS } from '../constants/colors';
+import { Confetti } from './Confetti';
 
 const BORDER_WIDTH = 3;
 const BOARD_BORDER_WIDTH = 2; // Must match borderWidth in board style
@@ -164,6 +165,13 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   const prevBoardPiecesRef = useRef([]);
   const knownPieceIdsRef = useRef(new Set());
   const lockedPieceIdsRef = useRef(new Set());
+  const prevIsCompleteRef = useRef(false);
+  
+  const piecesOpacity = useRef(new Animated.Value(1)).current;
+  const piecesScale = useRef(new Animated.Value(1)).current;
+  const completeImageOpacity = useRef(new Animated.Value(0)).current;
+  const completeImageScale = useRef(new Animated.Value(0.8)).current;
+  const [showConfetti, setShowConfetti] = useState(false);
 
   const checkCorrectPosition = (piece) => {
     if (!piece || pieceWidth === 0 || pieceHeight === 0) return false;
@@ -224,6 +232,62 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
     }
   }, [boardPieces]);
 
+  const handleConfettiComplete = useRef(() => {
+    Animated.sequence([
+      Animated.parallel([
+        Animated.timing(piecesOpacity, {
+          toValue: 0,
+          duration: 400,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(piecesScale, {
+          toValue: 0.95,
+          duration: 400,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.parallel([
+        Animated.timing(completeImageOpacity, {
+          toValue: 1,
+          duration: 500,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(completeImageScale, {
+          toValue: 1,
+          friction: 6,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+  }).current;
+
+  useEffect(() => {
+    let timeout1;
+
+    if (isComplete && !prevIsCompleteRef.current) {
+      // Wait 1 second for locked animation to finish
+      timeout1 = setTimeout(() => {
+        // Start confetti animation - transition will trigger when all confetti is done
+        setShowConfetti(true);
+      }, 1000);
+    } else if (!isComplete && prevIsCompleteRef.current) {
+      setShowConfetti(false);
+      piecesOpacity.setValue(1);
+      piecesScale.setValue(1);
+      completeImageOpacity.setValue(0);
+      completeImageScale.setValue(0.8);
+    }
+    prevIsCompleteRef.current = isComplete;
+
+    return () => {
+      if (timeout1) clearTimeout(timeout1);
+    };
+  }, [isComplete]);
+
   const renderGrid = () => {
     if (rows === 0 || cols === 0 || pieceWidth === 0 || pieceHeight === 0) return null;
 
@@ -267,26 +331,43 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
         }
       ]}
     >
-      {isComplete && originalImageUri ? (
-        <View
+      <Confetti 
+        isActive={showConfetti} 
+        boardWidth={boardWidth} 
+        boardHeight={boardHeight}
+        onAllComplete={handleConfettiComplete}
+      />
+      {originalImageUri && (
+        <Animated.View
           style={[
             styles.completeImageContainer,
             {
               width: contentWidth,
               height: contentHeight,
+              opacity: completeImageOpacity,
+              transform: [{ scale: completeImageScale }],
             }
           ]}
+          pointerEvents={isComplete ? 'auto' : 'none'}
         >
           <Image
             source={{ uri: originalImageUri }}
             style={styles.completeImage}
             resizeMode="cover"
           />
-        </View>
-      ) : (
-        <>
-          {renderGrid()}
-          {boardPieces && boardPieces.map((piece) => {
+        </Animated.View>
+      )}
+      <Animated.View
+        style={{
+          width: '100%',
+          height: '100%',
+          opacity: piecesOpacity,
+          transform: [{ scale: piecesScale }],
+        }}
+        pointerEvents={isComplete ? 'none' : 'auto'}
+      >
+        {renderGrid()}
+        {boardPieces && boardPieces.map((piece) => {
         if (!piece || !piece.imageUri) {
           return null;
         }
@@ -331,8 +412,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
           />
           );
         })}
-        </>
-      )}
+      </Animated.View>
     </TouchableOpacity>
   );
 };
