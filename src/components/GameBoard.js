@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Image, TouchableOpacity, TouchableWithoutFeedback, Animated, Easing } from 'react-native';
 import { COLORS } from '../constants/colors';
 import { Confetti } from './Confetti';
@@ -167,10 +167,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   const lockedPieceIdsRef = useRef(new Set());
   const prevIsCompleteRef = useRef(false);
   
-  const piecesOpacity = useRef(new Animated.Value(1)).current;
   const piecesScale = useRef(new Animated.Value(1)).current;
-  const completeImageOpacity = useRef(new Animated.Value(0)).current;
-  const completeImageScale = useRef(new Animated.Value(0.8)).current;
   const [showConfetti, setShowConfetti] = useState(false);
 
   const checkCorrectPosition = (piece) => {
@@ -232,57 +229,17 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
     }
   }, [boardPieces]);
 
-  const handleConfettiComplete = useCallback(() => {
-    Animated.sequence([
-      Animated.parallel([
-        Animated.timing(piecesOpacity, {
-          toValue: 0,
-          duration: 400,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(piecesScale, {
-          toValue: 0.95,
-          duration: 400,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.parallel([
-        Animated.timing(completeImageOpacity, {
-          toValue: 1,
-          duration: 500,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.spring(completeImageScale, {
-          toValue: 1,
-          friction: 6,
-          tension: 40,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start();
-  }, [piecesOpacity, piecesScale, completeImageOpacity, completeImageScale]);
 
   useEffect(() => {
     let timeout1;
 
     if (isComplete && !prevIsCompleteRef.current) {
-      console.log('Puzzle complete! Starting confetti in 1 second...');
-      // Wait 1 second for locked animation to finish
       timeout1 = setTimeout(() => {
-        console.log('Starting confetti animation');
-        // Start confetti animation - transition will trigger when all confetti is done
         setShowConfetti(true);
       }, 1000);
     } else if (!isComplete && prevIsCompleteRef.current) {
-      console.log('Puzzle no longer complete, resetting confetti');
       setShowConfetti(false);
-      piecesOpacity.setValue(1);
       piecesScale.setValue(1);
-      completeImageOpacity.setValue(0);
-      completeImageScale.setValue(0.8);
     }
     prevIsCompleteRef.current = isComplete;
 
@@ -302,7 +259,15 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
       gridLines.push(
         <View
           key={`v-${col}`}
-          style={[styles.gridLine, { left: col * pieceWidth, top: 0, width: 1, height: gridHeight }]}
+          style={[
+            styles.gridLine,
+            {
+              left: col * pieceWidth,
+              top: 0,
+              width: 1,
+              height: gridHeight,
+            }
+          ]}
         />
       );
     }
@@ -311,7 +276,15 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
       gridLines.push(
         <View
           key={`h-${row}`}
-          style={[styles.gridLine, { left: 0, top: row * pieceHeight, width: gridWidth, height: 1 }]}
+          style={[
+            styles.gridLine,
+            {
+              left: 0,
+              top: row * pieceHeight,
+              width: gridWidth,
+              height: 1,
+            }
+          ]}
         />
       );
     }
@@ -334,31 +307,10 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
         }
       ]}
     >
-      {originalImageUri && (
-        <Animated.View
-          style={[
-            styles.completeImageContainer,
-            {
-              width: contentWidth,
-              height: contentHeight,
-              opacity: completeImageOpacity,
-              transform: [{ scale: completeImageScale }],
-            }
-          ]}
-          pointerEvents={isComplete ? 'auto' : 'none'}
-        >
-          <Image
-            source={{ uri: originalImageUri }}
-            style={styles.completeImage}
-            resizeMode="cover"
-          />
-        </Animated.View>
-      )}
       <Animated.View
         style={{
           width: '100%',
           height: '100%',
-          opacity: piecesOpacity,
           transform: [{ scale: piecesScale }],
         }}
         pointerEvents={isComplete ? 'none' : 'auto'}
@@ -414,7 +366,6 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
         isActive={showConfetti} 
         boardWidth={boardWidth} 
         boardHeight={boardHeight}
-        onAllComplete={handleConfettiComplete}
       />
     </TouchableOpacity>
   );
