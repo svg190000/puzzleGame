@@ -45,7 +45,7 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
           { resize: { width: scaledWidth, height: scaledHeight } },
           { crop: { originX: cropX, originY: 0, width: cropWidth, height: scaledHeight } }
         ],
-        { format: ImageManipulator.SaveFormat.PNG, compress: 0.9 }
+        { format: ImageManipulator.SaveFormat.PNG, compress: 1 }
       );
       
       processedImageUri = scaledImage.uri;
@@ -67,7 +67,7 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
           { resize: { width: scaledWidth, height: scaledHeight } },
           { crop: { originX: 0, originY: cropY, width: scaledWidth, height: cropHeight } }
         ],
-        { format: ImageManipulator.SaveFormat.PNG, compress: 0.9 }
+        { format: ImageManipulator.SaveFormat.PNG, compress: 1 }
       );
       
       processedImageUri = scaledImage.uri;
@@ -97,7 +97,7 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
               },
             },
           ],
-          { format: ImageManipulator.SaveFormat.PNG, compress: 0.9 }
+          { format: ImageManipulator.SaveFormat.PNG, compress: 1 }
         );
 
         const edgeTypes = {
@@ -125,6 +125,7 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
       pieces,
       originalWidth: processedWidth,
       originalHeight: processedHeight,
+      originalImageUri: processedImageUri,
       rows,
       cols,
     };

@@ -200,6 +200,12 @@ export default function App() {
     return isCorrectCol && isCorrectRow;
   };
 
+  const isPuzzleComplete = () => {
+    if (!puzzleData || holderPieces.length > 0) return false;
+    if (boardPieces.length !== puzzleData.pieces.length) return false;
+    return boardPieces.every((piece) => isPieceLocked(piece));
+  };
+
   const swapPieces = (piece1 = selectedPiece, piece2 = selectedPiece2) => {
     if (!piece1 || !piece2) return;
     if (isPieceLocked(piece1) || isPieceLocked(piece2)) return;
@@ -564,6 +570,8 @@ export default function App() {
                   onPieceSelect={handlePieceSelect}
                   rows={puzzleData?.rows ?? difficulty.rows}
                   cols={puzzleData?.cols ?? difficulty.cols}
+                  isComplete={isPuzzleComplete()}
+                  originalImageUri={puzzleData?.originalImageUri}
                 />
               </View>
 

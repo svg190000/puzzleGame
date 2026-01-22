@@ -159,7 +159,7 @@ const AnimatedBoardPiece = ({ piece, pieceWidth, pieceHeight, borderStyle, isHig
   );
 };
 
-export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidth = 0, pieceHeight = 0, selectedPieceId, selectedPieceId2, onTap, onPieceSelect, rows = 0, cols = 0 }) => {
+export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidth = 0, pieceHeight = 0, selectedPieceId, selectedPieceId2, onTap, onPieceSelect, rows = 0, cols = 0, isComplete = false, originalImageUri = null }) => {
   const [swappedIds, setSwappedIds] = useState(new Set());
   const prevBoardPiecesRef = useRef([]);
   const knownPieceIdsRef = useRef(new Set());
@@ -252,6 +252,9 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
     return gridLines;
   };
 
+  const contentWidth = boardWidth - (BOARD_BORDER_WIDTH * 2);
+  const contentHeight = boardHeight - (BOARD_BORDER_WIDTH * 2);
+
   return (
     <TouchableOpacity
       activeOpacity={1}
@@ -264,8 +267,26 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
         }
       ]}
     >
-      {renderGrid()}
-      {boardPieces && boardPieces.map((piece) => {
+      {isComplete && originalImageUri ? (
+        <View
+          style={[
+            styles.completeImageContainer,
+            {
+              width: contentWidth,
+              height: contentHeight,
+            }
+          ]}
+        >
+          <Image
+            source={{ uri: originalImageUri }}
+            style={styles.completeImage}
+            resizeMode="cover"
+          />
+        </View>
+      ) : (
+        <>
+          {renderGrid()}
+          {boardPieces && boardPieces.map((piece) => {
         if (!piece || !piece.imageUri) {
           return null;
         }
@@ -308,8 +329,10 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
             isNewlyPlaced={newlyPlacedIds.has(piece.id)}
             wasSwapped={swappedIds.has(piece.id)}
           />
-        );
-      })}
+          );
+        })}
+        </>
+      )}
     </TouchableOpacity>
   );
 };
@@ -376,5 +399,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 2,
     elevation: 2,
+  },
+  completeImageContainer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: BORDER_WIDTH,
+    borderColor: COLORS.success,
+    backgroundColor: COLORS.white,
+  },
+  completeImage: {
+    width: '100%',
+    height: '100%',
   },
 });
