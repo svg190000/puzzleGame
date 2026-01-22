@@ -171,7 +171,11 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   
   const piecesScale = useRef(new Animated.Value(1)).current;
   const pieceBorderRadius = useRef(new Animated.Value(8)).current;
+  const piecesOpacity = useRef(new Animated.Value(1)).current;
+  const completeImageOpacity = useRef(new Animated.Value(0)).current;
   const [showConfetti, setShowConfetti] = useState(false);
+  const [showCompleteImage, setShowCompleteImage] = useState(false);
+  const [hideGrid, setHideGrid] = useState(false);
 
   const checkCorrectPosition = (piece) => {
     if (!piece || pieceWidth === 0 || pieceHeight === 0) return false;
@@ -233,13 +237,36 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   }, [boardPieces]);
 
   const handleConfettiComplete = useCallback(() => {
+    // Hide grid immediately when confetti finishes
+    setHideGrid(true);
+    
+    // Animate border radius to 0
     Animated.timing(pieceBorderRadius, {
       toValue: 0,
       duration: 500,
       easing: Easing.out(Easing.ease),
       useNativeDriver: true,
-    }).start();
-  }, [pieceBorderRadius]);
+    }).start(() => {
+      // After border radius animation, transition to complete image
+      setShowCompleteImage(true);
+      Animated.parallel([
+        // Fade out pieces
+        Animated.timing(piecesOpacity, {
+          toValue: 0,
+          duration: 600,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        // Fade in complete image
+        Animated.timing(completeImageOpacity, {
+          toValue: 1,
+          duration: 600,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+  }, [pieceBorderRadius, piecesOpacity, completeImageOpacity]);
 
   useEffect(() => {
     let timeout1;
@@ -252,6 +279,10 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
       setShowConfetti(false);
       piecesScale.setValue(1);
       pieceBorderRadius.setValue(8);
+      piecesOpacity.setValue(1);
+      completeImageOpacity.setValue(0);
+      setShowCompleteImage(false);
+      setHideGrid(false);
     }
     prevIsCompleteRef.current = isComplete;
 
@@ -324,10 +355,11 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
           width: '100%',
           height: '100%',
           transform: [{ scale: piecesScale }],
+          opacity: piecesOpacity,
         }}
         pointerEvents={isComplete ? 'none' : 'auto'}
       >
-        {renderGrid()}
+        {!hideGrid && renderGrid()}
         {boardPieces && boardPieces.map((piece) => {
         if (!piece || !piece.imageUri) {
           return null;
@@ -376,6 +408,23 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
           );
         })}
       </Animated.View>
+      {/* Complete image that fades in after confetti */}
+      {showCompleteImage && originalImageUri && (
+        <Animated.Image
+          source={{ uri: originalImageUri }}
+          style={[
+            styles.completeImageContainer,
+            {
+              width: cols * pieceWidth,
+              height: rows * pieceHeight,
+              left: 0,
+              top: 0,
+              opacity: completeImageOpacity,
+            }
+          ]}
+          resizeMode="cover"
+        />
+      )}
       <Confetti 
         isActive={showConfetti} 
         boardWidth={boardWidth} 
@@ -457,7 +506,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: BORDER_WIDTH,
     borderColor: COLORS.success,
-    backgroundColor: COLORS.white,
   },
   completeImage: {
     width: '100%',
