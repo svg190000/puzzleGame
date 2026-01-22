@@ -148,19 +148,14 @@ export default function App() {
   const handleBackButton = resetGameState;
 
   const getPieceDimensions = (actualBoardWidth, actualBoardHeight) => {
-    // Board border is drawn inside, so content area is board size minus border
     const contentWidth = actualBoardWidth - (BOARD_BORDER_WIDTH * 2);
     const contentHeight = actualBoardHeight - (BOARD_BORDER_WIDTH * 2);
+    const cols = puzzleData?.cols ?? difficulty.cols;
+    const rows = puzzleData?.rows ?? difficulty.rows;
     
-    if (!puzzleData) {
-      return {
-        width: contentWidth / difficulty.cols,
-        height: contentHeight / difficulty.rows
-      };
-    }
     return {
-      width: contentWidth / puzzleData.cols,
-      height: contentHeight / puzzleData.rows
+      width: contentWidth / cols,
+      height: contentHeight / rows
     };
   };
 
@@ -173,15 +168,11 @@ export default function App() {
       return { width: maxBoardWidth, height: maxBoardHeight };
     }
 
-    // Account for board border (drawn inside) when calculating content area
     const availableContentWidth = maxBoardWidth - (BOARD_BORDER_WIDTH * 2);
     const availableContentHeight = maxBoardHeight - (BOARD_BORDER_WIDTH * 2);
-    
     const calculatedPieceWidth = Math.floor(availableContentWidth / puzzleData.cols);
     const calculatedPieceHeight = Math.floor(availableContentHeight / puzzleData.rows);
     
-    // Board dimensions = content area + border (border is drawn inside)
-    // Pieces will be positioned starting at 0, border takes up space inside
     return {
       width: (calculatedPieceWidth * puzzleData.cols) + (BOARD_BORDER_WIDTH * 2),
       height: (calculatedPieceHeight * puzzleData.rows) + (BOARD_BORDER_WIDTH * 2)
@@ -201,7 +192,6 @@ export default function App() {
     const { width: boardW, height: boardH } = getBoardDimensions();
     const { width: pieceWidth, height: pieceHeight } = getPieceDimensions(boardW, boardH);
     const POSITION_TOLERANCE = 2;
-    // Pieces start at 0 (border is drawn inside the board)
     const correctX = correctCol * pieceWidth;
     const correctY = correctRow * pieceHeight;
     const isCorrectCol = Math.abs((pieceOnBoard.boardX || 0) - correctX) <= POSITION_TOLERANCE;
@@ -353,14 +343,13 @@ export default function App() {
 
     if (!selectedPiece) return;
 
-    // Pieces start at 0, border is drawn inside
-    const minX = 0;
-    const minY = 0;
-    const maxX = boardW - pieceWidth - (BOARD_BORDER_WIDTH * 2);
-    const maxY = boardH - pieceHeight - (BOARD_BORDER_WIDTH * 2);
+    const contentWidth = boardW - (BOARD_BORDER_WIDTH * 2);
+    const contentHeight = boardH - (BOARD_BORDER_WIDTH * 2);
+    const maxX = contentWidth - pieceWidth;
+    const maxY = contentHeight - pieceHeight;
     
-    let newBoardX = Math.max(minX, Math.min(locationX - (pieceWidth / 2), maxX));
-    let newBoardY = Math.max(minY, Math.min(locationY - (pieceHeight / 2), maxY));
+    let newBoardX = Math.max(0, Math.min(locationX - (pieceWidth / 2), maxX));
+    let newBoardY = Math.max(0, Math.min(locationY - (pieceHeight / 2), maxY));
 
     const rows = puzzleData?.rows ?? difficulty.rows;
     const cols = puzzleData?.cols ?? difficulty.cols;
@@ -389,7 +378,6 @@ export default function App() {
 
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
-        // Pieces start at 0, border is drawn inside
         const cellX = col * pieceWidth;
         const cellY = row * pieceHeight;
 

@@ -227,7 +227,6 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   const renderGrid = () => {
     if (rows === 0 || cols === 0 || pieceWidth === 0 || pieceHeight === 0) return null;
 
-    // Grid lines align with pieces, which start at 0 (border is drawn inside)
     const gridWidth = cols * pieceWidth;
     const gridHeight = rows * pieceHeight;
     const gridLines = [];
