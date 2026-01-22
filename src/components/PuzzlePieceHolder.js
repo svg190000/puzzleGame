@@ -4,30 +4,30 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
 import { PuzzlePiece } from './PuzzlePiece';
 
-// Animated wrapper for pieces that were just returned to the holder
+const HOLDER_HEIGHT = 140;
+
+const ENTRANCE_ANIMATION_CONFIG = {
+  scale: { initialValue: 0.5, targetValue: 1, spring: { friction: 5, tension: 45, useNativeDriver: true } },
+  opacity: { initialValue: 0, targetValue: 1, timing: { duration: 250, useNativeDriver: true } },
+};
+
+const createEntranceAnimation = (scaleAnim, opacityAnim) => {
+  requestAnimationFrame(() => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, { toValue: ENTRANCE_ANIMATION_CONFIG.scale.targetValue, ...ENTRANCE_ANIMATION_CONFIG.scale.spring }),
+      Animated.timing(opacityAnim, { toValue: ENTRANCE_ANIMATION_CONFIG.opacity.targetValue, ...ENTRANCE_ANIMATION_CONFIG.opacity.timing }),
+    ]).start();
+  });
+};
+
 const AnimatedHolderPiece = ({ piece, pieceWidth, pieceHeight, isSelected, isSelected2, onPieceSelect, isNewlyReturned }) => {
   const wasNewlyReturnedOnMount = useRef(isNewlyReturned).current;
-  
-  const scaleAnim = useRef(new Animated.Value(wasNewlyReturnedOnMount ? 0.5 : 1)).current;
-  const opacityAnim = useRef(new Animated.Value(wasNewlyReturnedOnMount ? 0 : 1)).current;
+  const scaleAnim = useRef(new Animated.Value(wasNewlyReturnedOnMount ? ENTRANCE_ANIMATION_CONFIG.scale.initialValue : 1)).current;
+  const opacityAnim = useRef(new Animated.Value(wasNewlyReturnedOnMount ? ENTRANCE_ANIMATION_CONFIG.opacity.initialValue : 1)).current;
 
   useEffect(() => {
     if (wasNewlyReturnedOnMount) {
-      requestAnimationFrame(() => {
-        Animated.parallel([
-          Animated.spring(scaleAnim, {
-            toValue: 1,
-            friction: 5,
-            tension: 45,
-            useNativeDriver: true,
-          }),
-          Animated.timing(opacityAnim, {
-            toValue: 1,
-            duration: 250,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      });
+      createEntranceAnimation(scaleAnim, opacityAnim);
     }
   }, []);
 
@@ -61,10 +61,9 @@ export const PuzzlePieceHolder = ({
   onHolderTap,
   resetScrollKey,
 }) => {
-  const holderHeight = 140;
-  const progressBarHeight = 18; // Space for progress bar at bottom
-  const verticalPadding = 24; // Top + bottom padding for pieces area
-  const availableHeight = holderHeight - progressBarHeight - verticalPadding;
+  const PROGRESS_BAR_HEIGHT = 18;
+  const VERTICAL_PADDING = 24;
+  const availableHeight = HOLDER_HEIGHT - PROGRESS_BAR_HEIGHT - VERTICAL_PADDING;
   const scrollViewRef = useRef(null);
   const [scrollPosition, setScrollPosition] = useState(0);
   const [scrollContentWidth, setScrollContentWidth] = useState(0);
@@ -79,7 +78,6 @@ export const PuzzlePieceHolder = ({
   const knownPieceIdsRef = useRef(new Set());
   const lastResetKeyForKnownPieces = useRef(undefined);
   
-  // Detect newly returned pieces (pieces that appear in holder that we haven't seen)
   const newlyReturnedIds = new Set();
   pieces.forEach(piece => {
     if (!knownPieceIdsRef.current.has(piece.id)) {
@@ -87,9 +85,7 @@ export const PuzzlePieceHolder = ({
     }
   });
   
-  // Update known pieces after render
   useEffect(() => {
-    // Reset known pieces on new game
     if (resetScrollKey !== undefined && resetScrollKey !== lastResetKeyForKnownPieces.current) {
       knownPieceIdsRef.current = new Set(pieces.map(p => p.id));
       lastResetKeyForKnownPieces.current = resetScrollKey;
@@ -97,41 +93,36 @@ export const PuzzlePieceHolder = ({
     }
     
     const currentIds = new Set(pieces.map(p => p.id));
-    
-    // Remove IDs no longer in holder
     knownPieceIdsRef.current.forEach(id => {
       if (!currentIds.has(id)) {
         knownPieceIdsRef.current.delete(id);
       }
     });
-    
-    // Add new pieces
     pieces.forEach(piece => {
       knownPieceIdsRef.current.add(piece.id);
     });
   }, [pieces, resetScrollKey]);
   
+  const MAX_PIECE_WIDTH = 85;
+  const MAX_PIECE_HEIGHT = 80;
+  const PIECE_SPACING = 10;
+  const SCROLL_INDICATOR_PADDING = 28;
+
   const pieceAspectRatio = pieceHeight > 0 && pieceWidth > 0 ? pieceHeight / pieceWidth : 1;
-  
   let holderPieceHeight = availableHeight;
   let holderPieceWidth = holderPieceHeight / pieceAspectRatio;
   
-  const maxWidth = 85; // Smaller max for better fit
-  const maxHeight = 80; // Cap height as well
-  if (holderPieceWidth > maxWidth) {
-    holderPieceWidth = maxWidth;
+  if (holderPieceWidth > MAX_PIECE_WIDTH) {
+    holderPieceWidth = MAX_PIECE_WIDTH;
     holderPieceHeight = holderPieceWidth * pieceAspectRatio;
   }
-  if (holderPieceHeight > maxHeight) {
-    holderPieceHeight = maxHeight;
+  if (holderPieceHeight > MAX_PIECE_HEIGHT) {
+    holderPieceHeight = MAX_PIECE_HEIGHT;
     holderPieceWidth = holderPieceHeight / pieceAspectRatio;
   }
   
-  const pieceSpacing = 10;
-  const scrollIndicatorPadding = 28; // Space for scroll indicators
-  const totalContentWidth = pieces.length * holderPieceWidth + (pieces.length - 1) * pieceSpacing + (scrollIndicatorPadding * 2);
-  
-  const scrollAreaWidth = boardWidth - (scrollIndicatorPadding * 2);
+  const totalContentWidth = pieces.length * holderPieceWidth + (pieces.length - 1) * PIECE_SPACING + (SCROLL_INDICATOR_PADDING * 2);
+  const scrollAreaWidth = boardWidth - (SCROLL_INDICATOR_PADDING * 2);
   const contentWidth = scrollContentWidth > 0 ? scrollContentWidth : totalContentWidth;
   const scrollableWidth = Math.max(0, contentWidth - scrollAreaWidth);
   
@@ -244,44 +235,28 @@ export const PuzzlePieceHolder = ({
               previousContentWidth.current = currentContentWidth;
               
               if (newScrollableWidth > 0 && oldScrollableWidth > 0) {
-                const pieceWidthWithSpacing = holderPieceWidth + pieceSpacing;
-                
-                // Calculate viewport bounds
-                const viewportLeft = currentScroll;
-                const viewportRight = currentScroll + scrollAreaWidth;
-                
-                // Check if we're near an edge (within 1 piece width)
-                const edgeThreshold = pieceWidthWithSpacing;
+                const edgeThreshold = holderPieceWidth + PIECE_SPACING;
                 const isNearLeftEdge = currentScroll < edgeThreshold;
                 const isNearRightEdge = currentScroll > (oldScrollableWidth - edgeThreshold);
                 
                 let newScrollPosition;
-                
                 if (isNearRightEdge) {
-                  // Near right edge - scroll left to show more pieces
                   newScrollPosition = Math.max(0, newScrollableWidth - scrollAreaWidth * 0.3);
                 } else if (isNearLeftEdge) {
-                  // Near left edge - stay near left but ensure we don't go negative
                   newScrollPosition = Math.min(currentScroll, newScrollableWidth);
                 } else {
-                  // Middle area - maintain proportional position, but adjust if content shrunk significantly
                   const scrollRatio = currentScroll / oldScrollableWidth;
                   newScrollPosition = scrollRatio * newScrollableWidth;
-                  
-                  // If we're now too far right after adjustment, pull back
                   if (newScrollPosition > newScrollableWidth - edgeThreshold) {
                     newScrollPosition = Math.max(0, newScrollableWidth - scrollAreaWidth * 0.3);
                   }
                 }
                 
-                // Ensure position is within bounds
                 newScrollPosition = Math.max(0, Math.min(newScrollableWidth, newScrollPosition));
-                
                 actualScrollPosition.current = newScrollPosition;
                 setScrollPosition(newScrollPosition);
                 scrollViewRef.current.scrollTo({ x: newScrollPosition, animated: true });
               } else if (newScrollableWidth <= 0) {
-                // No more scrollable content
                 actualScrollPosition.current = 0;
                 setScrollPosition(0);
                 scrollViewRef.current.scrollTo({ x: 0, animated: true });
@@ -291,7 +266,7 @@ export const PuzzlePieceHolder = ({
         });
       }
     }
-  }, [pieces.length, scrollContentWidth, scrollAreaWidth, totalContentWidth, holderPieceWidth, pieceSpacing]);
+  }, [pieces.length, scrollContentWidth, scrollAreaWidth, totalContentWidth, holderPieceWidth]);
 
   // Calculate scroll indicator visibility - hide when no pieces remain
   const hasPieces = pieces && pieces.length > 0;
@@ -335,7 +310,7 @@ export const PuzzlePieceHolder = ({
                       styles.pieceWrapper,
                       { 
                         width: holderPieceWidth, 
-                        marginRight: index < pieces.length - 1 ? pieceSpacing : 0 
+                        marginRight: index < pieces.length - 1 ? PIECE_SPACING : 0 
                       }
                     ]}
                   >
@@ -399,7 +374,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    height: 140,
+    height: HOLDER_HEIGHT,
     paddingVertical: 8,
   },
   contentRow: {

@@ -23,6 +23,12 @@ import { COLORS } from './src/constants/colors';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function App() {
+  const HEADER_HEIGHT = 100;
+  const HOLDER_HEIGHT = 140;
+  const ACTION_BUTTONS_HEIGHT = 70;
+  const EQUAL_SPACING = 16;
+  const HORIZONTAL_PADDING = 40;
+
   const [difficulty, setDifficulty] = useState({ rows: 3, cols: 3 });
   const [showDifficultyModal, setShowDifficultyModal] = useState(false);
   const [showGameScreen, setShowGameScreen] = useState(false);
@@ -99,7 +105,17 @@ export default function App() {
 
     setIsGeneratingPuzzle(true);
     try {
-      const puzzle = await generatePuzzle(imageUri, selectedDifficulty.rows, selectedDifficulty.cols);
+      // Calculate target board dimensions before generating puzzle
+      const availableHeight = SCREEN_HEIGHT - HEADER_HEIGHT - HOLDER_HEIGHT - ACTION_BUTTONS_HEIGHT - (EQUAL_SPACING * 3);
+      const maxBoardWidth = SCREEN_WIDTH - HORIZONTAL_PADDING;
+      const maxBoardHeight = Math.max(availableHeight * 0.9, maxBoardWidth * 0.8);
+      
+      const calculatedPieceWidth = Math.floor(maxBoardWidth / selectedDifficulty.cols);
+      const calculatedPieceHeight = Math.floor(maxBoardHeight / selectedDifficulty.rows);
+      const targetBoardWidth = calculatedPieceWidth * selectedDifficulty.cols;
+      const targetBoardHeight = calculatedPieceHeight * selectedDifficulty.rows;
+      
+      const puzzle = await generatePuzzle(imageUri, selectedDifficulty.rows, selectedDifficulty.cols, targetBoardWidth, targetBoardHeight);
       const shuffledPieces = shuffleArray(puzzle.pieces);
       setPuzzleData(puzzle);
       setHolderPieces(shuffledPieces);
@@ -131,29 +147,17 @@ export default function App() {
   const handleBackButton = resetGameState;
 
   const getPieceDimensions = (actualBoardWidth, actualBoardHeight) => {
-    // Subtract board border from dimensions since border is included in the board's width/height
-    // This gives us the actual content area where pieces need to fit
-    const contentWidth = actualBoardWidth - (2 * BOARD_BORDER_WIDTH);
-    const contentHeight = actualBoardHeight - (2 * BOARD_BORDER_WIDTH);
-    
     if (!puzzleData) {
       return {
-        width: contentWidth / difficulty.cols,
-        height: contentHeight / difficulty.rows
+        width: actualBoardWidth / difficulty.cols,
+        height: actualBoardHeight / difficulty.rows
       };
     }
     return {
-      width: contentWidth / puzzleData.cols,
-      height: contentHeight / puzzleData.rows
+      width: actualBoardWidth / puzzleData.cols,
+      height: actualBoardHeight / puzzleData.rows
     };
   };
-
-  const HEADER_HEIGHT = 100;
-  const HOLDER_HEIGHT = 140; // Must match PuzzlePieceHolder height
-  const ACTION_BUTTONS_HEIGHT = 70;
-  const EQUAL_SPACING = 16;
-  const HORIZONTAL_PADDING = 40;
-  const BOARD_BORDER_WIDTH = 2; // Must match borderWidth in GameBoard styles
 
   const getBoardDimensions = () => {
     const availableHeight = SCREEN_HEIGHT - HEADER_HEIGHT - HOLDER_HEIGHT - ACTION_BUTTONS_HEIGHT - (EQUAL_SPACING * 3);
@@ -232,32 +236,26 @@ export default function App() {
 
     // Rule 1: If selected piece is from holder
     if (isSelectedFromHolder) {
-      // Tapping the same piece deselects it
       if (fullPiece.id === selectedPiece.id) {
         setSelectedPiece(null);
         setSelectedPiece2(null);
         return;
       }
-      // Tapping another holder piece swaps selection to that piece
       if (!isPieceFromBoard) {
         setSelectedPiece(fullPiece);
         setSelectedPiece2(null);
         return;
       }
-      // Cannot select a board piece when holder piece is selected
       return;
     }
 
-    // Rule 2: If selected piece is from board and tapping a holder piece,
-    // return the board piece to the holder (same as tapping the holder area)
+    // Rule 2: If selected piece is from board and tapping a holder piece, return to holder
     if (isSelectedFromBoard && !isPieceFromBoard) {
-      // Return the selected board piece to the holder
       setBoardPieces((prev) => prev.filter((p) => p.id !== selectedPiece.id));
       setHolderPieces((prev) => {
         if (prev.some((p) => p.id === selectedPiece.id)) return prev;
         const { boardX, boardY, ...pieceWithoutPosition } = selectedPiece;
-        const allPieces = [...prev, pieceWithoutPosition];
-        return restoreHolderOrder(allPieces);
+        return restoreHolderOrder([...prev, pieceWithoutPosition]);
       });
       setSelectedPiece(null);
       setSelectedPiece2(null);
@@ -281,7 +279,6 @@ export default function App() {
       setSelectedPiece(fullPiece);
       setSelectedPiece2(null);
     } else if (!selectedPiece2) {
-      // Setting the second piece - swap immediately if both are board pieces
       setSelectedPiece2(fullPiece);
       if (isSelectedFromBoard && isPieceFromBoard) {
         swapPieces(selectedPiece, fullPiece);
@@ -361,13 +358,8 @@ export default function App() {
     };
 
     const calculateOverlap = (cellX, cellY) => {
-      const pieceRight = newBoardX + pieceWidth;
-      const pieceBottom = newBoardY + pieceHeight;
-      const cellRight = cellX + pieceWidth;
-      const cellBottom = cellY + pieceHeight;
-
-      const overlapWidth = Math.max(0, Math.min(pieceRight, cellRight) - Math.max(newBoardX, cellX));
-      const overlapHeight = Math.max(0, Math.min(pieceBottom, cellBottom) - Math.max(newBoardY, cellY));
+      const overlapWidth = Math.max(0, Math.min(newBoardX + pieceWidth, cellX + pieceWidth) - Math.max(newBoardX, cellX));
+      const overlapHeight = Math.max(0, Math.min(newBoardY + pieceHeight, cellY + pieceHeight) - Math.max(newBoardY, cellY));
       return overlapWidth * overlapHeight;
     };
 

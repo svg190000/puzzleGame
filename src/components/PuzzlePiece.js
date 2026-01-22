@@ -2,6 +2,12 @@ import React, { useMemo, useRef, useEffect } from 'react';
 import { View, Image, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { COLORS } from '../constants/colors';
 
+const BORDER_WIDTH = 3;
+const SELECTION_ANIMATION_CONFIG = {
+  spring: { friction: 8, tension: 100, useNativeDriver: true },
+  scales: { selected: 1.08, selected2: 1.04, default: 1 },
+};
+
 export const PuzzlePiece = ({
   piece,
   pieceWidth = 0,
@@ -11,33 +17,19 @@ export const PuzzlePiece = ({
   onPress,
   style,
 }) => {
-  // Animated values for smooth transitions
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  // Animate when selection state changes
   useEffect(() => {
-    if (isSelected) {
-      Animated.spring(scaleAnim, {
-        toValue: 1.08,
-        friction: 8,
-        tension: 100,
-        useNativeDriver: true,
-      }).start();
-    } else if (isSelected2) {
-      Animated.spring(scaleAnim, {
-        toValue: 1.04,
-        friction: 8,
-        tension: 100,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 8,
-        tension: 100,
-        useNativeDriver: true,
-      }).start();
-    }
+    const targetScale = isSelected 
+      ? SELECTION_ANIMATION_CONFIG.scales.selected 
+      : isSelected2 
+        ? SELECTION_ANIMATION_CONFIG.scales.selected2 
+        : SELECTION_ANIMATION_CONFIG.scales.default;
+    
+    Animated.spring(scaleAnim, {
+      toValue: targetScale,
+      ...SELECTION_ANIMATION_CONFIG.spring,
+    }).start();
   }, [isSelected, isSelected2, scaleAnim]);
 
   if (!piece || !piece.imageUri) {
@@ -49,13 +41,11 @@ export const PuzzlePiece = ({
 
   const imageSource = useMemo(() => ({ uri: piece.imageUri }), [piece.imageUri]);
 
-  // Determine border style based on selection state
-  // Always reserve 3px border space to prevent layout shifts
   const borderStyle = isSelected 
-    ? { borderWidth: 3, borderColor: COLORS.accent }
+    ? { borderWidth: BORDER_WIDTH, borderColor: COLORS.accent }
     : isSelected2 
-    ? { borderWidth: 3, borderColor: COLORS.pastelGreen }
-    : { borderWidth: 3, borderColor: 'transparent' };
+      ? { borderWidth: BORDER_WIDTH, borderColor: COLORS.pastelGreen }
+      : { borderWidth: BORDER_WIDTH, borderColor: 'transparent' };
 
   // Animated transform style
   const animatedStyle = {
