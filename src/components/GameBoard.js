@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, Image, TouchableOpacity, TouchableWithoutFeedback, Animated, Easing } from 'react-native';
 import { COLORS } from '../constants/colors';
 import { Confetti } from './Confetti';
@@ -36,7 +36,7 @@ const createEntranceAnimation = (scaleAnim, opacityAnim, callback) => {
   });
 };
 
-const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked }) => {
+const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, borderRadius }) => {
   const wasNewlyLockedOnMount = useRef(isNewlyLocked).current;
   const scaleAnim = useRef(new Animated.Value(wasNewlyLockedOnMount ? ENTRANCE_ANIMATION_CONFIG.scale.initialValue : 1)).current;
   const opacityAnim = useRef(new Animated.Value(wasNewlyLockedOnMount ? ENTRANCE_ANIMATION_CONFIG.opacity.initialValue : 1)).current;
@@ -76,6 +76,7 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked }) 
             height: pieceHeight,
             borderWidth: BORDER_WIDTH,
             borderColor: animatedBorderColor,
+            borderRadius: borderRadius || 8,
           },
         ]}
       >
@@ -100,7 +101,7 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked }) 
   );
 };
 
-const AnimatedBoardPiece = ({ piece, pieceWidth, pieceHeight, borderStyle, isHighlighted, isSelected, onPieceSelect, isNewlyPlaced, wasSwapped }) => {
+const AnimatedBoardPiece = ({ piece, pieceWidth, pieceHeight, borderStyle, isHighlighted, isSelected, onPieceSelect, isNewlyPlaced, wasSwapped, borderRadius }) => {
   const wasNewlyPlacedOnMount = useRef(isNewlyPlaced).current;
   const scaleAnim = useRef(new Animated.Value(wasNewlyPlacedOnMount ? ENTRANCE_ANIMATION_CONFIG.scale.initialValue : 1)).current;
   const opacityAnim = useRef(new Animated.Value(wasNewlyPlacedOnMount ? ENTRANCE_ANIMATION_CONFIG.opacity.initialValue : 1)).current;
@@ -137,6 +138,7 @@ const AnimatedBoardPiece = ({ piece, pieceWidth, pieceHeight, borderStyle, isHig
           width: pieceWidth,
           height: pieceHeight,
           ...borderStyle,
+          borderRadius: borderRadius || 8,
         },
         isHighlighted && (isSelected ? styles.selectedBoardPiece : styles.selectedBoardPiece2),
       ]}
@@ -168,6 +170,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   const prevIsCompleteRef = useRef(false);
   
   const piecesScale = useRef(new Animated.Value(1)).current;
+  const pieceBorderRadius = useRef(new Animated.Value(8)).current;
   const [showConfetti, setShowConfetti] = useState(false);
 
   const checkCorrectPosition = (piece) => {
@@ -229,6 +232,14 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
     }
   }, [boardPieces]);
 
+  const handleConfettiComplete = useCallback(() => {
+    Animated.timing(pieceBorderRadius, {
+      toValue: 0,
+      duration: 500,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, [pieceBorderRadius]);
 
   useEffect(() => {
     let timeout1;
@@ -240,6 +251,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
     } else if (!isComplete && prevIsCompleteRef.current) {
       setShowConfetti(false);
       piecesScale.setValue(1);
+      pieceBorderRadius.setValue(8);
     }
     prevIsCompleteRef.current = isComplete;
 
@@ -342,6 +354,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
               pieceWidth={pieceWidth}
               pieceHeight={pieceHeight}
               isNewlyLocked={newlyLockedIds.has(piece.id)}
+              borderRadius={pieceBorderRadius}
             />
           );
         }
@@ -358,6 +371,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
             onPieceSelect={onPieceSelect}
             isNewlyPlaced={newlyPlacedIds.has(piece.id)}
             wasSwapped={swappedIds.has(piece.id)}
+            borderRadius={pieceBorderRadius}
           />
           );
         })}
@@ -366,6 +380,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
         isActive={showConfetti} 
         boardWidth={boardWidth} 
         boardHeight={boardHeight}
+        onAllComplete={handleConfettiComplete}
       />
     </TouchableOpacity>
   );
