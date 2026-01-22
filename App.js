@@ -475,6 +475,29 @@ export default function App() {
     setMoveCount((prev) => prev + 1);
   };
 
+  const handleTest = () => {
+    if (!puzzleData) return;
+
+    const { width: boardW, height: boardH } = getBoardDimensions();
+    const { width: pieceWidth, height: pieceHeight } = getPieceDimensions(boardW, boardH);
+    
+    const allPieces = [...holderPieces, ...boardPieces];
+    const piecesInCorrectPosition = allPieces.map((piece) => {
+      const correctRow = piece.correctRow ?? piece.row;
+      const correctCol = piece.correctCol ?? piece.col;
+      return {
+        ...piece,
+        boardX: correctCol * pieceWidth,
+        boardY: correctRow * pieceHeight,
+      };
+    });
+
+    setBoardPieces(piecesInCorrectPosition);
+    setHolderPieces([]);
+    setSelectedPiece(null);
+    setSelectedPiece2(null);
+  };
+
   const handleReset = () => {
     setBoardPieces((prevBoardPieces) => {
       const allPieces = [...holderPieces, ...prevBoardPieces];
@@ -567,6 +590,13 @@ export default function App() {
                 >
                   <Ionicons name="bulb" size={18} color={COLORS.buttonText} />
                   <Text style={styles.actionButtonText}>Hint</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={handleTest}
+                >
+                  <Ionicons name="checkmark-circle" size={18} color={COLORS.buttonText} />
+                  <Text style={styles.actionButtonText}>Test</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.actionButton}
