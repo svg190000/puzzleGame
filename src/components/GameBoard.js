@@ -49,7 +49,7 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, bo
           toValue: 1,
           duration: 600,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: false,
+          useNativeDriver: true,
         }).start();
       });
     }
@@ -237,7 +237,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
       toValue: 0,
       duration: 500,
       easing: Easing.out(Easing.ease),
-      useNativeDriver: false,
+      useNativeDriver: true,
     }).start();
   }, [pieceBorderRadius]);
 
