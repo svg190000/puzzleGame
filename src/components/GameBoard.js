@@ -3,6 +3,7 @@ import { View, StyleSheet, Image, TouchableOpacity, TouchableWithoutFeedback, An
 import { COLORS } from '../constants/colors';
 
 const BORDER_WIDTH = 3;
+const BOARD_BORDER_WIDTH = 2; // Must match borderWidth in board style
 const POSITION_TOLERANCE = 2;
 
 // Shared animation configuration
@@ -226,6 +227,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   const renderGrid = () => {
     if (rows === 0 || cols === 0 || pieceWidth === 0 || pieceHeight === 0) return null;
 
+    // Grid lines align with pieces, which start at 0 (border is drawn inside)
     const gridWidth = cols * pieceWidth;
     const gridHeight = rows * pieceHeight;
     const gridLines = [];
