@@ -586,7 +586,7 @@ export default function App() {
           <View style={styles.scrollView}>
             <View style={styles.initialState}>
               <View style={styles.welcomeContainer}>
-                <Text style={styles.welcomeText}>Potti's Puzzles</Text>
+                <Text style={styles.welcomeText}>Puzzles</Text>
               </View>
               <View style={styles.buttonContainer}>
                 <TouchableOpacity style={styles.newGameButton} onPress={handleNewGame}>
