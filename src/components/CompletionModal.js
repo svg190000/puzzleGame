@@ -107,24 +107,26 @@ export const CompletionModal = ({
               },
             ]}
           >
-            <View style={styles.polaroidFrame}>
-              {originalImageUri && imageWidth && imageHeight && (
-                <View style={styles.imageSection}>
-                  <Image
-                    source={{ uri: originalImageUri }}
-                    style={[
-                      styles.completedImage,
-                      {
-                        width: imageWidth * 0.75,
-                        height: imageHeight * 0.75,
-                      }
-                    ]}
-                    resizeMode="cover"
-                  />
+            <View style={styles.polaroidFrameWrapper}>
+              <View style={styles.polaroidFrame}>
+                {originalImageUri && imageWidth && imageHeight && (
+                  <View style={styles.imageSection}>
+                    <Image
+                      source={{ uri: originalImageUri }}
+                      style={[
+                        styles.completedImage,
+                        {
+                          width: imageWidth * 0.75,
+                          height: imageHeight * 0.75,
+                        }
+                      ]}
+                      resizeMode="cover"
+                    />
+                  </View>
+                )}
+                <View style={styles.frameBottomSection}>
+                  <Text style={styles.message}>{messageRef.current}</Text>
                 </View>
-              )}
-              <View style={styles.frameBottomSection}>
-                <Text style={styles.message}>{messageRef.current}</Text>
               </View>
             </View>
 
@@ -205,7 +207,7 @@ const styles = StyleSheet.create({
     minHeight: SCREEN_HEIGHT,
   },
   card: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background,
     borderRadius: 12,
     padding: 24,
     width: '100%',
@@ -217,11 +219,23 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 10,
   },
+  polaroidFrameWrapper: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: COLORS.text,
+    borderRadius: 6,
+    overflow: 'hidden',
+    shadowColor: COLORS.text,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
   polaroidFrame: {
     backgroundColor: COLORS.white,
     borderWidth: 12,
     borderColor: COLORS.white,
-    borderRadius: 6,
+    borderRadius: 5,
     shadowColor: COLORS.text,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.25,

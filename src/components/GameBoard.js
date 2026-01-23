@@ -248,6 +248,8 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
       const GRID_FADE_DELAY = 200;
       const CONFETTI_START_DELAY = 400;
       const COMPLETE_IMAGE_START_DELAY = 500;
+      const CONFETTI_DURATION = 600 + 2800; // LAUNCH_DURATION + FALL_DURATION
+      const MODAL_SHOW_DELAY = CONFETTI_START_DELAY + CONFETTI_DURATION;
       
       setTimeout(() => {
         // Square corners and fade out lock indicators simultaneously
@@ -296,13 +298,15 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
                 easing: Easing.out(Easing.ease),
                 useNativeDriver: true,
               }),
-            ]).start(() => {
-              // Callback when complete image animation finishes
-              if (onCompleteImageShown) {
-                onCompleteImageShown();
-              }
-            });
+            ]).start();
           }, COMPLETE_IMAGE_START_DELAY);
+
+          // Show modal after confetti finishes
+          setTimeout(() => {
+            if (onCompleteImageShown) {
+              onCompleteImageShown();
+            }
+          }, MODAL_SHOW_DELAY);
         });
       }, LOCK_ANIMATION_DELAY);
     } else if (!isComplete && prevIsCompleteRef.current) {
