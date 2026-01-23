@@ -256,16 +256,24 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
       const COMPLETE_IMAGE_START_DELAY = 500; // Complete image starts slightly after confetti
       
       setTimeout(() => {
-        // 1. Fade out lock indicators
-        Animated.timing(lockIndicatorOpacity, {
-          toValue: 0,
-          duration: FADE_DURATION,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }).start();
-
-        // 2. Fade out grid lines (starts slightly after lock indicators)
-        setTimeout(() => {
+        // 1. Animate border radius to 0 (square the corners) and fade out lock indicators simultaneously
+        Animated.parallel([
+          Animated.timing(pieceBorderRadius, {
+            toValue: 0,
+            duration: 1000,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(lockIndicatorOpacity, {
+            toValue: 0,
+            duration: 1000,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          // After corners are squared and lock indicators are faded, start the fade sequence
+          
+          // 2. Fade out grid lines
           Animated.timing(gridOpacity, {
             toValue: 0,
             duration: FADE_DURATION,
@@ -274,40 +282,33 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
           }).start(() => {
             setHideGrid(true);
           });
-        }, GRID_FADE_DELAY);
 
-        // 3. Start confetti during the fades
-        setTimeout(() => {
-          setShowConfetti(true);
-        }, CONFETTI_START_DELAY);
+          // 3. Start confetti during the grid fade
+          setTimeout(() => {
+            setShowConfetti(true);
+          }, CONFETTI_START_DELAY);
 
-        // 4. Start complete image fade-in synchronized with confetti
-        setTimeout(() => {
-          setShowCompleteImage(true);
-          Animated.parallel([
-            // Fade out pieces
-            Animated.timing(piecesOpacity, {
-              toValue: 0,
-              duration: 1000,
-              easing: Easing.out(Easing.ease),
-              useNativeDriver: true,
-            }),
-            // Fade in complete image
-            Animated.timing(completeImageOpacity, {
-              toValue: 1,
-              duration: 1000,
-              easing: Easing.out(Easing.ease),
-              useNativeDriver: true,
-            }),
-            // Animate border radius to 0
-            Animated.timing(pieceBorderRadius, {
-              toValue: 0,
-              duration: 1000,
-              easing: Easing.out(Easing.ease),
-              useNativeDriver: true,
-            }),
-          ]).start();
-        }, COMPLETE_IMAGE_START_DELAY);
+          // 4. Start complete image fade-in synchronized with confetti
+          setTimeout(() => {
+            setShowCompleteImage(true);
+            Animated.parallel([
+              // Fade out pieces
+              Animated.timing(piecesOpacity, {
+                toValue: 0,
+                duration: 1000,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: true,
+              }),
+              // Fade in complete image
+              Animated.timing(completeImageOpacity, {
+                toValue: 1,
+                duration: 1000,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: true,
+              }),
+            ]).start();
+          }, COMPLETE_IMAGE_START_DELAY);
+        });
       }, LOCK_ANIMATION_DELAY);
     } else if (!isComplete && prevIsCompleteRef.current) {
       // Reset all animations when puzzle is reset
