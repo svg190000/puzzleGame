@@ -31,15 +31,14 @@ function generateConfettiFromCorners(boardWidth, boardHeight) {
   const fallDistance = boardHeight + 300;
 
   // Bottom-left corner: shoot at angle (up and to the right)
-  // Angle range: 30-60 degrees (upward and rightward)
   for (let i = 0; i < CONFETTI_PER_CORNER; i++) {
-    const baseAngle = 45; // 45 degrees (diagonal up-right)
+    const baseAngle = 45;
     const angleVariation = rand(-ANGLE_SPREAD, ANGLE_SPREAD);
     const angle = degToRad(baseAngle + angleVariation);
     const velocity = rand(LAUNCH_VELOCITY * 0.7, LAUNCH_VELOCITY);
     
     const launchX = Math.cos(angle) * velocity;
-    const launchY = -Math.sin(angle) * velocity; // negative = upward
+    const launchY = -Math.sin(angle) * velocity;
     
     items.push({
       id: `confetti-${id++}-${Date.now()}`,
@@ -48,22 +47,21 @@ function generateConfettiFromCorners(boardWidth, boardHeight) {
       startY: boardHeight,
       translateXLaunch: launchX,
       translateYLaunch: launchY,
-      translateXFinal: launchX + rand(-40, 40), // slight drift during fall
+      translateXFinal: launchX + rand(-40, 40),
       translateYFinal: launchY + fallDistance,
       delay: rand(0, 150),
     });
   }
 
   // Bottom-right corner: shoot at angle (up and to the left)
-  // Angle range: 120-150 degrees (upward and leftward)
   for (let i = 0; i < CONFETTI_PER_CORNER; i++) {
-    const baseAngle = 135; // 135 degrees (diagonal up-left)
+    const baseAngle = 135;
     const angleVariation = rand(-ANGLE_SPREAD, ANGLE_SPREAD);
     const angle = degToRad(baseAngle + angleVariation);
     const velocity = rand(LAUNCH_VELOCITY * 0.7, LAUNCH_VELOCITY);
     
     const launchX = Math.cos(angle) * velocity;
-    const launchY = -Math.sin(angle) * velocity; // negative = upward
+    const launchY = -Math.sin(angle) * velocity;
     
     items.push({
       id: `confetti-${id++}-${Date.now()}`,
@@ -72,7 +70,7 @@ function generateConfettiFromCorners(boardWidth, boardHeight) {
       startY: boardHeight,
       translateXLaunch: launchX,
       translateYLaunch: launchY,
-      translateXFinal: launchX + rand(-40, 40), // slight drift during fall
+      translateXFinal: launchX + rand(-40, 40),
       translateYFinal: launchY + fallDistance,
       delay: rand(0, 150),
     });

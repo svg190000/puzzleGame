@@ -238,25 +238,19 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
     }
   }, [boardPieces]);
 
-  const handleConfettiComplete = useCallback(() => {
-    // Confetti is complete - this callback is no longer needed for the new flow
-    // but we keep it for compatibility
-  }, []);
 
   useEffect(() => {
     if (isComplete && !prevIsCompleteRef.current) {
       // Wait for piece lock-in animations to complete before starting completion sequence
       // Lock-in animation: entrance (250ms) + border color (600ms) = ~850ms
       const LOCK_ANIMATION_DELAY = 900;
-      
-      // Start the completion animation sequence after lock-in animations finish
       const FADE_DURATION = 700;
-      const GRID_FADE_DELAY = 200; // Grid starts fading slightly after lock indicators
-      const CONFETTI_START_DELAY = 400; // Confetti starts during the fades
-      const COMPLETE_IMAGE_START_DELAY = 500; // Complete image starts slightly after confetti
+      const GRID_FADE_DELAY = 200;
+      const CONFETTI_START_DELAY = 400;
+      const COMPLETE_IMAGE_START_DELAY = 500;
       
       setTimeout(() => {
-        // 1. Animate border radius to 0 (square the corners) and fade out lock indicators simultaneously
+        // Square corners and fade out lock indicators simultaneously
         Animated.parallel([
           Animated.timing(pieceBorderRadius, {
             toValue: 0,
@@ -271,9 +265,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
             useNativeDriver: true,
           }),
         ]).start(() => {
-          // After corners are squared and lock indicators are faded, start the fade sequence
-          
-          // 2. Fade out grid lines
+          // Fade out grid lines
           Animated.timing(gridOpacity, {
             toValue: 0,
             duration: FADE_DURATION,
@@ -283,23 +275,21 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
             setHideGrid(true);
           });
 
-          // 3. Start confetti during the grid fade
+          // Start confetti during grid fade
           setTimeout(() => {
             setShowConfetti(true);
           }, CONFETTI_START_DELAY);
 
-          // 4. Start complete image fade-in synchronized with confetti
+          // Fade in complete image and fade out pieces
           setTimeout(() => {
             setShowCompleteImage(true);
             Animated.parallel([
-              // Fade out pieces
               Animated.timing(piecesOpacity, {
                 toValue: 0,
                 duration: 1000,
                 easing: Easing.out(Easing.ease),
                 useNativeDriver: true,
               }),
-              // Fade in complete image
               Animated.timing(completeImageOpacity, {
                 toValue: 1,
                 duration: 1000,
@@ -313,14 +303,14 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
     } else if (!isComplete && prevIsCompleteRef.current) {
       // Reset all animations when puzzle is reset
       setShowConfetti(false);
+      setShowCompleteImage(false);
+      setHideGrid(false);
       piecesScale.setValue(1);
       pieceBorderRadius.setValue(8);
       piecesOpacity.setValue(1);
       completeImageOpacity.setValue(0);
       lockIndicatorOpacity.setValue(1);
       gridOpacity.setValue(1);
-      setShowCompleteImage(false);
-      setHideGrid(false);
     }
     prevIsCompleteRef.current = isComplete;
   }, [isComplete, lockIndicatorOpacity, gridOpacity, piecesOpacity, completeImageOpacity, pieceBorderRadius]);
@@ -370,9 +360,6 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
 
     return gridLines;
   };
-
-  const contentWidth = boardWidth - (BOARD_BORDER_WIDTH * 2);
-  const contentHeight = boardHeight - (BOARD_BORDER_WIDTH * 2);
 
   return (
     <TouchableOpacity
@@ -445,7 +432,6 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
           );
         })}
       </Animated.View>
-      {/* Complete image that fades in after confetti */}
       {showCompleteImage && originalImageUri && (
         <Animated.Image
           source={{ uri: originalImageUri }}
@@ -466,7 +452,6 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
         isActive={showConfetti} 
         boardWidth={boardWidth} 
         boardHeight={boardHeight}
-        onAllComplete={handleConfettiComplete}
       />
     </TouchableOpacity>
   );
@@ -543,9 +528,5 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: BORDER_WIDTH,
     borderColor: COLORS.success,
-  },
-  completeImage: {
-    width: '100%',
-    height: '100%',
   },
 });
