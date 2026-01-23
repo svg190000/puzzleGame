@@ -43,17 +43,44 @@ export default function App() {
   const [selectedPiece2, setSelectedPiece2] = useState(null);
   const [scrollResetKey, setScrollResetKey] = useState(0);
   const originalHolderOrderRef = useRef([]);
+  const timerIntervalRef = useRef(null);
 
+  // Timer effect - runs when game screen is shown
   useEffect(() => {
-    if (showGameScreen) {
-      const interval = setInterval(() => {
-        setTimer((prev) => prev + 1);
-      }, 1000);
-      return () => clearInterval(interval);
-    } else {
+    if (!showGameScreen) {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
       setTimer(0);
+      return;
     }
+
+    // Clear any existing interval before creating a new one
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
+
+    // Start timer
+    timerIntervalRef.current = setInterval(() => {
+      setTimer((prev) => prev + 1);
+    }, 1000);
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    };
   }, [showGameScreen]);
+
+  // Stop timer when puzzle is complete
+  useEffect(() => {
+    if (showGameScreen && isPuzzleComplete() && timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+  }, [showGameScreen, boardPieces, holderPieces, puzzleData]);
 
 
   const handleNewGame = () => {
