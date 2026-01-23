@@ -36,7 +36,7 @@ const createEntranceAnimation = (scaleAnim, opacityAnim, callback) => {
   });
 };
 
-const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, borderRadius }) => {
+const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, borderRadius, lockIndicatorOpacity }) => {
   const wasNewlyLockedOnMount = useRef(isNewlyLocked).current;
   const scaleAnim = useRef(new Animated.Value(wasNewlyLockedOnMount ? ENTRANCE_ANIMATION_CONFIG.scale.initialValue : 1)).current;
   const opacityAnim = useRef(new Animated.Value(wasNewlyLockedOnMount ? ENTRANCE_ANIMATION_CONFIG.opacity.initialValue : 1)).current;
@@ -94,7 +94,7 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, bo
             style={styles.boardPieceImage}
             resizeMode="cover"
           />
-          <View style={styles.lockIndicator} />
+          <Animated.View style={[styles.lockIndicator, { opacity: lockIndicatorOpacity }]} />
         </Animated.View>
       </Animated.View>
     </TouchableWithoutFeedback>
@@ -173,6 +173,8 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   const pieceBorderRadius = useRef(new Animated.Value(8)).current;
   const piecesOpacity = useRef(new Animated.Value(1)).current;
   const completeImageOpacity = useRef(new Animated.Value(0)).current;
+  const lockIndicatorOpacity = useRef(new Animated.Value(1)).current;
+  const gridOpacity = useRef(new Animated.Value(1)).current;
   const [showConfetti, setShowConfetti] = useState(false);
   const [showCompleteImage, setShowCompleteImage] = useState(false);
   const [hideGrid, setHideGrid] = useState(false);
@@ -237,61 +239,92 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   }, [boardPieces]);
 
   const handleConfettiComplete = useCallback(() => {
-    // Hide grid immediately when confetti finishes
-    setHideGrid(true);
-    
-    // Animate border radius to 0
-    Animated.timing(pieceBorderRadius, {
-      toValue: 0,
-      duration: 500,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }).start(() => {
-      // After border radius animation, transition to complete image
-      setShowCompleteImage(true);
-      Animated.parallel([
-        // Fade out pieces
-        Animated.timing(piecesOpacity, {
-          toValue: 0,
-          duration: 600,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-        // Fade in complete image
-        Animated.timing(completeImageOpacity, {
-          toValue: 1,
-          duration: 600,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]).start();
-    });
-  }, [pieceBorderRadius, piecesOpacity, completeImageOpacity]);
+    // Confetti is complete - this callback is no longer needed for the new flow
+    // but we keep it for compatibility
+  }, []);
 
   useEffect(() => {
-    let timeout1;
-
     if (isComplete && !prevIsCompleteRef.current) {
-      timeout1 = setTimeout(() => {
-        setShowConfetti(true);
-      }, 1000);
+      // Wait for piece lock-in animations to complete before starting completion sequence
+      // Lock-in animation: entrance (250ms) + border color (600ms) = ~850ms
+      const LOCK_ANIMATION_DELAY = 900;
+      
+      // Start the completion animation sequence after lock-in animations finish
+      const FADE_DURATION = 700;
+      const GRID_FADE_DELAY = 200; // Grid starts fading slightly after lock indicators
+      const CONFETTI_START_DELAY = 400; // Confetti starts during the fades
+      const COMPLETE_IMAGE_START_DELAY = 500; // Complete image starts slightly after confetti
+      
+      setTimeout(() => {
+        // 1. Fade out lock indicators
+        Animated.timing(lockIndicatorOpacity, {
+          toValue: 0,
+          duration: FADE_DURATION,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }).start();
+
+        // 2. Fade out grid lines (starts slightly after lock indicators)
+        setTimeout(() => {
+          Animated.timing(gridOpacity, {
+            toValue: 0,
+            duration: FADE_DURATION,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }).start(() => {
+            setHideGrid(true);
+          });
+        }, GRID_FADE_DELAY);
+
+        // 3. Start confetti during the fades
+        setTimeout(() => {
+          setShowConfetti(true);
+        }, CONFETTI_START_DELAY);
+
+        // 4. Start complete image fade-in synchronized with confetti
+        setTimeout(() => {
+          setShowCompleteImage(true);
+          Animated.parallel([
+            // Fade out pieces
+            Animated.timing(piecesOpacity, {
+              toValue: 0,
+              duration: 1000,
+              easing: Easing.out(Easing.ease),
+              useNativeDriver: true,
+            }),
+            // Fade in complete image
+            Animated.timing(completeImageOpacity, {
+              toValue: 1,
+              duration: 1000,
+              easing: Easing.out(Easing.ease),
+              useNativeDriver: true,
+            }),
+            // Animate border radius to 0
+            Animated.timing(pieceBorderRadius, {
+              toValue: 0,
+              duration: 1000,
+              easing: Easing.out(Easing.ease),
+              useNativeDriver: true,
+            }),
+          ]).start();
+        }, COMPLETE_IMAGE_START_DELAY);
+      }, LOCK_ANIMATION_DELAY);
     } else if (!isComplete && prevIsCompleteRef.current) {
+      // Reset all animations when puzzle is reset
       setShowConfetti(false);
       piecesScale.setValue(1);
       pieceBorderRadius.setValue(8);
       piecesOpacity.setValue(1);
       completeImageOpacity.setValue(0);
+      lockIndicatorOpacity.setValue(1);
+      gridOpacity.setValue(1);
       setShowCompleteImage(false);
       setHideGrid(false);
     }
     prevIsCompleteRef.current = isComplete;
+  }, [isComplete, lockIndicatorOpacity, gridOpacity, piecesOpacity, completeImageOpacity, pieceBorderRadius]);
 
-    return () => {
-      if (timeout1) clearTimeout(timeout1);
-    };
-  }, [isComplete]);
-
-  const renderGrid = () => {
+  const renderGrid = (gridOpacity) => {
     if (rows === 0 || cols === 0 || pieceWidth === 0 || pieceHeight === 0) return null;
 
     const gridWidth = cols * pieceWidth;
@@ -300,7 +333,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
 
     for (let col = 1; col < cols; col++) {
       gridLines.push(
-        <View
+        <Animated.View
           key={`v-${col}`}
           style={[
             styles.gridLine,
@@ -309,6 +342,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
               top: 0,
               width: 1,
               height: gridHeight,
+              opacity: gridOpacity,
             }
           ]}
         />
@@ -317,7 +351,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
 
     for (let row = 1; row < rows; row++) {
       gridLines.push(
-        <View
+        <Animated.View
           key={`h-${row}`}
           style={[
             styles.gridLine,
@@ -326,6 +360,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
               top: row * pieceHeight,
               width: gridWidth,
               height: 1,
+              opacity: gridOpacity,
             }
           ]}
         />
@@ -359,7 +394,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
         }}
         pointerEvents={isComplete ? 'none' : 'auto'}
       >
-        {!hideGrid && renderGrid()}
+        {!hideGrid && renderGrid(gridOpacity)}
         {boardPieces && boardPieces.map((piece) => {
         if (!piece || !piece.imageUri) {
           return null;
@@ -387,6 +422,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
               pieceHeight={pieceHeight}
               isNewlyLocked={newlyLockedIds.has(piece.id)}
               borderRadius={pieceBorderRadius}
+              lockIndicatorOpacity={lockIndicatorOpacity}
             />
           );
         }
