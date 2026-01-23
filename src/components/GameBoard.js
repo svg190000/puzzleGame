@@ -162,7 +162,7 @@ const AnimatedBoardPiece = ({ piece, pieceWidth, pieceHeight, borderStyle, isHig
   );
 };
 
-export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidth = 0, pieceHeight = 0, selectedPieceId, selectedPieceId2, onTap, onPieceSelect, rows = 0, cols = 0, isComplete = false, originalImageUri = null }) => {
+export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidth = 0, pieceHeight = 0, selectedPieceId, selectedPieceId2, onTap, onPieceSelect, rows = 0, cols = 0, isComplete = false, originalImageUri = null, onCompleteImageShown = null }) => {
   const [swappedIds, setSwappedIds] = useState(new Set());
   const prevBoardPiecesRef = useRef([]);
   const knownPieceIdsRef = useRef(new Set());
@@ -296,7 +296,12 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
                 easing: Easing.out(Easing.ease),
                 useNativeDriver: true,
               }),
-            ]).start();
+            ]).start(() => {
+              // Callback when complete image animation finishes
+              if (onCompleteImageShown) {
+                onCompleteImageShown();
+              }
+            });
           }, COMPLETE_IMAGE_START_DELAY);
         });
       }, LOCK_ANIMATION_DELAY);

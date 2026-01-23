@@ -17,6 +17,7 @@ import { PaperBackground } from './src/components/PaperBackground';
 import { GameBoard } from './src/components/GameBoard';
 import { PuzzlePieceHolder } from './src/components/PuzzlePieceHolder';
 import { GameStats } from './src/components/GameStats';
+import { CompletionModal } from './src/components/CompletionModal';
 import { generatePuzzle, shuffleArray } from './src/utils/puzzleUtils';
 import { COLORS } from './src/constants/colors';
 
@@ -42,6 +43,7 @@ export default function App() {
   const [selectedPiece, setSelectedPiece] = useState(null);
   const [selectedPiece2, setSelectedPiece2] = useState(null);
   const [scrollResetKey, setScrollResetKey] = useState(0);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
   const originalHolderOrderRef = useRef([]);
   const timerIntervalRef = useRef(null);
 
@@ -162,6 +164,7 @@ export default function App() {
 
   const resetGameState = () => {
     setShowGameScreen(false);
+    setShowCompletionModal(false);
     setTimer(0);
     setMoveCount(0);
     setPuzzleData(null);
@@ -170,6 +173,33 @@ export default function App() {
     setSelectedPiece(null);
     setSelectedPiece2(null);
     originalHolderOrderRef.current = [];
+  };
+
+  const handlePlayAgain = () => {
+    setShowCompletionModal(false);
+    setShowGameScreen(false);
+    setTimer(0);
+    setMoveCount(0);
+    setPuzzleData(null);
+    setHolderPieces([]);
+    setBoardPieces([]);
+    setSelectedPiece(null);
+    setSelectedPiece2(null);
+    originalHolderOrderRef.current = [];
+    setScrollResetKey((prev) => prev + 1);
+    // Open difficulty modal to start new game
+    setTimeout(() => {
+      setShowDifficultyModal(true);
+    }, 100);
+  };
+
+  const handleBackToMenu = () => {
+    resetGameState();
+  };
+
+  const handleSettings = () => {
+    // TODO: Implement settings functionality
+    console.log('Settings pressed');
   };
 
   const handleBackButton = resetGameState;
@@ -599,6 +629,7 @@ export default function App() {
                   cols={puzzleData?.cols ?? difficulty.cols}
                   isComplete={isPuzzleComplete()}
                   originalImageUri={puzzleData?.originalImageUri}
+                  onCompleteImageShown={() => setShowCompletionModal(true)}
                 />
               </View>
 
@@ -649,6 +680,18 @@ export default function App() {
           visible={showDifficultyModal}
           onSelect={handleDifficultySelected}
           onClose={() => setShowDifficultyModal(false)}
+        />
+        <CompletionModal
+          visible={showCompletionModal}
+          timer={timer}
+          moveCount={moveCount}
+          difficulty={difficulty}
+          originalImageUri={puzzleData?.originalImageUri}
+          imageWidth={puzzleData ? pieceWidth * (puzzleData.cols ?? difficulty.cols) : 0}
+          imageHeight={puzzleData ? pieceHeight * (puzzleData.rows ?? difficulty.rows) : 0}
+          onPlayAgain={handlePlayAgain}
+          onBackToMenu={handleBackToMenu}
+          onSettings={handleSettings}
         />
       </PaperBackground>
     </GestureHandlerRootView>
