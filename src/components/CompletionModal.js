@@ -220,7 +220,7 @@ export const CompletionModal = ({
                         { scale: polaroidScale },
                       ],
                       opacity: polaroidOpacity,
-                      width: imageWidth ? imageWidth * 0.6 + 26 : '100%',
+                      width: imageWidth ? Math.min(imageWidth * 0.75 + 26, SCREEN_WIDTH - 48) : '100%',
                     },
                   ]}
                 >
@@ -268,14 +268,14 @@ export const CompletionModal = ({
                       <View style={styles.thumbtackCircle} />
                     </Animated.View>
                     {originalImageUri && imageWidth && imageHeight && (
-                      <View style={[styles.imageSection, { width: imageWidth * 0.6 }]}>
+                      <View style={[styles.imageSection, { width: Math.min(imageWidth * 0.75, SCREEN_WIDTH - 72) }]}>
                         <Image
                           source={{ uri: originalImageUri }}
                           style={[
                             styles.completedImage,
                             {
-                              width: imageWidth * 0.6,
-                              height: imageHeight * 0.6,
+                              width: Math.min(imageWidth * 0.75, SCREEN_WIDTH - 72),
+                              height: imageHeight * 0.75,
                             }
                           ]}
                           resizeMode="cover"
@@ -314,7 +314,7 @@ export const CompletionModal = ({
                 onPress={onBackToMenu}
                 activeOpacity={0.8}
               >
-                <Ionicons name="home" size={24} color={COLORS.text} />
+                <Ionicons name="home" size={26} color={COLORS.text} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.button, styles.primaryButton]}
@@ -328,7 +328,7 @@ export const CompletionModal = ({
                 onPress={onSettings}
                 activeOpacity={0.8}
               >
-                <Ionicons name="settings" size={24} color={COLORS.text} />
+                <Ionicons name="settings" size={26} color={COLORS.text} />
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -361,25 +361,26 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     paddingVertical: 0,
   },
   contentContainer: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 0,
     minHeight: SCREEN_HEIGHT,
   },
   card: {
     backgroundColor: COLORS.background,
-    borderRadius: 12,
-    paddingTop: 24,
+    borderRadius: 0,
+    paddingTop: 50,
     paddingHorizontal: 24,
-    paddingBottom: 80,
-    width: '100%',
-    maxWidth: 420,
+    paddingBottom: 50,
+    width: SCREEN_WIDTH,
+    minHeight: SCREEN_HEIGHT,
     alignItems: 'center',
+    justifyContent: 'flex-start',
     shadowColor: COLORS.text,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2,
@@ -390,6 +391,7 @@ const styles = StyleSheet.create({
     width: '100%',
     position: 'relative',
     alignItems: 'center',
+    marginBottom: 40,
   },
   pinFulcrum: {
     alignItems: 'center',
@@ -449,8 +451,8 @@ const styles = StyleSheet.create({
   imageSection: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 10,
-    paddingHorizontal: 10,
+    paddingTop: 12,
+    paddingHorizontal: 12,
     paddingBottom: 0,
     backgroundColor: COLORS.white,
   },
@@ -459,8 +461,8 @@ const styles = StyleSheet.create({
   },
   frameBottomSection: {
     width: '100%',
-    height: 60,
-    paddingVertical: 8,
+    minHeight: 70,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
@@ -468,83 +470,98 @@ const styles = StyleSheet.create({
     borderTopWidth: 0,
   },
   message: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 22,
+    fontWeight: '700',
     color: COLORS.text,
     textAlign: 'center',
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
   },
   statsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    marginTop: 16,
-    marginBottom: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    maxWidth: SCREEN_WIDTH - 48,
+    marginTop: 0,
+    marginBottom: 32,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     backgroundColor: COLORS.background,
-    borderRadius: 12,
+    borderRadius: 16,
+    shadowColor: COLORS.text,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
   },
   statLabel: {
-    fontSize: 8,
-    fontWeight: '500',
+    fontSize: 10,
+    fontWeight: '600',
     color: COLORS.textLight,
-    marginBottom: 2,
+    marginBottom: 6,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   statValue: {
-    fontSize: 12,
+    fontSize: 18,
     fontWeight: '700',
     color: COLORS.text,
   },
   statDivider: {
     width: 1,
-    height: 20,
+    height: 32,
     backgroundColor: COLORS.border,
-    marginHorizontal: 8,
+    marginHorizontal: 12,
   },
   buttonContainer: {
     width: '100%',
+    maxWidth: SCREEN_WIDTH - 48,
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 0,
   },
   iconButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 56,
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.background,
     borderWidth: 2,
     borderColor: COLORS.border,
+    shadowColor: COLORS.text,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   button: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 16,
     paddingHorizontal: 24,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 56,
   },
   primaryButton: {
     backgroundColor: COLORS.accent,
     shadowColor: COLORS.text,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 6,
   },
   primaryButtonText: {
     color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
     letterSpacing: 0.5,
   },
 });
