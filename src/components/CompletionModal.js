@@ -43,15 +43,25 @@ export const CompletionModal = ({
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const cardScale = useRef(new Animated.Value(0.9)).current;
   const cardOpacity = useRef(new Animated.Value(0)).current;
-  const polaroidFloatY = useRef(new Animated.Value(0)).current;
-  const polaroidScale = useRef(new Animated.Value(1)).current;
-  const polaroidRotation = useRef(new Animated.Value(0)).current;
-  const polaroidAnimation = useRef(null);
+  const polaroidScale = useRef(new Animated.Value(0.3)).current;
+  const polaroidOpacity = useRef(new Animated.Value(0)).current;
+  const polaroidTranslateY = useRef(new Animated.Value(100)).current;
+  const thumbtackScale = useRef(new Animated.Value(0)).current;
+  const thumbtackOpacity = useRef(new Animated.Value(0)).current;
   const messageRef = useRef(getRandomMessage());
 
   useEffect(() => {
     if (visible) {
       messageRef.current = getRandomMessage();
+      
+      // Reset polaroid and thumbtack animations
+      polaroidScale.setValue(0.3);
+      polaroidOpacity.setValue(0);
+      polaroidTranslateY.setValue(100);
+      thumbtackScale.setValue(0);
+      thumbtackOpacity.setValue(0);
+      
+      // Animate backdrop and card first
       Animated.parallel([
         Animated.timing(backdropOpacity, {
           toValue: 1,
@@ -73,76 +83,72 @@ export const CompletionModal = ({
             useNativeDriver: true,
           }),
         ]),
-      ]).start();
-
-      // Elegant floating animation: gentle float with subtle scale pulse and slight rotation
-      const floatAnimation = Animated.parallel([
-        // Gentle vertical float
-        Animated.sequence([
-          Animated.timing(polaroidFloatY, {
-            toValue: -8,
-            duration: 2000,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(polaroidFloatY, {
-            toValue: 0,
-            duration: 2000,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ]),
-        // Subtle scale pulse (breathing effect)
-        Animated.sequence([
-          Animated.timing(polaroidScale, {
-            toValue: 1.02,
-            duration: 1500,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(polaroidScale, {
-            toValue: 1,
-            duration: 1500,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ]),
-        // Gentle rotation back and forth
-        Animated.sequence([
-          Animated.timing(polaroidRotation, {
-            toValue: 1,
-            duration: 3000,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(polaroidRotation, {
-            toValue: -1,
-            duration: 3000,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(polaroidRotation, {
-            toValue: 0,
-            duration: 3000,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ]),
-      ]);
-
-      polaroidAnimation.current = Animated.loop(floatAnimation);
-      polaroidAnimation.current.start();
+      ]).start(() => {
+        // After card animation, bring polaroid into frame
+        Animated.parallel([
+          Animated.sequence([
+            Animated.parallel([
+              Animated.timing(polaroidScale, {
+                toValue: 1.1,
+                duration: 400,
+                easing: Easing.out(Easing.back(1.5)),
+                useNativeDriver: true,
+              }),
+              Animated.timing(polaroidOpacity, {
+                toValue: 1,
+                duration: 300,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: true,
+              }),
+              Animated.timing(polaroidTranslateY, {
+                toValue: 0,
+                duration: 400,
+                easing: Easing.out(Easing.back(1.5)),
+                useNativeDriver: true,
+              }),
+            ]),
+            Animated.timing(polaroidScale, {
+              toValue: 1,
+              duration: 200,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+          ]),
+        ]).start(() => {
+          // After polaroid settles, pin it with thumbtack
+          Animated.parallel([
+            Animated.sequence([
+              Animated.timing(thumbtackScale, {
+                toValue: 1.3,
+                duration: 200,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: true,
+              }),
+              Animated.timing(thumbtackScale, {
+                toValue: 1,
+                duration: 150,
+                easing: Easing.inOut(Easing.ease),
+                useNativeDriver: true,
+              }),
+            ]),
+            Animated.timing(thumbtackOpacity, {
+              toValue: 1,
+              duration: 300,
+              easing: Easing.out(Easing.ease),
+              useNativeDriver: true,
+            }),
+          ]).start();
+        });
+      });
     } else {
-      if (polaroidAnimation.current) {
-        polaroidAnimation.current.stop();
-        polaroidAnimation.current = null;
-      }
       backdropOpacity.setValue(0);
       cardScale.setValue(0.9);
       cardOpacity.setValue(0);
-      polaroidFloatY.setValue(0);
-      polaroidScale.setValue(1);
-      polaroidRotation.setValue(0);
+      polaroidScale.setValue(0.3);
+      polaroidOpacity.setValue(0);
+      polaroidTranslateY.setValue(100);
+      thumbtackScale.setValue(0);
+      thumbtackOpacity.setValue(0);
     }
   }, [visible]);
 
@@ -172,48 +178,55 @@ export const CompletionModal = ({
               },
             ]}
           >
-            <Animated.View
-              style={[
-                styles.polaroidFrameWrapper,
-                {
-                  transform: [
+            <View style={styles.polaroidContainer}>
+              <View style={styles.pinFulcrum}>
+                <Animated.View
+                  style={[
+                    styles.polaroidFrameWrapper,
                     {
-                      translateY: polaroidFloatY,
+                      transform: [
+                        { scale: polaroidScale },
+                        { translateY: polaroidTranslateY },
+                      ],
+                      opacity: polaroidOpacity,
+                      width: imageWidth ? imageWidth * 0.6 + 26 : '100%',
                     },
-                    {
-                      scale: polaroidScale,
-                    },
-                    {
-                      rotate: polaroidRotation.interpolate({
-                        inputRange: [-1, 0, 1],
-                        outputRange: ['-3deg', '0deg', '3deg'],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <View style={styles.polaroidFrame}>
-                {originalImageUri && imageWidth && imageHeight && (
-                  <View style={styles.imageSection}>
-                    <Image
-                      source={{ uri: originalImageUri }}
+                  ]}
+                >
+                  <View style={styles.polaroidFrame}>
+                    <Animated.View
                       style={[
-                        styles.completedImage,
+                        styles.thumbtack,
                         {
-                          width: imageWidth * 0.75,
-                          height: imageHeight * 0.75,
-                        }
+                          transform: [{ scale: thumbtackScale }],
+                          opacity: thumbtackOpacity,
+                        },
                       ]}
-                      resizeMode="cover"
-                    />
+                    >
+                      <View style={styles.thumbtackCircle} />
+                    </Animated.View>
+                    {originalImageUri && imageWidth && imageHeight && (
+                      <View style={[styles.imageSection, { width: imageWidth * 0.6 }]}>
+                        <Image
+                          source={{ uri: originalImageUri }}
+                          style={[
+                            styles.completedImage,
+                            {
+                              width: imageWidth * 0.6,
+                              height: imageHeight * 0.6,
+                            }
+                          ]}
+                          resizeMode="cover"
+                        />
+                      </View>
+                    )}
+                    <View style={styles.frameBottomSection}>
+                      <Text style={styles.message}>{messageRef.current}</Text>
+                    </View>
                   </View>
-                )}
-                <View style={styles.frameBottomSection}>
-                  <Text style={styles.message}>{messageRef.current}</Text>
-                </View>
+                </Animated.View>
               </View>
-            </Animated.View>
+            </View>
 
             <View style={styles.statsContainer}>
               <View style={styles.statItem}>
@@ -310,6 +323,15 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 10,
   },
+  polaroidContainer: {
+    width: '100%',
+    position: 'relative',
+    alignItems: 'center',
+  },
+  pinFulcrum: {
+    alignItems: 'center',
+    position: 'relative',
+  },
   polaroidFrameWrapper: {
     width: '100%',
     borderWidth: 1,
@@ -321,6 +343,29 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
+    alignItems: 'center',
+    transformOrigin: 'top center',
+  },
+  thumbtack: {
+    position: 'absolute',
+    top: 2,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  thumbtackCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: COLORS.error,
+    borderWidth: 2,
+    borderColor: COLORS.white,
+    shadowColor: COLORS.text,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 5,
   },
   polaroidFrame: {
     backgroundColor: COLORS.white,
@@ -332,13 +377,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 10,
-    overflow: 'hidden',
+    overflow: 'visible',
     alignItems: 'center',
     width: '100%',
     marginBottom: 0,
+    position: 'relative',
   },
   imageSection: {
-    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: 10,
