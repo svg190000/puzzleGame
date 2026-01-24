@@ -43,6 +43,10 @@ export const CompletionModal = ({
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const cardScale = useRef(new Animated.Value(0.9)).current;
   const cardOpacity = useRef(new Animated.Value(0)).current;
+  const polaroidFloatY = useRef(new Animated.Value(0)).current;
+  const polaroidScale = useRef(new Animated.Value(1)).current;
+  const polaroidRotation = useRef(new Animated.Value(0)).current;
+  const polaroidAnimation = useRef(null);
   const messageRef = useRef(getRandomMessage());
 
   useEffect(() => {
@@ -70,10 +74,75 @@ export const CompletionModal = ({
           }),
         ]),
       ]).start();
+
+      // Elegant floating animation: gentle float with subtle scale pulse and slight rotation
+      const floatAnimation = Animated.parallel([
+        // Gentle vertical float
+        Animated.sequence([
+          Animated.timing(polaroidFloatY, {
+            toValue: -8,
+            duration: 2000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(polaroidFloatY, {
+            toValue: 0,
+            duration: 2000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+        // Subtle scale pulse (breathing effect)
+        Animated.sequence([
+          Animated.timing(polaroidScale, {
+            toValue: 1.02,
+            duration: 1500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(polaroidScale, {
+            toValue: 1,
+            duration: 1500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+        // Gentle rotation back and forth
+        Animated.sequence([
+          Animated.timing(polaroidRotation, {
+            toValue: 1,
+            duration: 3000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(polaroidRotation, {
+            toValue: -1,
+            duration: 3000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(polaroidRotation, {
+            toValue: 0,
+            duration: 3000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+      ]);
+
+      polaroidAnimation.current = Animated.loop(floatAnimation);
+      polaroidAnimation.current.start();
     } else {
+      if (polaroidAnimation.current) {
+        polaroidAnimation.current.stop();
+        polaroidAnimation.current = null;
+      }
       backdropOpacity.setValue(0);
       cardScale.setValue(0.9);
       cardOpacity.setValue(0);
+      polaroidFloatY.setValue(0);
+      polaroidScale.setValue(1);
+      polaroidRotation.setValue(0);
     }
   }, [visible]);
 
@@ -103,7 +172,27 @@ export const CompletionModal = ({
               },
             ]}
           >
-            <View style={styles.polaroidFrameWrapper}>
+            <Animated.View
+              style={[
+                styles.polaroidFrameWrapper,
+                {
+                  transform: [
+                    {
+                      translateY: polaroidFloatY,
+                    },
+                    {
+                      scale: polaroidScale,
+                    },
+                    {
+                      rotate: polaroidRotation.interpolate({
+                        inputRange: [-1, 0, 1],
+                        outputRange: ['-3deg', '0deg', '3deg'],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
               <View style={styles.polaroidFrame}>
                 {originalImageUri && imageWidth && imageHeight && (
                   <View style={styles.imageSection}>
@@ -124,7 +213,7 @@ export const CompletionModal = ({
                   <Text style={styles.message}>{messageRef.current}</Text>
                 </View>
               </View>
-            </View>
+            </Animated.View>
 
             <View style={styles.statsContainer}>
               <View style={styles.statItem}>

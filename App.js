@@ -8,6 +8,7 @@ import {
   Dimensions,
   Alert,
 } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,6 +50,7 @@ export default function App() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showLoadingScreen, setShowLoadingScreen] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Loading...');
+  const contentOpacity = useSharedValue(1);
   const originalHolderOrderRef = useRef([]);
   const timerIntervalRef = useRef(null);
 
@@ -139,6 +141,7 @@ export default function App() {
   const handleDifficultySelected = async (selectedDifficulty) => {
     setDifficulty(selectedDifficulty);
     setShowDifficultyModal(false);
+    contentOpacity.value = 0;
     setShowLoadingScreen(true);
     setIsTransitioning(true);
     setLoadingMessage('Preparing game...');
@@ -148,6 +151,7 @@ export default function App() {
     if (!imageUri) {
       setIsTransitioning(false);
       setShowLoadingScreen(false);
+      contentOpacity.value = 1;
       return;
     }
 
@@ -187,6 +191,7 @@ export default function App() {
   };
 
   const resetGameState = async () => {
+    contentOpacity.value = 0;
     setShowLoadingScreen(true);
     setIsTransitioning(true);
     setLoadingMessage('Returning to menu...');
@@ -199,10 +204,14 @@ export default function App() {
   };
 
   const handleLoadingExitComplete = () => {
-    setShowLoadingScreen(false);
+    setTimeout(() => {
+      setShowLoadingScreen(false);
+      contentOpacity.value = withTiming(1, { duration: 300 });
+    }, 50);
   };
 
   const handlePlayAgain = async () => {
+    contentOpacity.value = 0;
     setShowLoadingScreen(true);
     setIsTransitioning(true);
     setLoadingMessage('Starting new game...');
@@ -596,18 +605,23 @@ export default function App() {
   const { width: boardWidth, height: boardHeight } = getBoardDimensions();
   const { width: pieceWidth, height: pieceHeight } = getPieceDimensions(boardWidth, boardHeight);
 
+  const contentAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: contentOpacity.value,
+  }));
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <StatusBar style="dark" />
-      {showLoadingScreen && (
-        <LoadingScreen 
-          message={loadingMessage} 
-          isVisible={isTransitioning}
-          onExitComplete={handleLoadingExitComplete}
-        />
-      )}
-      {!showLoadingScreen && (
-        <PaperBackground style={styles.background}>
+      <PaperBackground style={styles.background}>
+        {showLoadingScreen && (
+          <LoadingScreen 
+            message={loadingMessage} 
+            isVisible={isTransitioning}
+            onExitComplete={handleLoadingExitComplete}
+          />
+        )}
+        {!showLoadingScreen && (
+          <Animated.View style={[styles.contentWrapper, contentAnimatedStyle]}>
           {!showGameScreen ? (
           <View style={styles.scrollView}>
             <View style={styles.initialState}>
@@ -719,8 +733,9 @@ export default function App() {
           onBackToMenu={handleBackToMenu}
           onSettings={handleSettings}
         />
-        </PaperBackground>
-      )}
+          </Animated.View>
+        )}
+      </PaperBackground>
     </GestureHandlerRootView>
   );
 }
@@ -728,8 +743,12 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: COLORS.background,
   },
   background: {
+    flex: 1,
+  },
+  contentWrapper: {
     flex: 1,
   },
   scrollView: {
