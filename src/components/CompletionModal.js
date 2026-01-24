@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
   },
   thumbtack: {
     position: 'absolute',
-    top: 2,
+    top: -11, // Center of the 12px top border (12 / 2 = 6)
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
