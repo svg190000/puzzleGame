@@ -18,6 +18,7 @@ import { GameBoard } from './src/components/GameBoard';
 import { PuzzlePieceHolder } from './src/components/PuzzlePieceHolder';
 import { GameStats } from './src/components/GameStats';
 import { CompletionModal } from './src/components/CompletionModal';
+import { LoadingScreen } from './src/components/LoadingScreen';
 import { generatePuzzle, shuffleArray } from './src/utils/puzzleUtils';
 import { COLORS } from './src/constants/colors';
 
@@ -44,6 +45,9 @@ export default function App() {
   const [selectedPiece2, setSelectedPiece2] = useState(null);
   const [scrollResetKey, setScrollResetKey] = useState(0);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [showLoadingScreen, setShowLoadingScreen] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Loading...');
   const originalHolderOrderRef = useRef([]);
   const timerIntervalRef = useRef(null);
 
@@ -127,13 +131,22 @@ export default function App() {
   const handleDifficultySelected = async (selectedDifficulty) => {
     setDifficulty(selectedDifficulty);
     setShowDifficultyModal(false);
+    setShowLoadingScreen(true);
+    setIsTransitioning(true);
+    setLoadingMessage('Preparing game...');
+    
+    const startTime = Date.now();
+    const MIN_LOADING_TIME = 3000; // 3 seconds minimum
 
     const imageUri = await pickImageFromGallery();
     if (!imageUri) {
+      setIsTransitioning(false);
+      setShowLoadingScreen(false);
       return;
     }
 
     setIsGeneratingPuzzle(true);
+    setLoadingMessage('Generating puzzle...');
     try {
       // Calculate target board dimensions before generating puzzle
       const availableHeight = SCREEN_HEIGHT - HEADER_HEIGHT - HOLDER_HEIGHT - ACTION_BUTTONS_HEIGHT - (EQUAL_SPACING * 3);
@@ -150,6 +163,12 @@ export default function App() {
       setPuzzleData(puzzle);
       setHolderPieces(shuffledPieces);
       originalHolderOrderRef.current = shuffledPieces.map((p, index) => ({ id: p.id, index }));
+      
+      // Ensure minimum loading time of 3 seconds
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = Math.max(0, MIN_LOADING_TIME - elapsedTime);
+      await new Promise(resolve => setTimeout(resolve, remainingTime));
+      
       setShowGameScreen(true);
       setMoveCount(0);
       setTimer(0);
@@ -159,10 +178,19 @@ export default function App() {
       console.error(error);
     } finally {
       setIsGeneratingPuzzle(false);
+      // Trigger exit animation
+      setIsTransitioning(false);
     }
   };
 
-  const resetGameState = () => {
+  const resetGameState = async () => {
+    setShowLoadingScreen(true);
+    setIsTransitioning(true);
+    setLoadingMessage('Returning to menu...');
+    
+    // Delay to show loading screen longer for better UX
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
     setShowGameScreen(false);
     setShowCompletionModal(false);
     setTimer(0);
@@ -173,9 +201,20 @@ export default function App() {
     setSelectedPiece(null);
     setSelectedPiece2(null);
     originalHolderOrderRef.current = [];
+    
+    // Trigger exit animation
+    setIsTransitioning(false);
   };
 
-  const handlePlayAgain = () => {
+  const handleLoadingExitComplete = () => {
+    setShowLoadingScreen(false);
+  };
+
+  const handlePlayAgain = async () => {
+    setShowLoadingScreen(true);
+    setIsTransitioning(true);
+    setLoadingMessage('Starting new game...');
+    
     setShowCompletionModal(false);
     setShowGameScreen(false);
     setTimer(0);
@@ -187,6 +226,12 @@ export default function App() {
     setSelectedPiece2(null);
     originalHolderOrderRef.current = [];
     setScrollResetKey((prev) => prev + 1);
+    
+    // Small delay for smooth transition
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Trigger exit animation
+    setIsTransitioning(false);
     // Open difficulty modal to start new game
     setTimeout(() => {
       setShowDifficultyModal(true);
@@ -581,8 +626,16 @@ export default function App() {
   return (
     <GestureHandlerRootView style={styles.container}>
       <StatusBar style="dark" />
-      <PaperBackground style={styles.background}>
-        {!showGameScreen ? (
+      {showLoadingScreen && (
+        <LoadingScreen 
+          message={loadingMessage} 
+          isVisible={isTransitioning}
+          onExitComplete={handleLoadingExitComplete}
+        />
+      )}
+      {!showLoadingScreen && (
+        <PaperBackground style={styles.background}>
+          {!showGameScreen ? (
           <View style={styles.scrollView}>
             <View style={styles.initialState}>
               <View style={styles.welcomeContainer}>
@@ -634,7 +687,7 @@ export default function App() {
               </View>
 
               {puzzleData && (
-                <View style={{ marginBottom: 16 }}>
+                <View style={styles.holderContainer}>
                   <PuzzlePieceHolder
                     boardWidth={boardWidth}
                     pieces={holderPieces}
@@ -693,7 +746,8 @@ export default function App() {
           onBackToMenu={handleBackToMenu}
           onSettings={handleSettings}
         />
-      </PaperBackground>
+        </PaperBackground>
+      )}
     </GestureHandlerRootView>
   );
 }
@@ -788,6 +842,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
     minHeight: 0, // Important for flex to work
+  },
+  holderContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   actionButtonsContainer: {
     flexDirection: 'row',
