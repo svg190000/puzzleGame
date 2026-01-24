@@ -144,31 +144,28 @@ export const CompletionModal = ({
               useNativeDriver: true,
             }),
           ]).start(() => {
-            // Start swaying animation after thumbtack is pinned
-            const createSwayAnimation = () => {
-              return Animated.sequence([
+            // Start continuous swaying animation after thumbtack is pinned
+            // Use a continuous loop with smooth easing for fluid motion without pause
+            const createSwayLoop = () => {
+              Animated.sequence([
                 Animated.timing(polaroidRotate, {
                   toValue: 0.05, // ~3 degrees to the right
                   duration: 2000,
-                  easing: Easing.inOut(Easing.sin),
+                  easing: Easing.bezier(0.42, 0, 0.58, 1), // Smooth ease in/out bezier
                   useNativeDriver: true,
                 }),
                 Animated.timing(polaroidRotate, {
                   toValue: -0.05, // ~3 degrees to the left
                   duration: 2000,
-                  easing: Easing.inOut(Easing.sin),
+                  easing: Easing.bezier(0.42, 0, 0.58, 1), // Smooth ease in/out bezier
                   useNativeDriver: true,
                 }),
-              ]);
-            };
-
-            const startSwayLoop = () => {
-              createSwayAnimation().start(() => {
-                startSwayLoop();
+              ]).start(() => {
+                // Immediately start next iteration for continuous flow
+                createSwayLoop();
               });
             };
-
-            startSwayLoop();
+            createSwayLoop();
           });
         });
       });
@@ -216,33 +213,48 @@ export const CompletionModal = ({
             <View style={styles.polaroidContainer}>
               <View style={styles.pinFulcrum}>
                 <Animated.View
-                  onLayout={(event) => {
-                    const { height } = event.nativeEvent.layout;
-                    if (height > 0) {
-                      // Set the pivot offset to half the height (to rotate around top center)
-                      const offset = height / 2;
-                      polaroidPivotOffset.setValue(offset);
-                      polaroidPivotOffsetNegative.setValue(-offset);
-                    }
-                  }}
                   style={[
-                    styles.polaroidFrameWrapper,
                     {
                       transform: [
-                        { translateY: polaroidPivotOffset },
-                        { rotate: polaroidRotate.interpolate({
-                            inputRange: [-0.05, 0.05],
-                            outputRange: ['-0.05rad', '0.05rad'],
-                          }) },
-                        { translateY: polaroidPivotOffsetNegative },
-                        { scale: polaroidScale },
                         { translateY: polaroidTranslateY },
+                        { scale: polaroidScale },
                       ],
                       opacity: polaroidOpacity,
                       width: imageWidth ? imageWidth * 0.6 + 26 : '100%',
                     },
                   ]}
                 >
+                  <Animated.View
+                    onLayout={(event) => {
+                      const { height } = event.nativeEvent.layout;
+                      if (height > 0) {
+                        // Pivot point is at the top center (y=0), so we need to translate down by half height
+                        // to move the top center to the rotation origin, then rotate, then translate back
+                        const offset = height / 2;
+                        polaroidPivotOffset.setValue(offset);
+                        polaroidPivotOffsetNegative.setValue(-offset);
+                      }
+                    }}
+                    style={[
+                      styles.polaroidFrameWrapper,
+                      {
+                        transform: [
+                          // Move pivot point (top center) to origin for rotation
+                          { translateY: polaroidPivotOffset },
+                          // Rotate around the origin (which is now at top center)
+                          { 
+                            rotate: polaroidRotate.interpolate({
+                              inputRange: [-0.05, 0.05],
+                              outputRange: ['-0.05rad', '0.05rad'],
+                            })
+                          },
+                          // Move back from origin
+                          { translateY: polaroidPivotOffsetNegative },
+                        ],
+                        width: '100%',
+                      },
+                    ]}
+                  >
                   <View style={styles.polaroidFrame}>
                     <Animated.View
                       style={[
@@ -274,6 +286,7 @@ export const CompletionModal = ({
                       <Text style={styles.message}>{messageRef.current}</Text>
                     </View>
                   </View>
+                </Animated.View>
                 </Animated.View>
               </View>
             </View>
