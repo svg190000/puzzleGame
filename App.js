@@ -18,7 +18,7 @@ import { PaperBackground } from './src/components/PaperBackground';
 import { GameBoard } from './src/components/GameBoard';
 import { PuzzlePieceHolder } from './src/components/PuzzlePieceHolder';
 import { GameStats } from './src/components/GameStats';
-import { CompletionModal } from './src/components/CompletionModal';
+import { CompletionScreen } from './src/components/CompletionScreen';
 import { LoadingScreen } from './src/components/LoadingScreen';
 import { generatePuzzle, shuffleArray } from './src/utils/puzzleUtils';
 import { COLORS } from './src/constants/colors';
@@ -622,7 +622,19 @@ export default function App() {
         )}
         {!showLoadingScreen && (
           <Animated.View style={[styles.contentWrapper, contentAnimatedStyle]}>
-          {!showGameScreen ? (
+          {showCompletionModal ? (
+            <CompletionScreen
+              timer={timer}
+              moveCount={moveCount}
+              difficulty={difficulty}
+              originalImageUri={puzzleData?.originalImageUri}
+              imageWidth={puzzleData ? pieceWidth * (puzzleData.cols ?? difficulty.cols) : 0}
+              imageHeight={puzzleData ? pieceHeight * (puzzleData.rows ?? difficulty.rows) : 0}
+              onPlayAgain={handlePlayAgain}
+              onBackToMenu={handleBackToMenu}
+              onSettings={handleSettings}
+            />
+          ) : !showGameScreen ? (
           <View style={styles.scrollView}>
             <View style={styles.initialState}>
               <View style={styles.welcomeContainer}>
@@ -720,18 +732,6 @@ export default function App() {
           visible={showDifficultyModal}
           onSelect={handleDifficultySelected}
           onClose={() => setShowDifficultyModal(false)}
-        />
-        <CompletionModal
-          visible={showCompletionModal}
-          timer={timer}
-          moveCount={moveCount}
-          difficulty={difficulty}
-          originalImageUri={puzzleData?.originalImageUri}
-          imageWidth={puzzleData ? pieceWidth * (puzzleData.cols ?? difficulty.cols) : 0}
-          imageHeight={puzzleData ? pieceHeight * (puzzleData.rows ?? difficulty.rows) : 0}
-          onPlayAgain={handlePlayAgain}
-          onBackToMenu={handleBackToMenu}
-          onSettings={handleSettings}
         />
           </Animated.View>
         )}
