@@ -30,7 +30,8 @@ export default function App() {
   const ACTION_BUTTONS_HEIGHT = 70;
   const EQUAL_SPACING = 16;
   const HORIZONTAL_PADDING = 40;
-  const BOARD_BORDER_WIDTH = 2; // Must match borderWidth in GameBoard styles
+  const BOARD_BORDER_WIDTH = 2;
+  const MIN_LOADING_TIME = 3000;
 
   const [difficulty, setDifficulty] = useState({ rows: 3, cols: 3 });
   const [showDifficultyModal, setShowDifficultyModal] = useState(false);
@@ -51,7 +52,6 @@ export default function App() {
   const originalHolderOrderRef = useRef([]);
   const timerIntervalRef = useRef(null);
 
-  // Timer effect - runs when game screen is shown
   useEffect(() => {
     if (!showGameScreen) {
       if (timerIntervalRef.current) {
@@ -62,12 +62,10 @@ export default function App() {
       return;
     }
 
-    // Clear any existing interval before creating a new one
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
     }
 
-    // Start timer
     timerIntervalRef.current = setInterval(() => {
       setTimer((prev) => prev + 1);
     }, 1000);
@@ -80,7 +78,6 @@ export default function App() {
     };
   }, [showGameScreen]);
 
-  // Stop timer when puzzle is complete
   useEffect(() => {
     if (showGameScreen && isPuzzleComplete() && timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
@@ -128,6 +125,17 @@ export default function App() {
     }
   };
 
+  const clearGameState = () => {
+    setTimer(0);
+    setMoveCount(0);
+    setPuzzleData(null);
+    setHolderPieces([]);
+    setBoardPieces([]);
+    setSelectedPiece(null);
+    setSelectedPiece2(null);
+    originalHolderOrderRef.current = [];
+  };
+
   const handleDifficultySelected = async (selectedDifficulty) => {
     setDifficulty(selectedDifficulty);
     setShowDifficultyModal(false);
@@ -136,8 +144,6 @@ export default function App() {
     setLoadingMessage('Preparing game...');
     
     const startTime = Date.now();
-    const MIN_LOADING_TIME = 3000; // 3 seconds minimum
-
     const imageUri = await pickImageFromGallery();
     if (!imageUri) {
       setIsTransitioning(false);
@@ -148,7 +154,6 @@ export default function App() {
     setIsGeneratingPuzzle(true);
     setLoadingMessage('Generating puzzle...');
     try {
-      // Calculate target board dimensions before generating puzzle
       const availableHeight = SCREEN_HEIGHT - HEADER_HEIGHT - HOLDER_HEIGHT - ACTION_BUTTONS_HEIGHT - (EQUAL_SPACING * 3);
       const maxBoardWidth = SCREEN_WIDTH - HORIZONTAL_PADDING;
       const maxBoardHeight = Math.max(availableHeight * 0.9, maxBoardWidth * 0.8);
@@ -164,7 +169,6 @@ export default function App() {
       setHolderPieces(shuffledPieces);
       originalHolderOrderRef.current = shuffledPieces.map((p, index) => ({ id: p.id, index }));
       
-      // Ensure minimum loading time of 3 seconds
       const elapsedTime = Date.now() - startTime;
       const remainingTime = Math.max(0, MIN_LOADING_TIME - elapsedTime);
       await new Promise(resolve => setTimeout(resolve, remainingTime));
@@ -178,7 +182,6 @@ export default function App() {
       console.error(error);
     } finally {
       setIsGeneratingPuzzle(false);
-      // Trigger exit animation
       setIsTransitioning(false);
     }
   };
@@ -187,22 +190,11 @@ export default function App() {
     setShowLoadingScreen(true);
     setIsTransitioning(true);
     setLoadingMessage('Returning to menu...');
-    
-    // Delay to show loading screen longer for better UX
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     setShowGameScreen(false);
     setShowCompletionModal(false);
-    setTimer(0);
-    setMoveCount(0);
-    setPuzzleData(null);
-    setHolderPieces([]);
-    setBoardPieces([]);
-    setSelectedPiece(null);
-    setSelectedPiece2(null);
-    originalHolderOrderRef.current = [];
-    
-    // Trigger exit animation
+    clearGameState();
     setIsTransitioning(false);
   };
 
@@ -217,25 +209,12 @@ export default function App() {
     
     setShowCompletionModal(false);
     setShowGameScreen(false);
-    setTimer(0);
-    setMoveCount(0);
-    setPuzzleData(null);
-    setHolderPieces([]);
-    setBoardPieces([]);
-    setSelectedPiece(null);
-    setSelectedPiece2(null);
-    originalHolderOrderRef.current = [];
+    clearGameState();
     setScrollResetKey((prev) => prev + 1);
     
-    // Small delay for smooth transition
     await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // Trigger exit animation
     setIsTransitioning(false);
-    // Open difficulty modal to start new game
-    setTimeout(() => {
-      setShowDifficultyModal(true);
-    }, 100);
+    setTimeout(() => setShowDifficultyModal(true), 100);
   };
 
   const handleBackToMenu = () => {
@@ -243,7 +222,6 @@ export default function App() {
   };
 
   const handleSettings = () => {
-    // TODO: Implement settings functionality
     console.log('Settings pressed');
   };
 
@@ -347,7 +325,6 @@ export default function App() {
     const isSelectedFromBoard = selectedPiece ? boardPieces.some((p) => p.id === selectedPiece.id) : false;
     const isSelectedFromHolder = selectedPiece ? holderPieces.some((p) => p.id === selectedPiece.id) : false;
 
-    // Rule 1: If selected piece is from holder
     if (isSelectedFromHolder) {
       if (fullPiece.id === selectedPiece.id) {
         setSelectedPiece(null);
@@ -362,7 +339,6 @@ export default function App() {
       return;
     }
 
-    // Rule 2: If selected piece is from board and tapping a holder piece, return to holder
     if (isSelectedFromBoard && !isPieceFromBoard) {
       setBoardPieces((prev) => prev.filter((p) => p.id !== selectedPiece.id));
       setHolderPieces((prev) => {
@@ -375,7 +351,6 @@ export default function App() {
       return;
     }
 
-    // Handle deselection
     if (fullPiece.id === selectedPiece?.id) {
       setSelectedPiece(null);
       setSelectedPiece2(null);
@@ -386,8 +361,6 @@ export default function App() {
       setSelectedPiece2(null);
       return;
     }
-
-    // Handle selection
     if (!selectedPiece) {
       setSelectedPiece(fullPiece);
       setSelectedPiece2(null);
@@ -841,7 +814,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    minHeight: 0, // Important for flex to work
+    minHeight: 0,
   },
   holderContainer: {
     width: '100%',

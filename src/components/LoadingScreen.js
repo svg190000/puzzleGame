@@ -19,18 +19,16 @@ export const LoadingScreen = ({ message = 'Loading...', isVisible = true, onExit
 
   useEffect(() => {
     if (isVisible) {
-      // Entry animation: drop from top, bounce, then settle
       opacity.value = withTiming(1, { duration: 200 });
       translateY.value = withSequence(
-        withTiming(0, { duration: 400 }), // Drop down
-        withSpring(-20, { damping: 8, stiffness: 100 }), // Bounce up
-        withSpring(0, { damping: 10, stiffness: 120 }) // Settle
+        withTiming(0, { duration: 400 }),
+        withSpring(-20, { damping: 8, stiffness: 100 }),
+        withSpring(0, { damping: 10, stiffness: 120 })
       );
     } else {
-      // Exit animation: jump up, then fall down out of view
       translateY.value = withSequence(
-        withSpring(-50, { damping: 8, stiffness: 150 }), // Jump up
-        withTiming(SCREEN_HEIGHT, { duration: 400 }) // Fall down out of view
+        withSpring(-50, { damping: 8, stiffness: 150 }),
+        withTiming(SCREEN_HEIGHT, { duration: 400 })
       );
       opacity.value = withTiming(0, { duration: 300 }, (finished) => {
         if (finished && onExitComplete) {
@@ -62,11 +60,11 @@ export const LoadingScreen = ({ message = 'Loading...', isVisible = true, onExit
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: -200, // Extra space at top to cover bounce/jump animations
+    top: -200,
     left: 0,
     right: 0,
-    bottom: -200, // Extra space at bottom to cover bounce/jump animations
-    height: SCREEN_HEIGHT + 400, // Total height includes extra space for animations
+    bottom: -200,
+    height: SCREEN_HEIGHT + 400,
     zIndex: 9999,
   },
   background: {

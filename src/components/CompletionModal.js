@@ -47,10 +47,7 @@ export const CompletionModal = ({
 
   useEffect(() => {
     if (visible) {
-      // Reset message on each show
       messageRef.current = getRandomMessage();
-      
-      // Animate backdrop and card
       Animated.parallel([
         Animated.timing(backdropOpacity, {
           toValue: 1,
@@ -74,7 +71,6 @@ export const CompletionModal = ({
         ]),
       ]).start();
     } else {
-      // Reset animations when hidden
       backdropOpacity.setValue(0);
       cardScale.setValue(0.9);
       cardOpacity.setValue(0);
@@ -164,7 +160,7 @@ export const CompletionModal = ({
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.iconButton}
-                onPress={onSettings || (() => {})}
+                onPress={onSettings}
                 activeOpacity={0.8}
               >
                 <Ionicons name="settings" size={24} color={COLORS.text} />
@@ -351,17 +347,6 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: COLORS.white,
     fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  secondaryButton: {
-    backgroundColor: COLORS.background,
-    borderWidth: 2,
-    borderColor: COLORS.border,
-  },
-  secondaryButtonText: {
-    color: COLORS.text,
-    fontSize: 15,
     fontWeight: '600',
     letterSpacing: 0.5,
   },
