@@ -46,6 +46,9 @@ export const CompletionModal = ({
   const polaroidScale = useRef(new Animated.Value(0.3)).current;
   const polaroidOpacity = useRef(new Animated.Value(0)).current;
   const polaroidTranslateY = useRef(new Animated.Value(100)).current;
+  const polaroidRotate = useRef(new Animated.Value(0)).current;
+  const polaroidPivotOffset = useRef(new Animated.Value(0)).current;
+  const polaroidPivotOffsetNegative = useRef(new Animated.Value(0)).current;
   const thumbtackScale = useRef(new Animated.Value(0)).current;
   const thumbtackOpacity = useRef(new Animated.Value(0)).current;
   const messageRef = useRef(getRandomMessage());
@@ -58,6 +61,9 @@ export const CompletionModal = ({
       polaroidScale.setValue(0.3);
       polaroidOpacity.setValue(0);
       polaroidTranslateY.setValue(100);
+      polaroidRotate.setValue(0);
+      polaroidPivotOffset.setValue(0);
+      polaroidPivotOffsetNegative.setValue(0);
       thumbtackScale.setValue(0);
       thumbtackOpacity.setValue(0);
       
@@ -137,7 +143,33 @@ export const CompletionModal = ({
               easing: Easing.out(Easing.ease),
               useNativeDriver: true,
             }),
-          ]).start();
+          ]).start(() => {
+            // Start swaying animation after thumbtack is pinned
+            const createSwayAnimation = () => {
+              return Animated.sequence([
+                Animated.timing(polaroidRotate, {
+                  toValue: 0.05, // ~3 degrees to the right
+                  duration: 2000,
+                  easing: Easing.inOut(Easing.sin),
+                  useNativeDriver: true,
+                }),
+                Animated.timing(polaroidRotate, {
+                  toValue: -0.05, // ~3 degrees to the left
+                  duration: 2000,
+                  easing: Easing.inOut(Easing.sin),
+                  useNativeDriver: true,
+                }),
+              ]);
+            };
+
+            const startSwayLoop = () => {
+              createSwayAnimation().start(() => {
+                startSwayLoop();
+              });
+            };
+
+            startSwayLoop();
+          });
         });
       });
     } else {
@@ -147,6 +179,9 @@ export const CompletionModal = ({
       polaroidScale.setValue(0.3);
       polaroidOpacity.setValue(0);
       polaroidTranslateY.setValue(100);
+      polaroidRotate.setValue(0);
+      polaroidPivotOffset.setValue(0);
+      polaroidPivotOffsetNegative.setValue(0);
       thumbtackScale.setValue(0);
       thumbtackOpacity.setValue(0);
     }
@@ -181,10 +216,25 @@ export const CompletionModal = ({
             <View style={styles.polaroidContainer}>
               <View style={styles.pinFulcrum}>
                 <Animated.View
+                  onLayout={(event) => {
+                    const { height } = event.nativeEvent.layout;
+                    if (height > 0) {
+                      // Set the pivot offset to half the height (to rotate around top center)
+                      const offset = height / 2;
+                      polaroidPivotOffset.setValue(offset);
+                      polaroidPivotOffsetNegative.setValue(-offset);
+                    }
+                  }}
                   style={[
                     styles.polaroidFrameWrapper,
                     {
                       transform: [
+                        { translateY: polaroidPivotOffset },
+                        { rotate: polaroidRotate.interpolate({
+                            inputRange: [-0.05, 0.05],
+                            outputRange: ['-0.05rad', '0.05rad'],
+                          }) },
+                        { translateY: polaroidPivotOffsetNegative },
                         { scale: polaroidScale },
                         { translateY: polaroidTranslateY },
                       ],
