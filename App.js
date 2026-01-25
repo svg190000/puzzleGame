@@ -401,9 +401,23 @@ export default function App() {
     const { width: boardW, height: boardH } = getBoardDimensions();
     const { width: pieceWidth, height: pieceHeight } = getPieceDimensions(boardW, boardH);
 
+    // Check if tap is on a piece - for locked pieces, use their grid position
     const tappedPiece = boardPieces.find((piece) => {
-      const pieceX = piece.boardX || 0;
-      const pieceY = piece.boardY || 0;
+      let pieceX, pieceY;
+      
+      if (isPieceLocked(piece)) {
+        // For locked pieces, use their correct grid position
+        const correctRow = piece.correctRow ?? piece.row;
+        const correctCol = piece.correctCol ?? piece.col;
+        if (correctRow === undefined || correctCol === undefined) return false;
+        pieceX = correctCol * pieceWidth;
+        pieceY = correctRow * pieceHeight;
+      } else {
+        // For unlocked pieces, use their current board position
+        pieceX = piece.boardX || 0;
+        pieceY = piece.boardY || 0;
+      }
+      
       return locationX >= pieceX && locationX <= pieceX + pieceWidth &&
         locationY >= pieceY && locationY <= pieceY + pieceHeight;
     });
@@ -448,6 +462,21 @@ export default function App() {
     const isCellOccupied = (cellX, cellY) => {
       return boardPieces.some((p) => {
         if (p.id === selectedPiece.id) return false;
+        
+        // For locked pieces, check their actual grid position (correctRow/correctCol)
+        // This ensures we only block the actual cells that contain pieces, not the bounding box
+        if (isPieceLocked(p)) {
+          const correctRow = p.correctRow ?? p.row;
+          const correctCol = p.correctCol ?? p.col;
+          if (correctRow === undefined || correctCol === undefined) return false;
+          const correctX = correctCol * pieceWidth;
+          const correctY = correctRow * pieceHeight;
+          // Check if this cell position matches the piece's grid position
+          return Math.abs(cellX - correctX) < POSITION_TOLERANCE && 
+                 Math.abs(cellY - correctY) < POSITION_TOLERANCE;
+        }
+        
+        // For unlocked pieces, check their current board position
         const pX = p.boardX || 0;
         const pY = p.boardY || 0;
         return !(cellX + pieceWidth <= pX + POSITION_TOLERANCE ||

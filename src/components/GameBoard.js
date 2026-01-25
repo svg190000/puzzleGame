@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { View, StyleSheet, Image, TouchableOpacity, TouchableWithoutFeedback, Animated, Easing } from 'react-native';
 import { COLORS } from '../constants/colors';
 import { Confetti } from './Confetti';
@@ -6,6 +6,225 @@ import { Confetti } from './Confetti';
 const BORDER_WIDTH = 3;
 const BOARD_BORDER_WIDTH = 2; // Must match borderWidth in board style
 const POSITION_TOLERANCE = 2;
+
+// Utility function to group adjacent locked pieces
+const groupAdjacentLockedPieces = (lockedPieces, pieceWidth, pieceHeight, rows, cols) => {
+  if (lockedPieces.length === 0) return [];
+
+  // Create a grid map to quickly find pieces by their grid position
+  const gridMap = new Map();
+  lockedPieces.forEach(piece => {
+    const correctRow = piece.correctRow ?? piece.row;
+    const correctCol = piece.correctCol ?? piece.col;
+    const key = `${correctRow}-${correctCol}`;
+    gridMap.set(key, piece);
+  });
+
+  // Find all adjacent pieces using union-find approach
+  const groups = [];
+  const visited = new Set();
+
+  const findAdjacent = (piece, currentGroup) => {
+    const correctRow = piece.correctRow ?? piece.row;
+    const correctCol = piece.correctCol ?? piece.col;
+    const key = `${correctRow}-${correctCol}`;
+
+    if (visited.has(key)) return;
+    visited.add(key);
+    currentGroup.push(piece);
+
+    // Check all 4 directions
+    const directions = [
+      { row: -1, col: 0 }, // top
+      { row: 1, col: 0 },  // bottom
+      { row: 0, col: -1 },  // left
+      { row: 0, col: 1 },   // right
+    ];
+
+    directions.forEach(dir => {
+      const newRow = correctRow + dir.row;
+      const newCol = correctCol + dir.col;
+      const newKey = `${newRow}-${newCol}`;
+      
+      if (newRow >= 0 && newRow < rows && newCol >= 0 && newCol < cols && gridMap.has(newKey)) {
+        const adjacentPiece = gridMap.get(newKey);
+        findAdjacent(adjacentPiece, currentGroup);
+      }
+    });
+  };
+
+  lockedPieces.forEach(piece => {
+    const key = `${piece.correctRow ?? piece.row}-${piece.correctCol ?? piece.col}`;
+    if (!visited.has(key)) {
+      const group = [];
+      findAdjacent(piece, group);
+      if (group.length > 0) {
+        groups.push(group);
+      }
+    }
+  });
+
+  return groups;
+};
+
+// Calculate the bounding box and determine which edges of each piece should have borders
+const calculateMergedGroupBounds = (group, pieceWidth, pieceHeight) => {
+  if (group.length === 0) return null;
+
+  let minRow = Infinity, maxRow = -Infinity;
+  let minCol = Infinity, maxCol = -Infinity;
+
+  // Create a map of pieces by their grid position
+  const pieceMap = new Map();
+  group.forEach(piece => {
+    const row = piece.correctRow ?? piece.row;
+    const col = piece.correctCol ?? piece.col;
+    const key = `${row}-${col}`;
+    pieceMap.set(key, piece);
+    minRow = Math.min(minRow, row);
+    maxRow = Math.max(maxRow, row);
+    minCol = Math.min(minCol, col);
+    maxCol = Math.max(maxCol, col);
+  });
+
+  const left = minCol * pieceWidth;
+  const top = minRow * pieceHeight;
+  const width = (maxCol - minCol + 1) * pieceWidth;
+  const height = (maxRow - minRow + 1) * pieceHeight;
+
+  // For each piece, determine which edges should have borders (outer edges only)
+  const piecesWithBorders = group.map(piece => {
+    const row = piece.correctRow ?? piece.row;
+    const col = piece.correctCol ?? piece.col;
+    
+    // Check if adjacent pieces exist in the group
+    const hasTop = pieceMap.has(`${row - 1}-${col}`);
+    const hasBottom = pieceMap.has(`${row + 1}-${col}`);
+    const hasLeft = pieceMap.has(`${row}-${col - 1}`);
+    const hasRight = pieceMap.has(`${row}-${col + 1}`);
+    
+    // Check if adjacent pieces have inner corners that affect this piece's borders
+    // When an adjacent piece has an inner corner, this piece's border should stop to leave space for the connector
+    // Top-left neighbor's bottom-right inner corner affects this piece's top border (left side)
+    const topLeftNeighborHasInnerBottomRight = pieceMap.has(`${row - 1}-${col - 1}`) && 
+      pieceMap.has(`${row - 1}-${col}`) && pieceMap.has(`${row}-${col - 1}`);
+    // Top-right neighbor's bottom-left inner corner affects this piece's top border (right side)
+    const topRightNeighborHasInnerBottomLeft = pieceMap.has(`${row - 1}-${col + 1}`) && 
+      pieceMap.has(`${row - 1}-${col}`) && pieceMap.has(`${row}-${col + 1}`);
+    // Bottom-left neighbor's top-right inner corner affects this piece's bottom border (left side)
+    const bottomLeftNeighborHasInnerTopRight = pieceMap.has(`${row + 1}-${col - 1}`) && 
+      pieceMap.has(`${row + 1}-${col}`) && pieceMap.has(`${row}-${col - 1}`);
+    // Bottom-right neighbor's top-left inner corner affects this piece's bottom border (right side)
+    const bottomRightNeighborHasInnerTopLeft = pieceMap.has(`${row + 1}-${col + 1}`) && 
+      pieceMap.has(`${row + 1}-${col}`) && pieceMap.has(`${row}-${col + 1}`);
+    
+    // Left neighbor's top-right inner corner affects this piece's left border (top side)
+    const leftNeighborHasInnerTopRight = hasLeft && pieceMap.has(`${row - 1}-${col - 1}`) && pieceMap.has(`${row}-${col - 1}`);
+    // Left neighbor's bottom-right inner corner affects this piece's left border (bottom side)
+    const leftNeighborHasInnerBottomRight = hasLeft && pieceMap.has(`${row + 1}-${col - 1}`) && pieceMap.has(`${row}-${col - 1}`);
+    // Right neighbor's top-left inner corner affects this piece's right border (top side)
+    const rightNeighborHasInnerTopLeft = hasRight && pieceMap.has(`${row - 1}-${col + 1}`) && pieceMap.has(`${row}-${col + 1}`);
+    // Right neighbor's bottom-left inner corner affects this piece's right border (bottom side)
+    const rightNeighborHasInnerBottomLeft = hasRight && pieceMap.has(`${row + 1}-${col + 1}`) && pieceMap.has(`${row}-${col + 1}`);
+    // Top neighbor's bottom-left inner corner affects this piece's top border (left side)
+    const topNeighborHasInnerBottomLeft = hasTop && pieceMap.has(`${row - 1}-${col - 1}`) && pieceMap.has(`${row - 1}-${col}`);
+    // Top neighbor's bottom-right inner corner affects this piece's top border (right side)
+    const topNeighborHasInnerBottomRight = hasTop && pieceMap.has(`${row - 1}-${col + 1}`) && pieceMap.has(`${row - 1}-${col}`);
+    // Bottom neighbor's top-left inner corner affects this piece's bottom border (left side)
+    const bottomNeighborHasInnerTopLeft = hasBottom && pieceMap.has(`${row + 1}-${col - 1}`) && pieceMap.has(`${row + 1}-${col}`);
+    // Bottom neighbor's top-right inner corner affects this piece's bottom border (right side)
+    const bottomNeighborHasInnerTopRight = hasBottom && pieceMap.has(`${row + 1}-${col + 1}`) && pieceMap.has(`${row + 1}-${col}`);
+    
+    // Determine which corners should be rounded (outer corners)
+    const isTopLeftCorner = !hasTop && !hasLeft;
+    const isTopRightCorner = !hasTop && !hasRight;
+    const isBottomLeftCorner = !hasBottom && !hasLeft;
+    const isBottomRightCorner = !hasBottom && !hasRight;
+    
+    // Detect inner (concave) corners on this piece
+    // Inner corner occurs when a piece has neighbors on two adjacent sides
+    const isTopLeftInner = hasTop && hasLeft;
+    const isTopRightInner = hasTop && hasRight;
+    const isBottomLeftInner = hasBottom && hasLeft;
+    const isBottomRightInner = hasBottom && hasRight;
+    
+    return {
+      piece,
+      borders: {
+        top: !hasTop,
+        bottom: !hasBottom,
+        left: !hasLeft,
+        right: !hasRight,
+      },
+      corners: {
+        topLeft: isTopLeftCorner,
+        topRight: isTopRightCorner,
+        bottomLeft: isBottomLeftCorner,
+        bottomRight: isBottomRightCorner,
+      },
+      innerCorners: {
+        topLeft: isTopLeftInner,
+        topRight: isTopRightInner,
+        bottomLeft: isBottomLeftInner,
+        bottomRight: isBottomRightInner,
+      },
+      // Track which adjacent pieces have inner corners that affect this piece's borders
+      adjacentInnerCorners: {
+        topLeft: topLeftNeighborHasInnerBottomRight,
+        topRight: topRightNeighborHasInnerBottomLeft,
+        bottomLeft: bottomLeftNeighborHasInnerTopRight,
+        bottomRight: bottomRightNeighborHasInnerTopLeft,
+        leftTop: leftNeighborHasInnerTopRight,
+        leftBottom: leftNeighborHasInnerBottomRight,
+        rightTop: rightNeighborHasInnerTopLeft,
+        rightBottom: rightNeighborHasInnerBottomLeft,
+        topLeftEdge: topNeighborHasInnerBottomLeft,
+        topRightEdge: topNeighborHasInnerBottomRight,
+        bottomLeftEdge: bottomNeighborHasInnerTopLeft,
+        bottomRightEdge: bottomNeighborHasInnerTopRight,
+      },
+      row,
+      col,
+    };
+  });
+
+  // Determine which corners of the overall bounding box should be rounded
+  const hasTopLeft = group.some(p => {
+    const r = p.correctRow ?? p.row;
+    const c = p.correctCol ?? p.col;
+    return r === minRow && c === minCol;
+  });
+  const hasTopRight = group.some(p => {
+    const r = p.correctRow ?? p.row;
+    const c = p.correctCol ?? p.col;
+    return r === minRow && c === maxCol;
+  });
+  const hasBottomLeft = group.some(p => {
+    const r = p.correctRow ?? p.row;
+    const c = p.correctCol ?? p.col;
+    return r === maxRow && c === minCol;
+  });
+  const hasBottomRight = group.some(p => {
+    const r = p.correctRow ?? p.row;
+    const c = p.correctCol ?? p.col;
+    return r === maxRow && c === maxCol;
+  });
+
+  return {
+    left,
+    top,
+    width,
+    height,
+    corners: {
+      topLeft: hasTopLeft,
+      topRight: hasTopRight,
+      bottomLeft: hasBottomLeft,
+      bottomRight: hasBottomRight,
+    },
+    pieces: group,
+    piecesWithBorders, // New: pieces with border information
+  };
+};
 
 // Shared animation configuration
 const ENTRANCE_ANIMATION_CONFIG = {
@@ -34,6 +253,298 @@ const createEntranceAnimation = (scaleAnim, opacityAnim, callback) => {
       }),
     ]).start(callback);
   });
+};
+
+// Component to render a merged group of locked pieces
+const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked, borderRadius, lockIndicatorOpacity }) => {
+  const wasNewlyLockedOnMount = useRef(isNewlyLocked).current;
+  const scaleAnim = useRef(new Animated.Value(wasNewlyLockedOnMount ? ENTRANCE_ANIMATION_CONFIG.scale.initialValue : 1)).current;
+  const opacityAnim = useRef(new Animated.Value(wasNewlyLockedOnMount ? ENTRANCE_ANIMATION_CONFIG.opacity.initialValue : 1)).current;
+  const borderProgress = useRef(new Animated.Value(wasNewlyLockedOnMount ? 0 : 1)).current;
+
+  useEffect(() => {
+    if (wasNewlyLockedOnMount) {
+      createEntranceAnimation(scaleAnim, opacityAnim, () => {
+        Animated.timing(borderProgress, {
+          toValue: 1,
+          duration: 600,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+      });
+    }
+  }, []);
+
+  // Animate border color from white to success color
+  const animatedBorderColor = borderProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [COLORS.white, COLORS.success],
+  });
+
+  // Border radius value (will be used per-piece)
+  const borderRadiusValue = borderRadius || 8;
+  const isAnimated = typeof borderRadiusValue === 'object' && borderRadiusValue.__getValue;
+  
+  // Helper function to get border radius for a corner
+  const getCornerRadius = (shouldRound) => {
+    if (!shouldRound) return 0;
+    if (isAnimated) {
+      return borderRadiusValue;
+    }
+    return typeof borderRadiusValue === 'number' ? borderRadiusValue : 8;
+  };
+
+  return (
+    <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+      {/* Container for the merged group - no border, just positioning */}
+      {/* Use pointerEvents='box-none' to allow touches to pass through empty areas */}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          left: groupBounds.left,
+          top: groupBounds.top,
+          width: groupBounds.width,
+          height: groupBounds.height,
+          transform: [{ scale: scaleAnim }],
+          opacity: opacityAnim,
+        }}
+        pointerEvents="box-none"
+      >
+        {/* Render each piece with its image and composite borders */}
+        {groupBounds.piecesWithBorders.map(({ piece, borders, corners, innerCorners, adjacentInnerCorners, row, col }) => {
+          const relativeX = (col * pieceWidth) - groupBounds.left;
+          const relativeY = (row * pieceHeight) - groupBounds.top;
+          
+          // Calculate border radius for this piece's corners
+          // Convert animated values to static numbers for width/height properties
+          const pieceTopLeftRadius = corners.topLeft ? (isAnimated ? 8 : (typeof borderRadiusValue === 'number' ? borderRadiusValue : 8)) : 0;
+          const pieceTopRightRadius = corners.topRight ? (isAnimated ? 8 : (typeof borderRadiusValue === 'number' ? borderRadiusValue : 8)) : 0;
+          const pieceBottomLeftRadius = corners.bottomLeft ? (isAnimated ? 8 : (typeof borderRadiusValue === 'number' ? borderRadiusValue : 8)) : 0;
+          const pieceBottomRightRadius = corners.bottomRight ? (isAnimated ? 8 : (typeof borderRadiusValue === 'number' ? borderRadiusValue : 8)) : 0;
+          
+          // Get border radius value for inner corners (always static number)
+          const innerCornerRadius = typeof borderRadiusValue === 'number' ? borderRadiusValue : 8;
+          
+          // Get animated border radius values for border radius properties only
+          const animatedTopLeftRadius = getCornerRadius(corners.topLeft);
+          const animatedTopRightRadius = getCornerRadius(corners.topRight);
+          const animatedBottomLeftRadius = getCornerRadius(corners.bottomLeft);
+          const animatedBottomRightRadius = getCornerRadius(corners.bottomRight);
+          
+          // Show lock indicator only on the piece at the top-right of the overall bounding box
+          const minRow = Math.min(...groupBounds.pieces.map(p => p.correctRow ?? p.row));
+          const maxCol = Math.max(...groupBounds.pieces.map(p => p.correctCol ?? p.col));
+          const isTopRightPiece = groupBounds.corners.topRight && 
+            row === minRow && col === maxCol;
+
+          return (
+            <View
+              key={piece.id}
+              style={{
+                position: 'absolute',
+                left: relativeX,
+                top: relativeY,
+                width: pieceWidth,
+                height: pieceHeight,
+                overflow: 'hidden',
+              }}
+            >
+              {/* Piece image */}
+              <Image
+                source={{ uri: piece.imageUri }}
+                style={[
+                  styles.mergedPieceImage,
+                  {
+                    width: '100%',
+                    height: '100%',
+                  },
+                ]}
+                resizeMode="cover"
+              />
+              
+              {/* Composite border - render border segments on outer edges */}
+              {/* Border segments extend fully - inner corner connectors will connect them at meeting points */}
+              {borders.top && (
+                <Animated.View
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: BORDER_WIDTH,
+                    backgroundColor: animatedBorderColor,
+                  }}
+                />
+              )}
+              {borders.bottom && (
+                <Animated.View
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: BORDER_WIDTH,
+                    backgroundColor: animatedBorderColor,
+                  }}
+                />
+              )}
+              {borders.left && (
+                <Animated.View
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: BORDER_WIDTH,
+                    backgroundColor: animatedBorderColor,
+                  }}
+                />
+              )}
+              {borders.right && (
+                <Animated.View
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: BORDER_WIDTH,
+                    backgroundColor: animatedBorderColor,
+                  }}
+                />
+              )}
+              
+              {/* Outer corner rounded borders */}
+              {corners.topLeft && (
+                <Animated.View
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: pieceTopLeftRadius, // Static number
+                    height: pieceTopLeftRadius, // Static number
+                    borderTopLeftRadius: animatedTopLeftRadius, // Animated value
+                    borderTopWidth: BORDER_WIDTH,
+                    borderLeftWidth: BORDER_WIDTH,
+                    borderColor: animatedBorderColor,
+                    borderRightWidth: 0,
+                    borderBottomWidth: 0,
+                  }}
+                />
+              )}
+              {corners.topRight && (
+                <Animated.View
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    width: pieceTopRightRadius, // Static number
+                    height: pieceTopRightRadius, // Static number
+                    borderTopRightRadius: animatedTopRightRadius, // Animated value
+                    borderTopWidth: BORDER_WIDTH,
+                    borderRightWidth: BORDER_WIDTH,
+                    borderColor: animatedBorderColor,
+                    borderLeftWidth: 0,
+                    borderBottomWidth: 0,
+                  }}
+                />
+              )}
+              {corners.bottomLeft && (
+                <Animated.View
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    width: pieceBottomLeftRadius, // Static number
+                    height: pieceBottomLeftRadius, // Static number
+                    borderBottomLeftRadius: animatedBottomLeftRadius, // Animated value
+                    borderBottomWidth: BORDER_WIDTH,
+                    borderLeftWidth: BORDER_WIDTH,
+                    borderColor: animatedBorderColor,
+                    borderRightWidth: 0,
+                    borderTopWidth: 0,
+                  }}
+                />
+              )}
+              {corners.bottomRight && (
+                <Animated.View
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    right: 0,
+                    width: pieceBottomRightRadius, // Static number
+                    height: pieceBottomRightRadius, // Static number
+                    borderBottomRightRadius: animatedBottomRightRadius, // Animated value
+                    borderBottomWidth: BORDER_WIDTH,
+                    borderRightWidth: BORDER_WIDTH,
+                    borderColor: animatedBorderColor,
+                    borderLeftWidth: 0,
+                    borderTopWidth: 0,
+                  }}
+                />
+              )}
+              
+              {/* Inner corner square connectors - positioned at the grid intersection '+' point */}
+              {/* Simple square connectors that connect the two perpendicular border segments */}
+              {innerCorners.topLeft && (
+                <Animated.View
+                  style={{
+                    position: 'absolute',
+                    // Grid intersection: top border meets left border
+                    // Position at intersection point, no rounding
+                    top: 0,
+                    left: 0,
+                    width: BORDER_WIDTH,
+                    height: BORDER_WIDTH,
+                    backgroundColor: animatedBorderColor,
+                  }}
+                />
+              )}
+              {innerCorners.topRight && (
+                <Animated.View
+                  style={{
+                    position: 'absolute',
+                    // Grid intersection: top border meets right border
+                    top: 0,
+                    right: 0,
+                    width: BORDER_WIDTH,
+                    height: BORDER_WIDTH,
+                    backgroundColor: animatedBorderColor,
+                  }}
+                />
+              )}
+              {innerCorners.bottomLeft && (
+                <Animated.View
+                  style={{
+                    position: 'absolute',
+                    // Grid intersection: bottom border meets left border
+                    bottom: 0,
+                    left: 0,
+                    width: BORDER_WIDTH,
+                    height: BORDER_WIDTH,
+                    backgroundColor: animatedBorderColor,
+                  }}
+                />
+              )}
+              {innerCorners.bottomRight && (
+                <Animated.View
+                  style={{
+                    position: 'absolute',
+                    // Grid intersection: right border meets bottom border
+                    // Right neighbor's left border (vertical) meets bottom neighbor's top border (horizontal)
+                    bottom: 0,
+                    right: 0,
+                    width: BORDER_WIDTH,
+                    height: BORDER_WIDTH,
+                    backgroundColor: animatedBorderColor,
+                  }}
+                />
+              )}
+            </View>
+          );
+        })}
+      </Animated.View>
+    </TouchableWithoutFeedback>
+  );
 };
 
 const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, borderRadius, lockIndicatorOpacity }) => {
@@ -94,7 +605,6 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, bo
             style={styles.boardPieceImage}
             resizeMode="cover"
           />
-          <Animated.View style={[styles.lockIndicator, { opacity: lockIndicatorOpacity }]} />
         </Animated.View>
       </Animated.View>
     </TouchableWithoutFeedback>
@@ -188,6 +698,28 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
     const isCorrectRow = Math.abs((piece.boardY || 0) - (correctRow * pieceHeight)) <= POSITION_TOLERANCE;
     return isCorrectCol && isCorrectRow;
   };
+
+  // Calculate merged groups of locked pieces
+  const mergedGroups = useMemo(() => {
+    if (pieceWidth === 0 || pieceHeight === 0 || rows === 0 || cols === 0) return [];
+    
+    const lockedPieces = boardPieces.filter(piece => checkCorrectPosition(piece));
+    if (lockedPieces.length === 0) return [];
+
+    const groups = groupAdjacentLockedPieces(lockedPieces, pieceWidth, pieceHeight, rows, cols);
+    return groups.map(group => calculateMergedGroupBounds(group, pieceWidth, pieceHeight)).filter(bounds => bounds !== null);
+  }, [boardPieces, pieceWidth, pieceHeight, rows, cols]);
+
+  // Track which pieces are part of merged groups
+  const piecesInMergedGroups = useMemo(() => {
+    const pieceIds = new Set();
+    mergedGroups.forEach(group => {
+      group.pieces.forEach(piece => {
+        pieceIds.add(piece.id);
+      });
+    });
+    return pieceIds;
+  }, [mergedGroups]);
 
   const prevPiecesMap = new Map(prevBoardPiecesRef.current.map(p => [p.id, p]));
   const newlyPlacedIds = new Set();
@@ -392,12 +924,35 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
         pointerEvents={isComplete ? 'none' : 'auto'}
       >
         {!hideGrid && renderGrid(gridOpacity)}
+        {/* Render merged groups first */}
+        {mergedGroups.map((groupBounds, index) => {
+          const isNewlyLocked = groupBounds.pieces.some(piece => newlyLockedIds.has(piece.id));
+          return (
+            <MergedPieceGroup
+              key={`merged-${index}-${groupBounds.pieces.map(p => p.id).join('-')}`}
+              groupBounds={groupBounds}
+              pieceWidth={pieceWidth}
+              pieceHeight={pieceHeight}
+              isNewlyLocked={isNewlyLocked}
+              borderRadius={pieceBorderRadius}
+              lockIndicatorOpacity={lockIndicatorOpacity}
+            />
+          );
+        })}
+        {/* Render individual pieces (unlocked and locked pieces not in merged groups) */}
         {boardPieces && boardPieces.map((piece) => {
         if (!piece || !piece.imageUri) {
           return null;
         }
 
         const isLocked = checkCorrectPosition(piece);
+        const isInMergedGroup = piecesInMergedGroups.has(piece.id);
+        
+        // Skip locked pieces that are part of merged groups
+        if (isLocked && isInMergedGroup) {
+          return null;
+        }
+
         const isSelected = !isLocked && selectedPieceId === piece.id;
         const isSelected2 = !isLocked && selectedPieceId2 === piece.id;
         const isHighlighted = isSelected || isSelected2;
@@ -504,6 +1059,9 @@ const styles = StyleSheet.create({
   boardPieceImage: {
     width: '100%',
     height: '100%',
+  },
+  mergedPieceImage: {
+    // Individual piece images within merged group
   },
   gridLine: {
     position: 'absolute',
