@@ -386,10 +386,10 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                   styles.mergedPieceImage,
                   {
                     position: 'absolute',
-                    left: 0.1,
-                    top: 0.1,
-                    width: pieceWidth + 0.2,
-                    height: pieceHeight + 0.2,
+                    left: overlap,
+                    top: overlap,
+                    width: pieceWidth + (overlap * 2),
+                    height: pieceHeight + (overlap * 2),
                   },
                 ]}
                 resizeMode="cover"
@@ -397,13 +397,14 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
               
               {/* Composite border - render border segments on outer edges */}
               {/* Border segments extend fully - inner corner connectors will connect them at meeting points */}
+              {/* Borders are positioned at 'overlap' to account for the container's -overlap offset */}
               {borders.top && (
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
+                    top: overlap,
+                    left: overlap,
+                    right: overlap,
                     height: BORDER_WIDTH,
                     backgroundColor: animatedBorderColor,
                   }}
@@ -413,9 +414,9 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
+                    bottom: overlap,
+                    left: overlap,
+                    right: overlap,
                     height: BORDER_WIDTH,
                     backgroundColor: animatedBorderColor,
                   }}
@@ -425,9 +426,9 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
+                    left: overlap,
+                    top: overlap,
+                    bottom: overlap,
                     width: BORDER_WIDTH,
                     backgroundColor: animatedBorderColor,
                   }}
@@ -437,9 +438,9 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    right: 0,
-                    top: 0,
-                    bottom: 0,
+                    right: overlap,
+                    top: overlap,
+                    bottom: overlap,
                     width: BORDER_WIDTH,
                     backgroundColor: animatedBorderColor,
                   }}
@@ -451,8 +452,8 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    top: 0,
-                    left: 0,
+                    top: overlap,
+                    left: overlap,
                     width: pieceTopLeftRadius, // Static number
                     height: pieceTopLeftRadius, // Static number
                     borderTopLeftRadius: animatedTopLeftRadius, // Animated value
@@ -468,8 +469,8 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    top: 0,
-                    right: 0,
+                    top: overlap,
+                    right: overlap,
                     width: pieceTopRightRadius, // Static number
                     height: pieceTopRightRadius, // Static number
                     borderTopRightRadius: animatedTopRightRadius, // Animated value
@@ -485,8 +486,8 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    bottom: 0,
-                    left: 0,
+                    bottom: overlap,
+                    left: overlap,
                     width: pieceBottomLeftRadius, // Static number
                     height: pieceBottomLeftRadius, // Static number
                     borderBottomLeftRadius: animatedBottomLeftRadius, // Animated value
@@ -502,8 +503,8 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    bottom: 0,
-                    right: 0,
+                    bottom: overlap,
+                    right: overlap,
                     width: pieceBottomRightRadius, // Static number
                     height: pieceBottomRightRadius, // Static number
                     borderBottomRightRadius: animatedBottomRightRadius, // Animated value
@@ -523,9 +524,9 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                   style={{
                     position: 'absolute',
                     // Grid intersection: top border meets left border
-                    // Position at intersection point, no rounding
-                    top: 0,
-                    left: 0,
+                    // Position at intersection point, accounting for overlap
+                    top: overlap,
+                    left: overlap,
                     width: BORDER_WIDTH,
                     height: BORDER_WIDTH,
                     backgroundColor: animatedBorderColor,
@@ -537,8 +538,8 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                   style={{
                     position: 'absolute',
                     // Grid intersection: top border meets right border
-                    top: 0,
-                    right: 0,
+                    top: overlap,
+                    right: overlap,
                     width: BORDER_WIDTH,
                     height: BORDER_WIDTH,
                     backgroundColor: animatedBorderColor,
@@ -550,8 +551,8 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                   style={{
                     position: 'absolute',
                     // Grid intersection: bottom border meets left border
-                    bottom: 0,
-                    left: 0,
+                    bottom: overlap,
+                    left: overlap,
                     width: BORDER_WIDTH,
                     height: BORDER_WIDTH,
                     backgroundColor: animatedBorderColor,
@@ -564,8 +565,8 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                     position: 'absolute',
                     // Grid intersection: right border meets bottom border
                     // Right neighbor's left border (vertical) meets bottom neighbor's top border (horizontal)
-                    bottom: 0,
-                    right: 0,
+                    bottom: overlap,
+                    right: overlap,
                     width: BORDER_WIDTH,
                     height: BORDER_WIDTH,
                     backgroundColor: animatedBorderColor,
