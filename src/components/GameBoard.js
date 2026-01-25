@@ -87,10 +87,12 @@ const calculateMergedGroupBounds = (group, pieceWidth, pieceHeight) => {
     maxCol = Math.max(maxCol, col);
   });
 
-  const left = minCol * pieceWidth;
-  const top = minRow * pieceHeight;
-  const width = (maxCol - minCol + 1) * pieceWidth;
-  const height = (maxRow - minRow + 1) * pieceHeight;
+  // Ensure all positions are exact integers - use floor to ensure consistent rounding
+  // This ensures pieces align perfectly without gaps
+  const left = Math.floor(minCol * pieceWidth);
+  const top = Math.floor(minRow * pieceHeight);
+  const width = Math.floor((maxCol - minCol + 1) * pieceWidth);
+  const height = Math.floor((maxRow - minRow + 1) * pieceHeight);
 
   // For each piece, determine which edges should have borders (outer edges only)
   const piecesWithBorders = group.map(piece => {
@@ -322,8 +324,12 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
       >
         {/* Render each piece with its image and composite borders */}
         {groupBounds.piecesWithBorders.map(({ piece, borders, corners, innerCorners, adjacentInnerCorners, row, col }) => {
-          const relativeX = (col * pieceWidth) - groupBounds.left;
-          const relativeY = (row * pieceHeight) - groupBounds.top;
+          // Calculate exact integer positions - use floor to match groupBounds calculation
+          // This ensures pieces align perfectly without gaps
+          const absoluteX = Math.floor(col * pieceWidth);
+          const absoluteY = Math.floor(row * pieceHeight);
+          const relativeX = absoluteX - groupBounds.left;
+          const relativeY = absoluteY - groupBounds.top;
           
           // Calculate border radius for this piece's corners
           // Convert animated values to static numbers for width/height properties
@@ -353,26 +359,37 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
           const isTopRightPiece = groupBounds.corners.topRight && 
             row === minRow && col === maxCol;
 
+          // Ensure pieces are positioned with a tiny overlap to eliminate any sub-pixel gaps
+          // This is a common technique to prevent visual gaps in pixel-perfect rendering
+          const overlap = 0.1; // Very small overlap to eliminate gaps
+          
           return (
             <View
               key={piece.id}
               style={{
                 position: 'absolute',
-                left: relativeX,
-                top: relativeY,
-                width: pieceWidth,
-                height: pieceHeight,
+                left: relativeX - overlap,
+                top: relativeY - overlap,
+                width: pieceWidth + (overlap * 2),
+                height: pieceHeight + (overlap * 2),
                 overflow: 'hidden',
+                backgroundColor: 'transparent',
+                margin: 0,
+                padding: 0,
+                borderWidth: 0,
               }}
             >
-              {/* Piece image */}
+              {/* Piece image - ensure exact pixel alignment with slight overlap */}
               <Image
                 source={{ uri: piece.imageUri }}
                 style={[
                   styles.mergedPieceImage,
                   {
-                    width: '100%',
-                    height: '100%',
+                    position: 'absolute',
+                    left: 0.1,
+                    top: 0.1,
+                    width: pieceWidth + 0.2,
+                    height: pieceHeight + 0.2,
                   },
                 ]}
                 resizeMode="cover"
@@ -588,6 +605,12 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, bo
     outputRange: [COLORS.white, COLORS.success],
   });
 
+  // Snap locked pieces to exact grid positions to prevent gaps
+  const correctRow = piece.correctRow ?? piece.row;
+  const correctCol = piece.correctCol ?? piece.col;
+  const exactX = correctCol !== undefined ? Math.floor(correctCol * pieceWidth) : (piece.boardX || 0);
+  const exactY = correctRow !== undefined ? Math.floor(correctRow * pieceHeight) : (piece.boardY || 0);
+
   return (
     <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
       {/* Outer Animated.View for border color animation (non-native driver) */}
@@ -597,8 +620,8 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, bo
           styles.lockedPiece,
           {
             position: 'absolute',
-            left: piece.boardX || 0,
-            top: piece.boardY || 0,
+            left: exactX,
+            top: exactY,
             width: pieceWidth,
             height: pieceHeight,
             borderWidth: BORDER_WIDTH,
@@ -1078,6 +1101,10 @@ const styles = StyleSheet.create({
   },
   mergedPieceImage: {
     // Individual piece images within merged group
+    // Ensure exact pixel rendering to prevent gaps
+    backgroundColor: 'transparent',
+    // Disable any potential sub-pixel rendering
+    transform: [{ translateX: 0 }, { translateY: 0 }],
   },
   gridLine: {
     position: 'absolute',

@@ -236,18 +236,6 @@ export default function App() {
 
   const handleBackButton = resetGameState;
 
-  const getPieceDimensions = (actualBoardWidth, actualBoardHeight) => {
-    const contentWidth = actualBoardWidth - (BOARD_BORDER_WIDTH * 2);
-    const contentHeight = actualBoardHeight - (BOARD_BORDER_WIDTH * 2);
-    const cols = puzzleData?.cols ?? difficulty.cols;
-    const rows = puzzleData?.rows ?? difficulty.rows;
-    
-    return {
-      width: contentWidth / cols,
-      height: contentHeight / rows
-    };
-  };
-
   const getBoardDimensions = () => {
     const availableHeight = SCREEN_HEIGHT - HEADER_HEIGHT - HOLDER_HEIGHT - ACTION_BUTTONS_HEIGHT - (EQUAL_SPACING * 3);
     const maxBoardWidth = SCREEN_WIDTH - HORIZONTAL_PADDING;
@@ -265,6 +253,22 @@ export default function App() {
     return {
       width: (calculatedPieceWidth * puzzleData.cols) + (BOARD_BORDER_WIDTH * 2),
       height: (calculatedPieceHeight * puzzleData.rows) + (BOARD_BORDER_WIDTH * 2)
+    };
+  };
+
+  const getPieceDimensions = (actualBoardWidth, actualBoardHeight) => {
+    const contentWidth = actualBoardWidth - (BOARD_BORDER_WIDTH * 2);
+    const contentHeight = actualBoardHeight - (BOARD_BORDER_WIDTH * 2);
+    const cols = puzzleData?.cols ?? difficulty.cols;
+    const rows = puzzleData?.rows ?? difficulty.rows;
+    
+    // Calculate integer piece dimensions
+    const pieceWidth = Math.floor(contentWidth / cols);
+    const pieceHeight = Math.floor(contentHeight / rows);
+    
+    return {
+      width: pieceWidth,
+      height: pieceHeight
     };
   };
 

@@ -75,15 +75,40 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
       processedHeight = cropHeight;
     }
 
-    const pieceWidth = Math.floor(processedWidth / cols);
-    const pieceHeight = Math.floor(processedHeight / rows);
+    // Calculate integer piece dimensions
+    // targetBoardWidth and targetBoardHeight should already be multiples of the grid size
+    // ensuring integer piece dimensions
+    const pieceWidth = Math.floor(targetBoardWidth / cols);
+    const pieceHeight = Math.floor(targetBoardHeight / rows);
+    
+    // Ensure the processed image exactly matches the target dimensions
+    // This guarantees all pieces will be the same integer size
+    const exactWidth = pieceWidth * cols;
+    const exactHeight = pieceHeight * rows;
+    
+    // If the processed image doesn't match exactly, resize it
+    if (Math.abs(processedWidth - exactWidth) > 0.5 || Math.abs(processedHeight - exactHeight) > 0.5) {
+      const finalImage = await ImageManipulator.manipulateAsync(
+        processedImageUri,
+        [
+          { resize: { width: exactWidth, height: exactHeight } }
+        ],
+        { format: ImageManipulator.SaveFormat.PNG, compress: 1 }
+      );
+      processedImageUri = finalImage.uri;
+      processedWidth = exactWidth;
+      processedHeight = exactHeight;
+    }
 
     const pieces = [];
     
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
-        const originX = col * pieceWidth;
-        const originY = row * pieceHeight;
+        // Calculate exact integer positions - ensure no floating point errors
+        const originX = Math.round(col * pieceWidth);
+        const originY = Math.round(row * pieceHeight);
+        const cropWidth = Math.round(pieceWidth);
+        const cropHeight = Math.round(pieceHeight);
         
         const pieceImage = await ImageManipulator.manipulateAsync(
           processedImageUri,
@@ -92,8 +117,8 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
               crop: {
                 originX,
                 originY,
-                width: pieceWidth,
-                height: pieceHeight,
+                width: cropWidth,
+                height: cropHeight,
               },
             },
           ],
@@ -123,8 +148,8 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
 
     return {
       pieces,
-      originalWidth: processedWidth,
-      originalHeight: processedHeight,
+      originalWidth: exactWidth,
+      originalHeight: exactHeight,
       originalImageUri: processedImageUri,
       rows,
       cols,
