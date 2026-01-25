@@ -898,18 +898,23 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   const renderGrid = (gridOpacity) => {
     if (rows === 0 || cols === 0 || pieceWidth === 0 || pieceHeight === 0) return null;
 
+    // Account for the 0.1px overlap used in merged pieces
+    // Grid lines should align with the visual boundaries where pieces meet
+    const overlap = 0.1;
     const gridWidth = cols * pieceWidth;
     const gridHeight = rows * pieceHeight;
     const gridLines = [];
 
     for (let col = 1; col < cols; col++) {
+      // Position grid line at the visual boundary where pieces overlap
+      // Each piece extends 0.1px beyond its grid position, so the line is at col * pieceWidth - 0.1
       gridLines.push(
         <Animated.View
           key={`v-${col}`}
           style={[
             styles.gridLine,
             {
-              left: col * pieceWidth,
+              left: col * pieceWidth - overlap,
               top: 0,
               width: 1,
               height: gridHeight,
@@ -921,6 +926,8 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
     }
 
     for (let row = 1; row < rows; row++) {
+      // Position grid line at the visual boundary where pieces overlap
+      // Each piece extends 0.1px beyond its grid position, so the line is at row * pieceHeight - 0.1
       gridLines.push(
         <Animated.View
           key={`h-${row}`}
@@ -928,7 +935,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
             styles.gridLine,
             {
               left: 0,
-              top: row * pieceHeight,
+              top: row * pieceHeight - overlap,
               width: gridWidth,
               height: 1,
               opacity: gridOpacity,
