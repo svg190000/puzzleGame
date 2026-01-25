@@ -142,11 +142,21 @@ const calculateMergedGroupBounds = (group, pieceWidth, pieceHeight) => {
     const isBottomRightCorner = !hasBottom && !hasRight;
     
     // Detect inner (concave) corners on this piece
-    // Inner corner occurs when a piece has neighbors on two adjacent sides
-    const isTopLeftInner = hasTop && hasLeft;
-    const isTopRightInner = hasTop && hasRight;
-    const isBottomLeftInner = hasBottom && hasLeft;
-    const isBottomRightInner = hasBottom && hasRight;
+    // Inner corner occurs when a piece has neighbors on two adjacent sides BUT no diagonal neighbor
+    // This creates a concave corner (pointing inward), not a convex corner (pointing outward)
+    const hasTopLeftDiagonal = pieceMap.has(`${row - 1}-${col - 1}`);
+    const hasTopRightDiagonal = pieceMap.has(`${row - 1}-${col + 1}`);
+    const hasBottomLeftDiagonal = pieceMap.has(`${row + 1}-${col - 1}`);
+    const hasBottomRightDiagonal = pieceMap.has(`${row + 1}-${col + 1}`);
+    
+    // Top-left inner: has top and left neighbors, but NO top-left diagonal neighbor (concave)
+    const isTopLeftInner = hasTop && hasLeft && !hasTopLeftDiagonal;
+    // Top-right inner: has top and right neighbors, but NO top-right diagonal neighbor (concave)
+    const isTopRightInner = hasTop && hasRight && !hasTopRightDiagonal;
+    // Bottom-left inner: has bottom and left neighbors, but NO bottom-left diagonal neighbor (concave)
+    const isBottomLeftInner = hasBottom && hasLeft && !hasBottomLeftDiagonal;
+    // Bottom-right inner: has bottom and right neighbors, but NO bottom-right diagonal neighbor (concave)
+    const isBottomRightInner = hasBottom && hasRight && !hasBottomRightDiagonal;
     
     return {
       piece,
@@ -331,6 +341,12 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
           const animatedBottomLeftRadius = getCornerRadius(corners.bottomLeft);
           const animatedBottomRightRadius = getCornerRadius(corners.bottomRight);
           
+          // Check if the merged group is composite (has inner corners) or simple rectangle
+          const hasInnerCorners = groupBounds.piecesWithBorders.some(p => 
+            p.innerCorners.topLeft || p.innerCorners.topRight || 
+            p.innerCorners.bottomLeft || p.innerCorners.bottomRight
+          );
+          
           // Show lock indicator only on the piece at the top-right of the overall bounding box
           const minRow = Math.min(...groupBounds.pieces.map(p => p.correctRow ?? p.row));
           const maxCol = Math.max(...groupBounds.pieces.map(p => p.correctCol ?? p.col));
@@ -483,9 +499,9 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 />
               )}
               
-              {/* Inner corner square connectors - positioned at the grid intersection '+' point */}
+              {/* Inner corner square connectors - only render if group is composite (has inner corners) */}
               {/* Simple square connectors that connect the two perpendicular border segments */}
-              {innerCorners.topLeft && (
+              {hasInnerCorners && innerCorners.topLeft && (
                 <Animated.View
                   style={{
                     position: 'absolute',
@@ -499,7 +515,7 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                   }}
                 />
               )}
-              {innerCorners.topRight && (
+              {hasInnerCorners && innerCorners.topRight && (
                 <Animated.View
                   style={{
                     position: 'absolute',
@@ -512,7 +528,7 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                   }}
                 />
               )}
-              {innerCorners.bottomLeft && (
+              {hasInnerCorners && innerCorners.bottomLeft && (
                 <Animated.View
                   style={{
                     position: 'absolute',
@@ -525,7 +541,7 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                   }}
                 />
               )}
-              {innerCorners.bottomRight && (
+              {hasInnerCorners && innerCorners.bottomRight && (
                 <Animated.View
                   style={{
                     position: 'absolute',
