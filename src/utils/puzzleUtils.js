@@ -101,15 +101,16 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
     }
 
     const pieces = [];
-    
+    // Crop each piece on pixel boundaries (integer origin, integer size).
+    // Adjacent pieces share edges exactly; no "between pixels" slicing.
+
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
-        // Calculate exact integer positions - ensure no floating point errors
         const originX = Math.round(col * pieceWidth);
         const originY = Math.round(row * pieceHeight);
         const cropWidth = Math.round(pieceWidth);
         const cropHeight = Math.round(pieceHeight);
-        
+
         const pieceImage = await ImageManipulator.manipulateAsync(
           processedImageUri,
           [

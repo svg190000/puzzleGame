@@ -359,19 +359,17 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
           const isTopRightPiece = groupBounds.corners.topRight && 
             row === minRow && col === maxCol;
 
-          // Ensure pieces are positioned with a tiny overlap to eliminate any sub-pixel gaps
-          // This is a common technique to prevent visual gaps in pixel-perfect rendering
-          const overlap = 0.1; // Very small overlap to eliminate gaps
-          
+          // Use exact pixel boundaries (no overlap) so assembled puzzle matches complete image size.
+          // Pieces are cut on pixel boundaries in puzzleUtils (integer crop origins/sizes).
           return (
             <View
               key={piece.id}
               style={{
                 position: 'absolute',
-                left: relativeX - overlap,
-                top: relativeY - overlap,
-                width: pieceWidth + (overlap * 2),
-                height: pieceHeight + (overlap * 2),
+                left: relativeX,
+                top: relativeY,
+                width: pieceWidth,
+                height: pieceHeight,
                 overflow: 'hidden',
                 backgroundColor: 'transparent',
                 margin: 0,
@@ -379,32 +377,28 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 borderWidth: 0,
               }}
             >
-              {/* Piece image - ensure exact pixel alignment with slight overlap */}
               <Image
                 source={{ uri: piece.imageUri }}
                 style={[
                   styles.mergedPieceImage,
                   {
                     position: 'absolute',
-                    left: overlap,
-                    top: overlap,
-                    width: pieceWidth + (overlap * 2),
-                    height: pieceHeight + (overlap * 2),
+                    left: 0,
+                    top: 0,
+                    width: pieceWidth,
+                    height: pieceHeight,
                   },
                 ]}
                 resizeMode="cover"
               />
               
-              {/* Composite border - render border segments on outer edges */}
-              {/* Border segments extend fully - inner corner connectors will connect them at meeting points */}
-              {/* Borders are positioned at 'overlap' to account for the container's -overlap offset */}
               {borders.top && (
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    top: overlap,
-                    left: overlap,
-                    right: overlap,
+                    top: 0,
+                    left: 0,
+                    right: 0,
                     height: BORDER_WIDTH,
                     backgroundColor: animatedBorderColor,
                   }}
@@ -414,9 +408,9 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    bottom: overlap,
-                    left: overlap,
-                    right: overlap,
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
                     height: BORDER_WIDTH,
                     backgroundColor: animatedBorderColor,
                   }}
@@ -426,9 +420,9 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    left: overlap,
-                    top: overlap,
-                    bottom: overlap,
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
                     width: BORDER_WIDTH,
                     backgroundColor: animatedBorderColor,
                   }}
@@ -438,25 +432,24 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    right: overlap,
-                    top: overlap,
-                    bottom: overlap,
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
                     width: BORDER_WIDTH,
                     backgroundColor: animatedBorderColor,
                   }}
                 />
               )}
               
-              {/* Outer corner rounded borders */}
               {corners.topLeft && (
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    top: overlap,
-                    left: overlap,
-                    width: pieceTopLeftRadius, // Static number
-                    height: pieceTopLeftRadius, // Static number
-                    borderTopLeftRadius: animatedTopLeftRadius, // Animated value
+                    top: 0,
+                    left: 0,
+                    width: pieceTopLeftRadius,
+                    height: pieceTopLeftRadius,
+                    borderTopLeftRadius: animatedTopLeftRadius,
                     borderTopWidth: BORDER_WIDTH,
                     borderLeftWidth: BORDER_WIDTH,
                     borderColor: animatedBorderColor,
@@ -469,11 +462,11 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    top: overlap,
-                    right: overlap,
-                    width: pieceTopRightRadius, // Static number
-                    height: pieceTopRightRadius, // Static number
-                    borderTopRightRadius: animatedTopRightRadius, // Animated value
+                    top: 0,
+                    right: 0,
+                    width: pieceTopRightRadius,
+                    height: pieceTopRightRadius,
+                    borderTopRightRadius: animatedTopRightRadius,
                     borderTopWidth: BORDER_WIDTH,
                     borderRightWidth: BORDER_WIDTH,
                     borderColor: animatedBorderColor,
@@ -486,11 +479,11 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    bottom: overlap,
-                    left: overlap,
-                    width: pieceBottomLeftRadius, // Static number
-                    height: pieceBottomLeftRadius, // Static number
-                    borderBottomLeftRadius: animatedBottomLeftRadius, // Animated value
+                    bottom: 0,
+                    left: 0,
+                    width: pieceBottomLeftRadius,
+                    height: pieceBottomLeftRadius,
+                    borderBottomLeftRadius: animatedBottomLeftRadius,
                     borderBottomWidth: BORDER_WIDTH,
                     borderLeftWidth: BORDER_WIDTH,
                     borderColor: animatedBorderColor,
@@ -503,11 +496,11 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    bottom: overlap,
-                    right: overlap,
-                    width: pieceBottomRightRadius, // Static number
-                    height: pieceBottomRightRadius, // Static number
-                    borderBottomRightRadius: animatedBottomRightRadius, // Animated value
+                    bottom: 0,
+                    right: 0,
+                    width: pieceBottomRightRadius,
+                    height: pieceBottomRightRadius,
+                    borderBottomRightRadius: animatedBottomRightRadius,
                     borderBottomWidth: BORDER_WIDTH,
                     borderRightWidth: BORDER_WIDTH,
                     borderColor: animatedBorderColor,
@@ -517,16 +510,12 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 />
               )}
               
-              {/* Inner corner square connectors - only render if group is composite (has inner corners) */}
-              {/* Simple square connectors that connect the two perpendicular border segments */}
               {hasInnerCorners && innerCorners.topLeft && (
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    // Grid intersection: top border meets left border
-                    // Position at intersection point, accounting for overlap
-                    top: overlap,
-                    left: overlap,
+                    top: 0,
+                    left: 0,
                     width: BORDER_WIDTH,
                     height: BORDER_WIDTH,
                     backgroundColor: animatedBorderColor,
@@ -537,9 +526,8 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    // Grid intersection: top border meets right border
-                    top: overlap,
-                    right: overlap,
+                    top: 0,
+                    right: 0,
                     width: BORDER_WIDTH,
                     height: BORDER_WIDTH,
                     backgroundColor: animatedBorderColor,
@@ -550,9 +538,8 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    // Grid intersection: bottom border meets left border
-                    bottom: overlap,
-                    left: overlap,
+                    bottom: 0,
+                    left: 0,
                     width: BORDER_WIDTH,
                     height: BORDER_WIDTH,
                     backgroundColor: animatedBorderColor,
@@ -563,10 +550,8 @@ const MergedPieceGroup = ({ groupBounds, pieceWidth, pieceHeight, isNewlyLocked,
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    // Grid intersection: right border meets bottom border
-                    // Right neighbor's left border (vertical) meets bottom neighbor's top border (horizontal)
-                    bottom: overlap,
-                    right: overlap,
+                    bottom: 0,
+                    right: 0,
                     width: BORDER_WIDTH,
                     height: BORDER_WIDTH,
                     backgroundColor: animatedBorderColor,
@@ -899,23 +884,18 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   const renderGrid = (gridOpacity) => {
     if (rows === 0 || cols === 0 || pieceWidth === 0 || pieceHeight === 0) return null;
 
-    // Account for the 0.1px overlap used in merged pieces
-    // Grid lines should align with the visual boundaries where pieces meet
-    const overlap = 0.1;
     const gridWidth = cols * pieceWidth;
     const gridHeight = rows * pieceHeight;
     const gridLines = [];
 
     for (let col = 1; col < cols; col++) {
-      // Position grid line at the visual boundary where pieces overlap
-      // Each piece extends 0.1px beyond its grid position, so the line is at col * pieceWidth - 0.1
       gridLines.push(
         <Animated.View
           key={`v-${col}`}
           style={[
             styles.gridLine,
             {
-              left: col * pieceWidth - overlap,
+              left: col * pieceWidth,
               top: 0,
               width: 1,
               height: gridHeight,
@@ -927,8 +907,6 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
     }
 
     for (let row = 1; row < rows; row++) {
-      // Position grid line at the visual boundary where pieces overlap
-      // Each piece extends 0.1px beyond its grid position, so the line is at row * pieceHeight - 0.1
       gridLines.push(
         <Animated.View
           key={`h-${row}`}
@@ -936,7 +914,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
             styles.gridLine,
             {
               left: 0,
-              top: row * pieceHeight - overlap,
+              top: row * pieceHeight,
               width: gridWidth,
               height: 1,
               opacity: gridOpacity,
