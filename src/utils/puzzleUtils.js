@@ -29,6 +29,10 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
     let processedHeight = originalHeight;
     
     // Scale and crop image to fit board dimensions, keeping center in focus
+    // Use a two-step scaling process to maintain HD quality: scale to 2x first, then downscale
+    // Only use 2x scaling if the original image is large enough to avoid upscaling artifacts
+    const QUALITY_SCALE_FACTOR = 2; // Scale to 2x resolution first for better quality
+    
     if (originalAspectRatio > targetAspectRatio) {
       // Image is wider than target - scale to fit height, then crop from sides
       const scaleFactor = targetBoardHeight / originalHeight;
@@ -39,12 +43,34 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
       const cropWidth = targetBoardWidth;
       const cropX = (scaledWidth - cropWidth) / 2;
       
-      const scaledImage = await ImageManipulator.manipulateAsync(
-        imageUri,
-        [
+      // Use 2x scaling only if original image is large enough (at least 2x the target)
+      const useQualityScaling = originalWidth >= cropWidth * QUALITY_SCALE_FACTOR && 
+                                 originalHeight >= scaledHeight * QUALITY_SCALE_FACTOR;
+      
+      let manipulationActions = [];
+      if (useQualityScaling) {
+        // First scale to 2x resolution for better quality preservation
+        const highResWidth = scaledWidth * QUALITY_SCALE_FACTOR;
+        const highResHeight = scaledHeight * QUALITY_SCALE_FACTOR;
+        const highResCropWidth = cropWidth * QUALITY_SCALE_FACTOR;
+        const highResCropX = cropX * QUALITY_SCALE_FACTOR;
+        
+        manipulationActions = [
+          { resize: { width: highResWidth, height: highResHeight } },
+          { crop: { originX: highResCropX, originY: 0, width: highResCropWidth, height: highResHeight } },
+          { resize: { width: cropWidth, height: scaledHeight } } // Final scale down to target size
+        ];
+      } else {
+        // Direct scaling if original is not large enough for 2x scaling
+        manipulationActions = [
           { resize: { width: scaledWidth, height: scaledHeight } },
           { crop: { originX: cropX, originY: 0, width: cropWidth, height: scaledHeight } }
-        ],
+        ];
+      }
+      
+      const scaledImage = await ImageManipulator.manipulateAsync(
+        imageUri,
+        manipulationActions,
         { format: ImageManipulator.SaveFormat.PNG, compress: 1 }
       );
       
@@ -61,12 +87,34 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
       const cropHeight = targetBoardHeight;
       const cropY = (scaledHeight - cropHeight) / 2;
       
-      const scaledImage = await ImageManipulator.manipulateAsync(
-        imageUri,
-        [
+      // Use 2x scaling only if original image is large enough (at least 2x the target)
+      const useQualityScaling = originalWidth >= scaledWidth * QUALITY_SCALE_FACTOR && 
+                                 originalHeight >= cropHeight * QUALITY_SCALE_FACTOR;
+      
+      let manipulationActions = [];
+      if (useQualityScaling) {
+        // First scale to 2x resolution for better quality preservation
+        const highResWidth = scaledWidth * QUALITY_SCALE_FACTOR;
+        const highResHeight = scaledHeight * QUALITY_SCALE_FACTOR;
+        const highResCropHeight = cropHeight * QUALITY_SCALE_FACTOR;
+        const highResCropY = cropY * QUALITY_SCALE_FACTOR;
+        
+        manipulationActions = [
+          { resize: { width: highResWidth, height: highResHeight } },
+          { crop: { originX: 0, originY: highResCropY, width: highResWidth, height: highResCropHeight } },
+          { resize: { width: scaledWidth, height: cropHeight } } // Final scale down to target size
+        ];
+      } else {
+        // Direct scaling if original is not large enough for 2x scaling
+        manipulationActions = [
           { resize: { width: scaledWidth, height: scaledHeight } },
           { crop: { originX: 0, originY: cropY, width: scaledWidth, height: cropHeight } }
-        ],
+        ];
+      }
+      
+      const scaledImage = await ImageManipulator.manipulateAsync(
+        imageUri,
+        manipulationActions,
         { format: ImageManipulator.SaveFormat.PNG, compress: 1 }
       );
       
