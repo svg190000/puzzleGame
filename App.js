@@ -8,7 +8,7 @@ import {
   Dimensions,
   Alert,
 } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, runOnJS } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -94,10 +94,6 @@ export default function App() {
       return;
     }
 
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-    }
-
     timerIntervalRef.current = setInterval(() => {
       setTimer((prev) => prev + 1);
     }, 1000);
@@ -172,11 +168,11 @@ export default function App() {
     const availableHeight = SCREEN_HEIGHT - HEADER_HEIGHT - HOLDER_HEIGHT - ACTION_BUTTONS_HEIGHT - (EQUAL_SPACING * 3);
     const maxBoardWidth = SCREEN_WIDTH - HORIZONTAL_PADDING;
     const maxBoardHeight = Math.max(availableHeight * 0.9, maxBoardWidth * 0.8);
-    const calculatedPieceWidth = Math.floor(maxBoardWidth / cols);
-    const calculatedPieceHeight = Math.floor(maxBoardHeight / rows);
+    const pieceWidth = Math.floor(maxBoardWidth / cols);
+    const pieceHeight = Math.floor(maxBoardHeight / rows);
     return {
-      width: calculatedPieceWidth * cols,
-      height: calculatedPieceHeight * rows,
+      width: pieceWidth * cols,
+      height: pieceHeight * rows,
     };
   };
 
@@ -257,7 +253,6 @@ export default function App() {
     setShowLoadingScreen(true);
     setIsTransitioning(true);
     setLoadingMessage('Starting new game...');
-    
     setShowCompletionModal(false);
     setShowGameScreen(false);
     clearGameState();
@@ -268,12 +263,10 @@ export default function App() {
     setTimeout(() => setShowDifficultyModal(true), 100);
   };
 
-  const handleBackToMenu = () => {
-    resetGameState();
-  };
+  const handleBackToMenu = resetGameState;
 
   const handleSettings = () => {
-    console.log('Settings pressed');
+    // Settings functionality to be implemented
   };
 
   const handleNavigate = (screen) => {
@@ -694,12 +687,9 @@ export default function App() {
   };
 
   const handleReset = () => {
-    setBoardPieces((prevBoardPieces) => {
-      const allPieces = [...holderPieces, ...prevBoardPieces];
-      setHolderPieces(restoreHolderOrder(allPieces));
-      return [];
-    });
-
+    const allPieces = [...holderPieces, ...boardPieces];
+    setHolderPieces(restoreHolderOrder(allPieces));
+    setBoardPieces([]);
     setSelectedPiece(null);
     setSelectedPiece2(null);
     setMoveCount(0);
@@ -740,7 +730,6 @@ export default function App() {
               onSettings={handleSettings}
             />
           ) : null}
-          {/* Mount all menu screens together, unmount when game screen or completion modal is showing */}
           {!showGameScreen && !showCompletionModal && (
             <>
               <View style={styles.screensContainer}>
@@ -781,7 +770,7 @@ export default function App() {
               <View style={styles.headerSection}>
                 <TouchableOpacity
                   style={styles.backButton}
-                  onPress={handleBackButton}
+                  onPress={resetGameState}
                 >
                   <Ionicons name="arrow-back" size={24} color={COLORS.text} />
                 </TouchableOpacity>

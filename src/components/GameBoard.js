@@ -5,13 +5,11 @@ import { Confetti } from './Confetti';
 
 const BORDER_WIDTH = 3;
 const POSITION_TOLERANCE = 2;
-
-// Animation constants
 const ENTRANCE_SCALE_INITIAL = 0.5;
 const ENTRANCE_OPACITY_INITIAL = 0;
 const ENTRANCE_DURATION = 250;
 const BORDER_COLOR_DURATION = 600;
-const LOCK_ANIMATION_DELAY = 900; // entrance (250ms) + border color (600ms) = ~850ms
+const LOCK_ANIMATION_DELAY = 900;
 
 const createEntranceAnimation = (scaleAnim, opacityAnim, callback) => {
   requestAnimationFrame(() => {
@@ -179,7 +177,6 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   const lockedPieceIdsRef = useRef(new Set());
   const prevIsCompleteRef = useRef(false);
   
-  const piecesScale = useRef(new Animated.Value(1)).current;
   const pieceBorderRadius = useRef(new Animated.Value(8)).current;
   const lockedPieceBorderRadius = useRef(new Animated.Value(6)).current;
   const piecesOpacity = useRef(new Animated.Value(1)).current;
@@ -325,7 +322,6 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
       setShowConfetti(false);
       setShowCompleteImage(false);
       setHideGrid(false);
-      piecesScale.setValue(1);
       pieceBorderRadius.setValue(8);
       lockedPieceBorderRadius.setValue(6);
       piecesOpacity.setValue(1);
@@ -347,16 +343,13 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
       gridLines.push(
         <Animated.View
           key={`v-${col}`}
-          style={[
-            styles.gridLine,
-            {
-              left: col * pieceWidth,
-              top: 0,
-              width: 1,
-              height: gridHeight,
-              opacity: gridOpacity,
-            }
-          ]}
+          style={[styles.gridLine, {
+            left: col * pieceWidth,
+            top: 0,
+            width: 1,
+            height: gridHeight,
+            opacity: gridOpacity,
+          }]}
         />
       );
     }
@@ -365,16 +358,13 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
       gridLines.push(
         <Animated.View
           key={`h-${row}`}
-          style={[
-            styles.gridLine,
-            {
-              left: 0,
-              top: row * pieceHeight,
-              width: gridWidth,
-              height: 1,
-              opacity: gridOpacity,
-            }
-          ]}
+          style={[styles.gridLine, {
+            left: 0,
+            top: row * pieceHeight,
+            width: gridWidth,
+            height: 1,
+            opacity: gridOpacity,
+          }]}
         />
       );
     }
@@ -398,7 +388,6 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
         style={{
           width: '100%',
           height: '100%',
-          transform: [{ scale: piecesScale }],
           opacity: piecesOpacity,
         }}
         pointerEvents={isComplete ? 'none' : 'auto'}
