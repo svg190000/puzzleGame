@@ -281,7 +281,13 @@ export default function App() {
     
     setShowGameScreen(false);
     
-    const currentIndex = screenOrder[currentScreen];
+    // Store the previous screen for animation calculation
+    const previousScreen = currentScreen;
+    
+    // Update current screen immediately so button states change in parallel
+    setCurrentScreen(screen);
+    
+    const currentIndex = screenOrder[previousScreen];
     const targetIndex = screenOrder[screen];
     const delta = targetIndex - currentIndex;
     
@@ -293,10 +299,9 @@ export default function App() {
         easing: Easing.out(Easing.ease),
       },
       () => {
-        // Reset translateX and update current screen
+        // Reset translateX and update current screen index
         screenTranslateX.value = 0;
         currentScreenIndex.value = targetIndex;
-        runOnJS(setCurrentScreen)(screen);
       }
     );
   };
@@ -734,7 +739,9 @@ export default function App() {
               onBackToMenu={handleBackToMenu}
               onSettings={handleSettings}
             />
-          ) : !showGameScreen ? (
+          ) : null}
+          {/* Mount all menu screens together, unmount when game screen or completion modal is showing */}
+          {!showGameScreen && !showCompletionModal && (
             <>
               <View style={styles.screensContainer}>
                 <ScreenSlideWrapper
@@ -761,9 +768,10 @@ export default function App() {
               </View>
               <NavigationBar currentScreen={currentScreen} onNavigate={handleNavigate} />
             </>
-          ) : (
-          <TouchableWithoutFeedback onPress={handleOutsideTap}>
-            <View style={styles.gameScreen}>
+          )}
+          {showGameScreen && !showCompletionModal && (
+            <TouchableWithoutFeedback onPress={handleOutsideTap}>
+              <View style={styles.gameScreen}>
               {isGeneratingPuzzle && (
                 <View style={styles.loadingOverlay}>
                   <Text style={styles.loadingText}>Generating puzzle...</Text>
@@ -838,9 +846,9 @@ export default function App() {
                   <Text style={styles.actionButtonText}>Reset</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          </TouchableWithoutFeedback>
-        )}
+              </View>
+            </TouchableWithoutFeedback>
+          )}
 
         <DifficultyModal
           visible={showDifficultyModal}

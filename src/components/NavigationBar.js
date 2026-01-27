@@ -1,18 +1,17 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const NavButton = ({ icon, label, isActive, onPress }) => {
-  const scale = useSharedValue(isActive ? 1.15 : 1);
+  const scale = useSharedValue(isActive ? 1.3 : 1);
 
   useEffect(() => {
-    scale.value = withSpring(isActive ? 1.15 : 1, {
-      damping: 15,
-      stiffness: 150,
+    scale.value = withTiming(isActive ? 1.3 : 1, {
+      duration: 200,
     });
   }, [isActive, scale]);
 
@@ -27,7 +26,6 @@ const NavButton = ({ icon, label, isActive, onPress }) => {
       activeOpacity={0.7}
     >
       <Animated.View style={[styles.navButtonContent, animatedStyle]}>
-        {isActive && <View style={styles.activeIndicator} />}
         <Ionicons 
           name={icon} 
           size={isActive ? 26 : 24} 
@@ -76,8 +74,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'flex-start',
-    paddingTop: 12,
-    paddingBottom: 40,
+    paddingTop: 8,
+    paddingBottom: 20,
     paddingHorizontal: 0,
     marginHorizontal: 0,
     borderTopWidth: 1,
@@ -93,29 +91,21 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingVertical: 8,
-    minHeight: 60,
+    paddingVertical: 6,
+    minHeight: 50,
   },
   navButtonContent: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 2,
     position: 'relative',
     width: '100%',
-  },
-  activeIndicator: {
-    position: 'absolute',
-    top: -8,
-    width: 40,
-    height: 3,
-    backgroundColor: COLORS.accent,
-    borderRadius: 2,
   },
   navButtonText: {
     fontSize: 11,
     color: COLORS.textLight,
     fontWeight: '500',
-    marginTop: 2,
+    marginTop: 0,
   },
   navButtonTextActive: {
     color: COLORS.accent,
