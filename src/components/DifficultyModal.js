@@ -19,7 +19,7 @@ export const DifficultyModal = ({ visible, onSelect, onClose }) => {
   const translateY = useSharedValue(SCREEN_HEIGHT);
   const backdropOpacity = useSharedValue(0);
 
-  const animateClose = () => {
+  const closeModal = () => {
     backdropOpacity.value = withTiming(0, { duration: ANIMATION_DURATION });
     translateY.value = withTiming(SCREEN_HEIGHT, { duration: ANIMATION_DURATION }, () => {
       runOnJS(setModalVisible)(false);
@@ -32,7 +32,7 @@ export const DifficultyModal = ({ visible, onSelect, onClose }) => {
       backdropOpacity.value = withTiming(1, { duration: ANIMATION_DURATION });
       translateY.value = withTiming(0, { duration: ANIMATION_DURATION });
     } else if (modalVisible) {
-      animateClose();
+      closeModal();
     }
   }, [visible, modalVisible]);
 
@@ -44,21 +44,16 @@ export const DifficultyModal = ({ visible, onSelect, onClose }) => {
     transform: [{ translateY: translateY.value }],
   }));
 
-  const handleClose = () => {
-    onClose();
-    animateClose();
-  };
-
   return (
     <Modal
       visible={modalVisible}
       transparent={true}
       animationType="none"
-      onRequestClose={handleClose}
+      onRequestClose={onClose}
       statusBarTranslucent={true}
     >
       <StatusBar style="dark" />
-      <TouchableWithoutFeedback onPress={handleClose}>
+      <TouchableWithoutFeedback onPress={onClose}>
         <Animated.View style={[styles.backdrop, backdropStyle]} />
       </TouchableWithoutFeedback>
       <Animated.View style={[styles.modal, contentStyle]}>
@@ -78,7 +73,7 @@ export const DifficultyModal = ({ visible, onSelect, onClose }) => {
             </TouchableOpacity>
           ))}
         </View>
-        <TouchableOpacity style={styles.cancelButton} onPress={handleClose}>
+        <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
       </Animated.View>
