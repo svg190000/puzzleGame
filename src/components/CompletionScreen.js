@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Easing, Image, ScrollView } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { Polaroid } from './Polaroid';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -52,95 +53,6 @@ const makeStyles = (theme) =>
     },
     statsScrollView: {
       flex: 1,
-    },
-    polaroidContainer: {
-      width: '100%',
-      position: 'relative',
-      alignItems: 'center',
-      marginBottom: 0,
-    },
-    pinFulcrum: {
-      alignItems: 'center',
-      position: 'relative',
-    },
-    polaroidFrameWrapper: {
-      width: '100%',
-      borderWidth: 1,
-      borderColor: theme.text,
-      borderRadius: 6,
-      overflow: 'hidden',
-      shadowColor: theme.shadow,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 12,
-      elevation: 8,
-      alignItems: 'center',
-      transformOrigin: 'top center',
-    },
-    thumbtack: {
-      position: 'absolute',
-      top: -11,
-      alignSelf: 'center',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 10,
-    },
-    thumbtackCircle: {
-      width: 20,
-      height: 20,
-      borderRadius: 10,
-      backgroundColor: theme.danger,
-      borderWidth: 2,
-      borderColor: theme.white,
-      shadowColor: theme.shadow,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.4,
-      shadowRadius: 4,
-      elevation: 5,
-    },
-    polaroidFrame: {
-      backgroundColor: theme.surface,
-      borderWidth: 12,
-      borderColor: theme.surface,
-      borderRadius: 5,
-      shadowColor: theme.shadow,
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.25,
-      shadowRadius: 16,
-      elevation: 10,
-      overflow: 'visible',
-      alignItems: 'center',
-      width: '100%',
-      marginBottom: 0,
-      position: 'relative',
-    },
-    imageSection: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingTop: 12,
-      paddingHorizontal: 12,
-      paddingBottom: 0,
-      backgroundColor: theme.surface,
-    },
-    completedImage: {
-      borderRadius: 2,
-    },
-    frameBottomSection: {
-      width: '100%',
-      minHeight: 70,
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.surface,
-      borderTopWidth: 0,
-    },
-    message: {
-      fontSize: 22,
-      fontWeight: '700',
-      color: theme.text,
-      textAlign: 'center',
-      letterSpacing: 0.5,
     },
     statsContainer: {
       flexDirection: 'row',
@@ -263,192 +175,19 @@ export const CompletionScreen = ({
 }) => {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const polaroidScale = useRef(new Animated.Value(0.3)).current;
-  const polaroidOpacity = useRef(new Animated.Value(0)).current;
-  const polaroidTranslateY = useRef(new Animated.Value(100)).current;
-  const polaroidRotate = useRef(new Animated.Value(0)).current;
-  const polaroidPivotOffset = useRef(new Animated.Value(0)).current;
-  const polaroidPivotOffsetNegative = useRef(new Animated.Value(0)).current;
-  const thumbtackScale = useRef(new Animated.Value(0)).current;
-  const thumbtackOpacity = useRef(new Animated.Value(0)).current;
-  const messageRef = useRef(getRandomMessage());
-
-  useEffect(() => {
-    messageRef.current = getRandomMessage();
-    
-    // Reset polaroid and thumbtack animations
-    polaroidScale.setValue(0.3);
-    polaroidOpacity.setValue(0);
-    polaroidTranslateY.setValue(100);
-    polaroidRotate.setValue(0);
-    polaroidPivotOffset.setValue(0);
-    polaroidPivotOffsetNegative.setValue(0);
-    thumbtackScale.setValue(0);
-    thumbtackOpacity.setValue(0);
-    
-    // Start polaroid animation
-    Animated.parallel([
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(polaroidScale, {
-            toValue: 1.1,
-            duration: 400,
-            easing: Easing.out(Easing.back(1.5)),
-            useNativeDriver: true,
-          }),
-          Animated.timing(polaroidOpacity, {
-            toValue: 1,
-            duration: 300,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(polaroidTranslateY, {
-            toValue: 0,
-            duration: 400,
-            easing: Easing.out(Easing.back(1.5)),
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.timing(polaroidScale, {
-          toValue: 1,
-          duration: 200,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start(() => {
-          // After polaroid settles, pin it with thumbtack
-          Animated.parallel([
-            Animated.sequence([
-              Animated.timing(thumbtackScale, {
-                toValue: 1.3,
-                duration: 200,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: true,
-              }),
-              Animated.timing(thumbtackScale, {
-                toValue: 1,
-                duration: 150,
-                easing: Easing.inOut(Easing.ease),
-                useNativeDriver: true,
-              }),
-            ]),
-            Animated.timing(thumbtackOpacity, {
-              toValue: 1,
-              duration: 300,
-              easing: Easing.out(Easing.ease),
-              useNativeDriver: true,
-            }),
-          ]).start(() => {
-            // Start continuous swaying animation after thumbtack is pinned
-            // Use a continuous loop with smooth easing for fluid motion without pause
-            const createSwayLoop = () => {
-              Animated.sequence([
-                Animated.timing(polaroidRotate, {
-                  toValue: 0.05, // ~3 degrees to the right
-                  duration: 2000,
-                  easing: Easing.bezier(0.42, 0, 0.58, 1), // Smooth ease in/out bezier
-                  useNativeDriver: true,
-                }),
-                Animated.timing(polaroidRotate, {
-                  toValue: -0.05, // ~3 degrees to the left
-                  duration: 2000,
-                  easing: Easing.bezier(0.42, 0, 0.58, 1), // Smooth ease in/out bezier
-                  useNativeDriver: true,
-                }),
-              ]).start(() => {
-                // Immediately start next iteration for continuous flow
-                createSwayLoop();
-              });
-            };
-            createSwayLoop();
-          });
-        });
-  }, []);
+  const [message] = useState(() => getRandomMessage());
 
   return (
     <View style={styles.container}>
       <View style={styles.polaroidSection}>
-        <View style={styles.polaroidContainer}>
-          <View style={styles.pinFulcrum}>
-            <Animated.View
-              style={[
-                {
-                  transform: [
-                    { translateY: polaroidTranslateY },
-                    { scale: polaroidScale },
-                  ],
-                  opacity: polaroidOpacity,
-                  width: imageWidth ? Math.min(imageWidth * 0.75 + 26, SCREEN_WIDTH - 48) : '100%',
-                },
-              ]}
-            >
-              <Animated.View
-                onLayout={(event) => {
-                  const { height } = event.nativeEvent.layout;
-                  if (height > 0) {
-                    // Pivot point is at the top center (y=0), so we need to translate down by half height
-                    // to move the top center to the rotation origin, then rotate, then translate back
-                    const offset = height / 2;
-                    polaroidPivotOffset.setValue(offset);
-                    polaroidPivotOffsetNegative.setValue(-offset);
-                  }
-                }}
-                style={[
-                  styles.polaroidFrameWrapper,
-                  {
-                    transform: [
-                      // Move pivot point (top center) to origin for rotation
-                      { translateY: polaroidPivotOffset },
-                      // Rotate around the origin (which is now at top center)
-                      { 
-                        rotate: polaroidRotate.interpolate({
-                          inputRange: [-0.05, 0.05],
-                          outputRange: ['-0.05rad', '0.05rad'],
-                        })
-                      },
-                      // Move back from origin
-                      { translateY: polaroidPivotOffsetNegative },
-                    ],
-                    width: '100%',
-                  },
-                ]}
-              >
-              <View style={styles.polaroidFrame}>
-                <Animated.View
-                  style={[
-                    styles.thumbtack,
-                    {
-                      transform: [{ scale: thumbtackScale }],
-                      opacity: thumbtackOpacity,
-                    },
-                  ]}
-                >
-                  <View style={styles.thumbtackCircle} />
-                </Animated.View>
-                {originalImageUri && imageWidth && imageHeight && (
-                  <View style={[styles.imageSection, { width: Math.min(imageWidth * 0.75, SCREEN_WIDTH - 72) }]}>
-                    <Image
-                      source={{ uri: originalImageUri }}
-                      style={[
-                        styles.completedImage,
-                        {
-                          width: Math.min(imageWidth * 0.75, SCREEN_WIDTH - 72),
-                          height: imageHeight * 0.75,
-                        }
-                      ]}
-                      resizeMode="cover"
-                    />
-                  </View>
-                )}
-                <View style={styles.frameBottomSection}>
-                  <Text style={styles.message}>{messageRef.current}</Text>
-                </View>
-              </View>
-            </Animated.View>
-            </Animated.View>
-          </View>
-        </View>
+        <Polaroid
+          imageUri={originalImageUri}
+          imageWidth={imageWidth}
+          imageHeight={imageHeight}
+          caption={message}
+          maxWidth={SCREEN_WIDTH - 48}
+          animate
+        />
       </View>
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
