@@ -64,6 +64,7 @@ export default function App() {
   const timerIntervalRef = useRef(null);
   const navigationRef = useNavigationContainerRef();
   const [currentRouteName, setCurrentRouteName] = useState('Home');
+  const [isNavigationReady, setIsNavigationReady] = useState(false);
 
   useEffect(() => {
     if (!showGameScreen) {
@@ -93,6 +94,13 @@ export default function App() {
       timerIntervalRef.current = null;
     }
   }, [showGameScreen, boardPieces, holderPieces, puzzleData]);
+
+  // Reset navigation ready state when navigation container is unmounted
+  useEffect(() => {
+    if (showGameScreen || showCompletionModal) {
+      setIsNavigationReady(false);
+    }
+  }, [showGameScreen, showCompletionModal]);
 
 
   const handleNewGame = () => {
@@ -770,6 +778,7 @@ export default function App() {
               <NavigationContainer 
                 ref={navigationRef}
                 onReady={() => {
+                  setIsNavigationReady(true);
                   const route = navigationRef.getCurrentRoute();
                   if (route) setCurrentRouteName(route.name);
                 }}
@@ -795,7 +804,7 @@ export default function App() {
                   />
                 </Stack.Navigator>
               </NavigationContainer>
-              {navigationRef.isReady() && (
+              {isNavigationReady && (
                 <NavigationBar navigation={navigationRef} currentRouteName={currentRouteName} />
               )}
             </View>
