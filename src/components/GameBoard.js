@@ -1,45 +1,40 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, TouchableWithoutFeedback, Animated, Easing } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { StyleSheet, Image, TouchableOpacity, TouchableWithoutFeedback, Animated, Easing } from 'react-native';
 import { COLORS } from '../constants/colors';
 import { Confetti } from './Confetti';
 
 const BORDER_WIDTH = 3;
-const BOARD_BORDER_WIDTH = 2; // Must match borderWidth in board style
 const POSITION_TOLERANCE = 2;
 
-// Shared animation configuration
-const ENTRANCE_ANIMATION_CONFIG = {
-  scale: {
-    spring: { friction: 5, tension: 45, useNativeDriver: true },
-    initialValue: 0.5,
-    targetValue: 1,
-  },
-  opacity: {
-    timing: { duration: 250, useNativeDriver: true },
-    initialValue: 0,
-    targetValue: 1,
-  },
-};
+// Animation constants
+const ENTRANCE_SCALE_INITIAL = 0.5;
+const ENTRANCE_OPACITY_INITIAL = 0;
+const ENTRANCE_DURATION = 250;
+const BORDER_COLOR_DURATION = 600;
+const LOCK_ANIMATION_DELAY = 900; // entrance (250ms) + border color (600ms) = ~850ms
 
 const createEntranceAnimation = (scaleAnim, opacityAnim, callback) => {
   requestAnimationFrame(() => {
     Animated.parallel([
       Animated.spring(scaleAnim, {
-        toValue: ENTRANCE_ANIMATION_CONFIG.scale.targetValue,
-        ...ENTRANCE_ANIMATION_CONFIG.scale.spring,
+        toValue: 1,
+        friction: 5,
+        tension: 45,
+        useNativeDriver: true,
       }),
       Animated.timing(opacityAnim, {
-        toValue: ENTRANCE_ANIMATION_CONFIG.opacity.targetValue,
-        ...ENTRANCE_ANIMATION_CONFIG.opacity.timing,
+        toValue: 1,
+        duration: ENTRANCE_DURATION,
+        useNativeDriver: true,
       }),
     ]).start(callback);
   });
 };
 
-const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, borderRadius, lockIndicatorOpacity }) => {
+const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, borderRadius }) => {
   const wasNewlyLockedOnMount = useRef(isNewlyLocked).current;
-  const scaleAnim = useRef(new Animated.Value(wasNewlyLockedOnMount ? ENTRANCE_ANIMATION_CONFIG.scale.initialValue : 1)).current;
-  const opacityAnim = useRef(new Animated.Value(wasNewlyLockedOnMount ? ENTRANCE_ANIMATION_CONFIG.opacity.initialValue : 1)).current;
+  const scaleAnim = useRef(new Animated.Value(wasNewlyLockedOnMount ? ENTRANCE_SCALE_INITIAL : 1)).current;
+  const opacityAnim = useRef(new Animated.Value(wasNewlyLockedOnMount ? ENTRANCE_OPACITY_INITIAL : 1)).current;
   const borderProgress = useRef(new Animated.Value(wasNewlyLockedOnMount ? 0 : 1)).current;
 
   useEffect(() => {
@@ -47,7 +42,7 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, bo
       createEntranceAnimation(scaleAnim, opacityAnim, () => {
         Animated.timing(borderProgress, {
           toValue: 1,
-          duration: 600,
+          duration: BORDER_COLOR_DURATION,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }).start();
@@ -61,7 +56,6 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, bo
     outputRange: [COLORS.white, COLORS.success],
   });
 
-  // Snap locked pieces to exact grid positions to prevent gaps
   const correctRow = piece.correctRow ?? piece.row;
   const correctCol = piece.correctCol ?? piece.col;
   const exactX = correctCol !== undefined ? Math.floor(correctCol * pieceWidth) : (piece.boardX || 0);
@@ -69,7 +63,6 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, bo
 
   return (
     <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-      {/* Outer Animated.View for positioning */}
       <Animated.View
         style={[
           styles.boardPiece,
@@ -84,7 +77,6 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, bo
           },
         ]}
       >
-        {/* Inner Animated.View for scale/opacity animation (native driver) */}
         <Animated.View
           style={{
             width: '100%',
@@ -100,7 +92,6 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, bo
             style={styles.boardPieceImage}
             resizeMode="cover"
           />
-          {/* Border overlay on top of image */}
           <Animated.View
             style={{
               position: 'absolute',
@@ -122,8 +113,8 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, bo
 
 const AnimatedBoardPiece = ({ piece, pieceWidth, pieceHeight, borderStyle, isHighlighted, isSelected, onPieceSelect, isNewlyPlaced, wasSwapped, borderRadius }) => {
   const wasNewlyPlacedOnMount = useRef(isNewlyPlaced).current;
-  const scaleAnim = useRef(new Animated.Value(wasNewlyPlacedOnMount ? ENTRANCE_ANIMATION_CONFIG.scale.initialValue : 1)).current;
-  const opacityAnim = useRef(new Animated.Value(wasNewlyPlacedOnMount ? ENTRANCE_ANIMATION_CONFIG.opacity.initialValue : 1)).current;
+  const scaleAnim = useRef(new Animated.Value(wasNewlyPlacedOnMount ? ENTRANCE_SCALE_INITIAL : 1)).current;
+  const opacityAnim = useRef(new Animated.Value(wasNewlyPlacedOnMount ? ENTRANCE_OPACITY_INITIAL : 1)).current;
 
   useEffect(() => {
     if (wasNewlyPlacedOnMount) {
@@ -133,8 +124,8 @@ const AnimatedBoardPiece = ({ piece, pieceWidth, pieceHeight, borderStyle, isHig
 
   useEffect(() => {
     if (wasSwapped) {
-      scaleAnim.setValue(ENTRANCE_ANIMATION_CONFIG.scale.initialValue);
-      opacityAnim.setValue(ENTRANCE_ANIMATION_CONFIG.opacity.initialValue);
+      scaleAnim.setValue(ENTRANCE_SCALE_INITIAL);
+      opacityAnim.setValue(ENTRANCE_OPACITY_INITIAL);
       createEntranceAnimation(scaleAnim, opacityAnim);
     }
   }, [wasSwapped, piece.boardX, piece.boardY]);
@@ -204,9 +195,14 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
     const correctRow = piece.correctRow ?? piece.row;
     const correctCol = piece.correctCol ?? piece.col;
     if (correctRow === undefined || correctCol === undefined) return false;
-    const isCorrectCol = Math.abs((piece.boardX || 0) - (correctCol * pieceWidth)) <= POSITION_TOLERANCE;
-    const isCorrectRow = Math.abs((piece.boardY || 0) - (correctRow * pieceHeight)) <= POSITION_TOLERANCE;
-    return isCorrectCol && isCorrectRow;
+    const expectedX = correctCol * pieceWidth;
+    const expectedY = correctRow * pieceHeight;
+    const actualX = piece.boardX || 0;
+    const actualY = piece.boardY || 0;
+    return (
+      Math.abs(actualX - expectedX) <= POSITION_TOLERANCE &&
+      Math.abs(actualY - expectedY) <= POSITION_TOLERANCE
+    );
   };
 
   const prevPiecesMap = new Map(prevBoardPiecesRef.current.map(p => [p.id, p]));
@@ -224,8 +220,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
       currentSwapped.push(piece.id);
     }
 
-    const isNowLocked = checkCorrectPosition(piece);
-    if (isNowLocked && !lockedPieceIdsRef.current.has(piece.id)) {
+    if (checkCorrectPosition(piece) && !lockedPieceIdsRef.current.has(piece.id)) {
       newlyLockedIds.add(piece.id);
     }
   });
@@ -262,55 +257,47 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
 
   useEffect(() => {
     if (isComplete && !prevIsCompleteRef.current) {
-      // Wait for piece lock-in animations to complete before starting completion sequence
-      // Lock-in animation: entrance (250ms) + border color (600ms) = ~850ms
-      const LOCK_ANIMATION_DELAY = 900;
-      const FADE_DURATION = 700;
-      const GRID_FADE_DELAY = 200;
+      const GRID_FADE_DURATION = 800;
+      const CORNER_SQUARE_DURATION = 1000;
       const CONFETTI_START_DELAY = 400;
       const COMPLETE_IMAGE_START_DELAY = 500;
-      const CONFETTI_DURATION = 600 + 2800; // LAUNCH_DURATION + FALL_DURATION
+      const CONFETTI_DURATION = 3400; // LAUNCH_DURATION + FALL_DURATION
       const MODAL_SHOW_DELAY = CONFETTI_START_DELAY + CONFETTI_DURATION;
       
       setTimeout(() => {
-        // Fade out grid lines
         Animated.timing(gridOpacity, {
           toValue: 0,
-          duration: 800,
+          duration: GRID_FADE_DURATION,
           easing: Easing.out(Easing.ease),
           useNativeDriver: true,
         }).start(() => {
           setHideGrid(true);
         });
 
-        // Square corners and fade out lock indicators simultaneously
         Animated.parallel([
           Animated.timing(pieceBorderRadius, {
             toValue: 0,
-            duration: 1000,
+            duration: CORNER_SQUARE_DURATION,
             easing: Easing.out(Easing.ease),
             useNativeDriver: true,
           }),
           Animated.timing(lockedPieceBorderRadius, {
             toValue: 0,
-            duration: 1000,
+            duration: CORNER_SQUARE_DURATION,
             easing: Easing.out(Easing.ease),
             useNativeDriver: true,
           }),
           Animated.timing(lockIndicatorOpacity, {
             toValue: 0,
-            duration: 1000,
+            duration: CORNER_SQUARE_DURATION,
             easing: Easing.out(Easing.ease),
             useNativeDriver: true,
           }),
         ]).start(() => {
-
-          // Start confetti during grid fade
           setTimeout(() => {
             setShowConfetti(true);
           }, CONFETTI_START_DELAY);
 
-          // Fade in complete image and fade out pieces
           setTimeout(() => {
             setShowCompleteImage(true);
             Animated.parallel([
@@ -329,16 +316,12 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
             ]).start();
           }, COMPLETE_IMAGE_START_DELAY);
 
-          // Show modal after confetti finishes
           setTimeout(() => {
-            if (onCompleteImageShown) {
-              onCompleteImageShown();
-            }
+            onCompleteImageShown?.();
           }, MODAL_SHOW_DELAY);
         });
       }, LOCK_ANIMATION_DELAY);
     } else if (!isComplete && prevIsCompleteRef.current) {
-      // Reset all animations when puzzle is reset
       setShowConfetti(false);
       setShowCompleteImage(false);
       setHideGrid(false);
@@ -351,9 +334,9 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
       gridOpacity.setValue(1);
     }
     prevIsCompleteRef.current = isComplete;
-  }, [isComplete, lockIndicatorOpacity, gridOpacity, piecesOpacity, completeImageOpacity, pieceBorderRadius, lockedPieceBorderRadius]);
+  }, [isComplete]);
 
-  const renderGrid = (gridOpacity) => {
+  const renderGrid = () => {
     if (rows === 0 || cols === 0 || pieceWidth === 0 || pieceHeight === 0) return null;
 
     const gridWidth = cols * pieceWidth;
@@ -420,55 +403,48 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
         }}
         pointerEvents={isComplete ? 'none' : 'auto'}
       >
-        {!hideGrid && renderGrid(gridOpacity)}
-        {/* Render all pieces */}
-        {boardPieces && boardPieces.map((piece) => {
-        if (!piece || !piece.imageUri) {
-          return null;
-        }
+        {!hideGrid && renderGrid()}
+        {boardPieces?.map((piece) => {
+          if (!piece?.imageUri) return null;
 
-        const isLocked = checkCorrectPosition(piece);
+          const isLocked = checkCorrectPosition(piece);
+          const isSelected = !isLocked && selectedPieceId === piece.id;
+          const isSelected2 = !isLocked && selectedPieceId2 === piece.id;
 
-        const isSelected = !isLocked && selectedPieceId === piece.id;
-        const isSelected2 = !isLocked && selectedPieceId2 === piece.id;
-        const isHighlighted = isSelected || isSelected2;
+          const getBorderStyle = () => {
+            if (isLocked) return { borderWidth: BORDER_WIDTH, borderColor: COLORS.success };
+            if (isSelected) return { borderWidth: BORDER_WIDTH, borderColor: COLORS.accent };
+            if (isSelected2) return { borderWidth: BORDER_WIDTH, borderColor: COLORS.pastelGreen };
+            return { borderWidth: BORDER_WIDTH, borderColor: 'transparent' };
+          };
 
-        const borderStyle = isLocked
-          ? { borderWidth: BORDER_WIDTH, borderColor: COLORS.success }
-          : isSelected
-            ? { borderWidth: BORDER_WIDTH, borderColor: COLORS.accent }
-            : isSelected2
-              ? { borderWidth: BORDER_WIDTH, borderColor: COLORS.pastelGreen }
-              : { borderWidth: BORDER_WIDTH, borderColor: 'transparent' };
+          if (isLocked) {
+            return (
+              <AnimatedLockedPiece
+                key={`locked-${piece.id}-${piece.boardX}-${piece.boardY}`}
+                piece={piece}
+                pieceWidth={pieceWidth}
+                pieceHeight={pieceHeight}
+                isNewlyLocked={newlyLockedIds.has(piece.id)}
+                borderRadius={lockedPieceBorderRadius}
+              />
+            );
+          }
 
-        if (isLocked) {
           return (
-            <AnimatedLockedPiece
-              key={`locked-${piece.id}-${piece.boardX}-${piece.boardY}`}
+            <AnimatedBoardPiece
+              key={`${piece.id}-${piece.boardX}-${piece.boardY}`}
               piece={piece}
               pieceWidth={pieceWidth}
               pieceHeight={pieceHeight}
-              isNewlyLocked={newlyLockedIds.has(piece.id)}
-              borderRadius={lockedPieceBorderRadius}
-              lockIndicatorOpacity={lockIndicatorOpacity}
+              borderStyle={getBorderStyle()}
+              isHighlighted={isSelected || isSelected2}
+              isSelected={isSelected}
+              onPieceSelect={onPieceSelect}
+              isNewlyPlaced={newlyPlacedIds.has(piece.id)}
+              wasSwapped={swappedIds.has(piece.id)}
+              borderRadius={pieceBorderRadius}
             />
-          );
-        }
-
-        return (
-          <AnimatedBoardPiece
-            key={`${piece.id}-${piece.boardX}-${piece.boardY}`}
-            piece={piece}
-            pieceWidth={pieceWidth}
-            pieceHeight={pieceHeight}
-            borderStyle={borderStyle}
-            isHighlighted={isHighlighted}
-            isSelected={isSelected}
-            onPieceSelect={onPieceSelect}
-            isNewlyPlaced={newlyPlacedIds.has(piece.id)}
-            wasSwapped={swappedIds.has(piece.id)}
-            borderRadius={pieceBorderRadius}
-          />
           );
         })}
       </Animated.View>
@@ -543,22 +519,6 @@ const styles = StyleSheet.create({
   },
   lockedPiece: {
     opacity: 0.95,
-  },
-  lockIndicator: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.success,
-    borderWidth: 1,
-    borderColor: COLORS.white,
-    shadowColor: COLORS.text,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-    elevation: 2,
   },
   completeImageContainer: {
     position: 'absolute',
