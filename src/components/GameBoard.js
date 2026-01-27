@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { StyleSheet, Image, TouchableOpacity, TouchableWithoutFeedback, Animated, Easing } from 'react-native';
-import { COLORS } from '../constants/colors';
+import { useTheme } from '../contexts/ThemeContext';
 import { Confetti } from './Confetti';
 import { SuccessBorderOverlay } from './SuccessBorderOverlay';
 
@@ -13,6 +13,51 @@ const BORDER_COLOR_DURATION = 600;
 const SUCCESS_BORDER_FADE_DURATION = 500; // Match overlay duration so border is green when trace disappears
 const LOCK_ANIMATION_DELAY = 900;
 
+const makeStyles = (theme) =>
+  StyleSheet.create({
+    board: {
+      backgroundColor: theme.surface,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: theme.border,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 5,
+      position: 'relative',
+      overflow: 'hidden',
+    },
+    boardPiece: {
+      borderRadius: 8,
+      overflow: 'hidden',
+      backgroundColor: theme.surface,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 3,
+      zIndex: 10,
+    },
+    selectedBoardPiece: { shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
+    selectedBoardPiece2: { shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
+    boardPieceImage: { width: '100%', height: '100%' },
+    gridLine: {
+      position: 'absolute',
+      backgroundColor: theme.gridLine,
+      pointerEvents: 'none',
+    },
+    lockedPiece: { opacity: 0.95 },
+    completeImageContainer: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      borderRadius: 8,
+      overflow: 'hidden',
+      borderWidth: BORDER_WIDTH,
+      borderColor: theme.success,
+    },
+  });
 
 const createEntranceAnimation = (scaleAnim, opacityAnim, callback) => {
   requestAnimationFrame(() => {
@@ -36,7 +81,8 @@ const WAVE_PULSE_OPACITY_MIN = 0.82;
 const WAVE_PULSE_DOWN_MS = 100;
 const WAVE_PULSE_UP_MS = 150;
 
-const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, borderRadius, liftWaveActive, liftWaveDelayMs }) => {
+const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, borderRadius, liftWaveActive, liftWaveDelayMs, theme }) => {
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const wasNewlyLockedOnMount = useRef(isNewlyLocked).current;
   const scaleAnim = useRef(new Animated.Value(wasNewlyLockedOnMount ? ENTRANCE_SCALE_INITIAL : 1)).current;
   const opacityAnim = useRef(new Animated.Value(wasNewlyLockedOnMount ? ENTRANCE_OPACITY_INITIAL : 1)).current;
@@ -153,7 +199,7 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, bo
   // Animate border color from white to success color
   const animatedBorderColor = borderProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [COLORS.white, COLORS.success],
+    outputRange: [theme.white, theme.success],
   });
 
   const correctRow = piece.correctRow ?? piece.row;
@@ -219,6 +265,7 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, bo
               height={pieceHeight}
               borderRadius={overlayBorderRadius}
               onComplete={handleAnimationComplete}
+              successColor={theme.success}
             />
           )}
         </Animated.View>
@@ -227,7 +274,8 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, bo
   );
 };
 
-const AnimatedBoardPiece = ({ piece, pieceWidth, pieceHeight, borderStyle, isHighlighted, isSelected, onPieceSelect, isNewlyPlaced, wasSwapped, borderRadius }) => {
+const AnimatedBoardPiece = ({ piece, pieceWidth, pieceHeight, borderStyle, isHighlighted, isSelected, onPieceSelect, isNewlyPlaced, wasSwapped, borderRadius, theme }) => {
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const wasNewlyPlacedOnMount = useRef(isNewlyPlaced).current;
   const scaleAnim = useRef(new Animated.Value(wasNewlyPlacedOnMount ? ENTRANCE_SCALE_INITIAL : 1)).current;
   const opacityAnim = useRef(new Animated.Value(wasNewlyPlacedOnMount ? ENTRANCE_OPACITY_INITIAL : 1)).current;
@@ -289,6 +337,9 @@ const AnimatedBoardPiece = ({ piece, pieceWidth, pieceHeight, borderStyle, isHig
 };
 
 export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidth = 0, pieceHeight = 0, selectedPieceId, selectedPieceId2, onTap, onPieceSelect, rows = 0, cols = 0, isComplete = false, originalImageUri = null, onCompleteImageShown = null }) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   const [swappedIds, setSwappedIds] = useState(new Set());
   const prevBoardPiecesRef = useRef([]);
   const knownPieceIdsRef = useRef(new Set());
@@ -517,9 +568,9 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
           const isSelected2 = !isLocked && selectedPieceId2 === piece.id;
 
           const getBorderStyle = () => {
-            if (isLocked) return { borderWidth: BORDER_WIDTH, borderColor: COLORS.success };
-            if (isSelected) return { borderWidth: BORDER_WIDTH, borderColor: COLORS.accent };
-            if (isSelected2) return { borderWidth: BORDER_WIDTH, borderColor: COLORS.pastelGreen };
+            if (isLocked) return { borderWidth: BORDER_WIDTH, borderColor: theme.success };
+            if (isSelected) return { borderWidth: BORDER_WIDTH, borderColor: theme.accent };
+            if (isSelected2) return { borderWidth: BORDER_WIDTH, borderColor: theme.pastelGreen };
             return { borderWidth: BORDER_WIDTH, borderColor: 'transparent' };
           };
 
@@ -539,6 +590,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
                 borderRadius={lockedPieceBorderRadius}
                 liftWaveActive={liftWaveActive}
                 liftWaveDelayMs={staggerMs}
+                theme={theme}
               />
             );
           }
@@ -556,6 +608,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
               isNewlyPlaced={newlyPlacedIds.has(piece.id)}
               wasSwapped={swappedIds.has(piece.id)}
               borderRadius={pieceBorderRadius}
+              theme={theme}
             />
           );
         })}
@@ -585,60 +638,3 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   );
 };
 
-const styles = StyleSheet.create({
-  board: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: COLORS.border,
-    shadowColor: COLORS.text,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  boardPiece: {
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: COLORS.white,
-    shadowColor: COLORS.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-    zIndex: 10, // Ensure pieces render above grid
-  },
-  selectedBoardPiece: {
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  selectedBoardPiece2: {
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  boardPieceImage: {
-    width: '100%',
-    height: '100%',
-  },
-  gridLine: {
-    position: 'absolute',
-    backgroundColor: 'rgba(184, 169, 217, 0.4)', // Light purple with transparency
-    pointerEvents: 'none', // Allow taps to pass through
-  },
-  lockedPiece: {
-    opacity: 0.95,
-  },
-  completeImageContainer: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: BORDER_WIDTH,
-    borderColor: COLORS.success,
-  },
-});

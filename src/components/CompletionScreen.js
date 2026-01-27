@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Easing, Image, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../constants/colors';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -28,6 +28,228 @@ const formatTime = (seconds) => {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
+const makeStyles = (theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      width: SCREEN_WIDTH,
+      height: SCREEN_HEIGHT,
+      backgroundColor: theme.background,
+    },
+    polaroidSection: {
+      paddingTop: 50,
+      paddingHorizontal: 24,
+      paddingBottom: 20,
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+    },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: 'flex-start',
+      paddingVertical: 20,
+      paddingBottom: 90,
+      paddingHorizontal: 24,
+    },
+    statsScrollView: {
+      flex: 1,
+    },
+    polaroidContainer: {
+      width: '100%',
+      position: 'relative',
+      alignItems: 'center',
+      marginBottom: 0,
+    },
+    pinFulcrum: {
+      alignItems: 'center',
+      position: 'relative',
+    },
+    polaroidFrameWrapper: {
+      width: '100%',
+      borderWidth: 1,
+      borderColor: theme.text,
+      borderRadius: 6,
+      overflow: 'hidden',
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 12,
+      elevation: 8,
+      alignItems: 'center',
+      transformOrigin: 'top center',
+    },
+    thumbtack: {
+      position: 'absolute',
+      top: -11,
+      alignSelf: 'center',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10,
+    },
+    thumbtackCircle: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: theme.danger,
+      borderWidth: 2,
+      borderColor: theme.white,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.4,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    polaroidFrame: {
+      backgroundColor: theme.surface,
+      borderWidth: 12,
+      borderColor: theme.surface,
+      borderRadius: 5,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.25,
+      shadowRadius: 16,
+      elevation: 10,
+      overflow: 'visible',
+      alignItems: 'center',
+      width: '100%',
+      marginBottom: 0,
+      position: 'relative',
+    },
+    imageSection: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingTop: 12,
+      paddingHorizontal: 12,
+      paddingBottom: 0,
+      backgroundColor: theme.surface,
+    },
+    completedImage: {
+      borderRadius: 2,
+    },
+    frameBottomSection: {
+      width: '100%',
+      minHeight: 70,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.surface,
+      borderTopWidth: 0,
+    },
+    message: {
+      fontSize: 22,
+      fontWeight: '700',
+      color: theme.text,
+      textAlign: 'center',
+      letterSpacing: 0.5,
+    },
+    statsContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '100%',
+      maxWidth: SCREEN_WIDTH - 48,
+      marginTop: 20,
+      marginBottom: 32,
+      paddingVertical: 16,
+      paddingHorizontal: 20,
+      backgroundColor: theme.surface,
+      borderRadius: 16,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    statItem: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    statLabel: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: theme.textMuted,
+      marginBottom: 6,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    statValue: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.text,
+    },
+    statDivider: {
+      width: 1,
+      height: 32,
+      backgroundColor: theme.border,
+      marginHorizontal: 12,
+    },
+    buttonFooter: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      width: SCREEN_WIDTH,
+      backgroundColor: theme.background,
+      paddingTop: 12,
+      paddingBottom: 24,
+      paddingHorizontal: 24,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: -2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 5,
+    },
+    buttonContainer: {
+      width: '100%',
+      maxWidth: SCREEN_WIDTH - 48,
+      flexDirection: 'row',
+      gap: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 0,
+    },
+    iconButton: {
+      width: 56,
+      height: 56,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.surfaceAlt,
+      borderWidth: 2,
+      borderColor: theme.border,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    button: {
+      flex: 1,
+      paddingVertical: 16,
+      paddingHorizontal: 24,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 56,
+    },
+    primaryButton: {
+      backgroundColor: theme.accent,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 6,
+    },
+    primaryButtonText: {
+      color: theme.buttonText,
+      fontSize: 17,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+    },
+  });
+
 export const CompletionScreen = ({ 
   timer, 
   moveCount, 
@@ -39,6 +261,8 @@ export const CompletionScreen = ({
   onBackToMenu,
   onSettings 
 }) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const polaroidScale = useRef(new Animated.Value(0.3)).current;
   const polaroidOpacity = useRef(new Animated.Value(0)).current;
   const polaroidTranslateY = useRef(new Animated.Value(100)).current;
@@ -255,7 +479,7 @@ export const CompletionScreen = ({
             onPress={onBackToMenu}
             activeOpacity={0.8}
           >
-            <Ionicons name="home" size={26} color={COLORS.text} />
+            <Ionicons name="home" size={26} color={theme.text} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.primaryButton]}
@@ -269,231 +493,10 @@ export const CompletionScreen = ({
             onPress={typeof onSettings === 'function' ? onSettings : undefined}
             activeOpacity={0.8}
           >
-            <Ionicons name="settings" size={26} color={COLORS.text} />
+            <Ionicons name="settings" size={26} color={theme.text} />
           </TouchableOpacity>
         </View>
       </View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-    backgroundColor: COLORS.background,
-  },
-  polaroidSection: {
-    paddingTop: 50,
-    paddingHorizontal: 24,
-    paddingBottom: 20,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'flex-start',
-    paddingVertical: 20,
-    paddingBottom: 90, // Space for footer buttons
-    paddingHorizontal: 24,
-  },
-  statsScrollView: {
-    flex: 1,
-  },
-  polaroidContainer: {
-    width: '100%',
-    position: 'relative',
-    alignItems: 'center',
-    marginBottom: 0,
-  },
-  pinFulcrum: {
-    alignItems: 'center',
-    position: 'relative',
-  },
-  polaroidFrameWrapper: {
-    width: '100%',
-    borderWidth: 1,
-    borderColor: COLORS.text,
-    borderRadius: 6,
-    overflow: 'hidden',
-    shadowColor: COLORS.text,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
-    alignItems: 'center',
-    transformOrigin: 'top center',
-  },
-  thumbtack: {
-    position: 'absolute',
-    top: -11, // Center of the 12px top border (12 / 2 = 6)
-    alignSelf: 'center',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  thumbtackCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: COLORS.error,
-    borderWidth: 2,
-    borderColor: COLORS.white,
-    shadowColor: COLORS.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  polaroidFrame: {
-    backgroundColor: COLORS.white,
-    borderWidth: 12,
-    borderColor: COLORS.white,
-    borderRadius: 5,
-    shadowColor: COLORS.text,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 10,
-    overflow: 'visible',
-    alignItems: 'center',
-    width: '100%',
-    marginBottom: 0,
-    position: 'relative',
-  },
-  imageSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 12,
-    paddingHorizontal: 12,
-    paddingBottom: 0,
-    backgroundColor: COLORS.white,
-  },
-  completedImage: {
-    borderRadius: 2,
-  },
-  frameBottomSection: {
-    width: '100%',
-    minHeight: 70,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.white,
-    borderTopWidth: 0,
-  },
-  message: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: COLORS.text,
-    textAlign: 'center',
-    letterSpacing: 0.5,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    maxWidth: SCREEN_WIDTH - 48,
-    marginTop: 20,
-    marginBottom: 32,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    shadowColor: COLORS.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: COLORS.textLight,
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  statDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: COLORS.border,
-    marginHorizontal: 12,
-  },
-  buttonFooter: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    width: SCREEN_WIDTH,
-    backgroundColor: COLORS.background,
-    paddingTop: 12,
-    paddingBottom: 24,
-    paddingHorizontal: 24,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    shadowColor: COLORS.text,
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  buttonContainer: {
-    width: '100%',
-    maxWidth: SCREEN_WIDTH - 48,
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 0,
-  },
-  iconButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.background,
-    borderWidth: 2,
-    borderColor: COLORS.border,
-    shadowColor: COLORS.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 56,
-  },
-  primaryButton: {
-    backgroundColor: COLORS.accent,
-    shadowColor: COLORS.text,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  primaryButtonText: {
-    color: COLORS.white,
-    fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-});

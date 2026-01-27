@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../constants/colors';
+import { useTheme } from '../contexts/ThemeContext';
 import { PuzzlePiece } from './PuzzlePiece';
 
 const HOLDER_HEIGHT = 140;
@@ -50,6 +50,47 @@ const AnimatedHolderPiece = ({ piece, pieceWidth, pieceHeight, isSelected, isSel
   );
 };
 
+const makeStyles = (theme) =>
+  StyleSheet.create({
+    container: { width: '100%' },
+    holder: {
+      backgroundColor: theme.surface,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: theme.border,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+      height: HOLDER_HEIGHT,
+      paddingVertical: 8,
+    },
+    contentRow: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+    scrollIndicator: { width: 24, height: '100%', alignItems: 'center', justifyContent: 'center' },
+    leftIndicator: { paddingLeft: 4 },
+    rightIndicator: { paddingRight: 4 },
+    scrollViewContainer: { flex: 1 },
+    scrollView: { flex: 1 },
+    scrollContent: { paddingHorizontal: 8, paddingVertical: 8, alignItems: 'center' },
+    pieceWrapper: { alignItems: 'center', justifyContent: 'center' },
+    emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    progressContainer: { paddingHorizontal: 24, paddingTop: 6, paddingBottom: 4, alignItems: 'center' },
+    progressTrack: {
+      height: 8,
+      backgroundColor: theme.border,
+      borderRadius: 4,
+      position: 'relative',
+    },
+    progressBar: {
+      position: 'absolute',
+      top: 0,
+      height: 8,
+      backgroundColor: theme.accent,
+      borderRadius: 4,
+    },
+  });
+
 export const PuzzlePieceHolder = ({
   boardWidth,
   pieces,
@@ -61,6 +102,9 @@ export const PuzzlePieceHolder = ({
   onHolderTap,
   resetScrollKey,
 }) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   const PROGRESS_BAR_HEIGHT = 18;
   const VERTICAL_PADDING = 24;
   const availableHeight = HOLDER_HEIGHT - PROGRESS_BAR_HEIGHT - VERTICAL_PADDING;
@@ -284,7 +328,7 @@ export const PuzzlePieceHolder = ({
           {/* Left scroll indicator */}
           <View style={[styles.scrollIndicator, styles.leftIndicator]}>
             {canScrollLeft && (
-              <Ionicons name="chevron-back" size={18} color={COLORS.textLight} />
+              <Ionicons name="chevron-back" size={18} color={theme.textMuted} />
             )}
           </View>
           
@@ -326,9 +370,9 @@ export const PuzzlePieceHolder = ({
                   </View>
                 );
               }) : (
-                <View style={[styles.emptyState, { width: scrollAreaWidth }]}>
-                  <Ionicons name="checkmark-circle" size={48} color={COLORS.success} />
-                </View>
+                  <View style={[styles.emptyState, { width: scrollAreaWidth }]}>
+                    <Ionicons name="checkmark-circle" size={48} color={theme.success} />
+                  </View>
               )}
             </ScrollView>
           </View>
@@ -336,7 +380,7 @@ export const PuzzlePieceHolder = ({
           {/* Right scroll indicator */}
           <View style={[styles.scrollIndicator, styles.rightIndicator]}>
             {canScrollRight && (
-              <Ionicons name="chevron-forward" size={18} color={COLORS.textLight} />
+              <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
             )}
           </View>
         </View>
@@ -360,77 +404,3 @@ export const PuzzlePieceHolder = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-  },
-  holder: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: COLORS.border,
-    shadowColor: COLORS.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    height: HOLDER_HEIGHT,
-    paddingVertical: 8,
-  },
-  contentRow: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  scrollIndicator: {
-    width: 24,
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  leftIndicator: {
-    paddingLeft: 4,
-  },
-  rightIndicator: {
-    paddingRight: 4,
-  },
-  scrollViewContainer: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  pieceWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  progressContainer: {
-    paddingHorizontal: 24,
-    paddingTop: 6,
-    paddingBottom: 4,
-    alignItems: 'center',
-  },
-  progressTrack: {
-    height: 8,
-    backgroundColor: COLORS.border,
-    borderRadius: 4,
-    position: 'relative',
-  },
-  progressBar: {
-    position: 'absolute',
-    top: 0,
-    height: 8,
-    backgroundColor: COLORS.accent,
-    borderRadius: 4,
-  },
-});

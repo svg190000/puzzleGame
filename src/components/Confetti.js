@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react';
 import { View, StyleSheet, Animated, Easing } from 'react-native';
-import { COLORS } from '../constants/colors';
+import { useTheme } from '../contexts/ThemeContext';
 
-const CONFETTI_COLORS = [
-  COLORS.accent || '#B8A9D9',
-  COLORS.success || '#A8E6CF',
-  COLORS.pastelBlue || '#BDE0FE',
-  COLORS.pastelGreen || '#A8E6CF',
-  '#FFB3BA',
+const getConfettiColors = (theme) => [
+  theme.accent,
+  theme.success,
+  theme.pastelBlue,
+  theme.pastelGreen,
+  theme.error || '#FFB3BA',
   '#FFD3A5',
   '#BAE1FF',
   '#FFDFBA',
@@ -25,7 +25,7 @@ const rand = (min, max) => min + Math.random() * (max - min);
 const randInt = (min, max) => Math.floor(rand(min, max + 1));
 const degToRad = (deg) => (deg * Math.PI) / 180;
 
-function generateConfettiFromCorners(boardWidth, boardHeight) {
+function generateConfettiFromCorners(boardWidth, boardHeight, colors) {
   const items = [];
   let id = 0;
   const fallDistance = boardHeight + 300;
@@ -42,7 +42,7 @@ function generateConfettiFromCorners(boardWidth, boardHeight) {
     
     items.push({
       id: `confetti-${id++}-${Date.now()}`,
-      color: CONFETTI_COLORS[randInt(0, CONFETTI_COLORS.length - 1)],
+      color: colors[randInt(0, colors.length - 1)],
       startX: 0,
       startY: boardHeight,
       translateXLaunch: launchX,
@@ -65,7 +65,7 @@ function generateConfettiFromCorners(boardWidth, boardHeight) {
     
     items.push({
       id: `confetti-${id++}-${Date.now()}`,
-      color: CONFETTI_COLORS[randInt(0, CONFETTI_COLORS.length - 1)],
+      color: colors[randInt(0, colors.length - 1)],
       startX: boardWidth,
       startY: boardHeight,
       translateXLaunch: launchX,
@@ -200,6 +200,8 @@ const ConfettiPiece = ({
 const CONFETTI_COUNT = CONFETTI_PER_CORNER * 2;
 
 export const Confetti = ({ isActive, boardWidth, boardHeight, onAllComplete }) => {
+  const { theme } = useTheme();
+  const confettiColors = useMemo(() => getConfettiColors(theme), [theme]);
   const completedCountRef = useRef(0);
   const onAllCompleteRef = useRef(onAllComplete);
   const hasTriggeredRef = useRef(false);
@@ -214,13 +216,13 @@ export const Confetti = ({ isActive, boardWidth, boardHeight, onAllComplete }) =
     if (isActive && boardWidth > 0 && boardHeight > 0) {
       completedCountRef.current = 0;
       hasTriggeredRef.current = false;
-      confettiDataRef.current = generateConfettiFromCorners(boardWidth, boardHeight);
+      confettiDataRef.current = generateConfettiFromCorners(boardWidth, boardHeight, confettiColors);
       setDataReady(true);
     } else if (!isActive) {
       confettiDataRef.current = null;
       setDataReady(false);
     }
-  }, [isActive, boardWidth, boardHeight]);
+  }, [isActive, boardWidth, boardHeight, confettiColors]);
 
   const handlePieceComplete = useCallback(() => {
     completedCountRef.current += 1;

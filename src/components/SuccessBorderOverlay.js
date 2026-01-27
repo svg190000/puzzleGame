@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Easing } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
-import { COLORS } from '../constants/colors';
 
 const ANIMATION_DURATION = 500; // Total animation duration in ms
 const GLOW_FADE_DURATION = 200; // Fade out duration after trace completes
@@ -26,7 +25,8 @@ export const SuccessBorderOverlay = ({
   width, 
   height, 
   borderRadius = 8,
-  onComplete 
+  onComplete,
+  successColor = '#16A34A',
 }) => {
   const strokeProgress = useRef(new Animated.Value(0)).current;
   const glowOpacity = useRef(new Animated.Value(0)).current;
@@ -141,7 +141,7 @@ export const SuccessBorderOverlay = ({
         rx={borderRadius}
         ry={borderRadius}
         fill="none"
-        stroke={COLORS.success}
+        stroke={successColor}
         strokeWidth={GLOW_STROKE_WIDTH}
         strokeDasharray={totalPerimeter}
         strokeDashoffset={strokeDashoffset}
@@ -158,7 +158,7 @@ export const SuccessBorderOverlay = ({
         rx={borderRadius}
         ry={borderRadius}
         fill="none"
-        stroke={COLORS.success}
+        stroke={successColor}
         strokeWidth={STROKE_WIDTH}
         strokeDasharray={totalPerimeter}
         strokeDashoffset={strokeDashoffset}

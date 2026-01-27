@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Dimensions, TouchableWithoutFeedback } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
-import { COLORS } from '../constants/colors';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const ANIMATION_DURATION = 300;
@@ -15,7 +15,84 @@ const DIFFICULTIES = [
   { label: 'Very Hard', rows: 8, cols: 8 },
 ];
 
+const makeStyles = (theme) =>
+  StyleSheet.create({
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    modal: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: theme.surface,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: 32,
+      paddingBottom: 40,
+      alignItems: 'center',
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      elevation: 12,
+    },
+    handle: {
+      width: 40,
+      height: 4,
+      backgroundColor: theme.border,
+      borderRadius: 2,
+      marginBottom: 24,
+      marginTop: -8,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: '700',
+      color: theme.text,
+      marginBottom: 24,
+      textAlign: 'center',
+      letterSpacing: 0.5,
+    },
+    buttonContainer: {
+      width: '100%',
+      gap: 12,
+      marginBottom: 20,
+    },
+    button: {
+      width: '100%',
+      paddingVertical: 16,
+      paddingHorizontal: 24,
+      borderRadius: 16,
+      backgroundColor: theme.accent,
+      alignItems: 'center',
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    buttonText: {
+      color: theme.white,
+      fontSize: 18,
+      fontWeight: '600',
+      letterSpacing: 0.5,
+    },
+    cancelButton: {
+      marginTop: 8,
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+    },
+    cancelButtonText: {
+      color: theme.textMuted,
+      fontSize: 16,
+      fontWeight: '500',
+    },
+  });
+
 export const DifficultyModal = ({ visible, onSelect, onClose }) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [modalVisible, setModalVisible] = useState(false);
   const translateY = useSharedValue(SCREEN_HEIGHT);
   const backdropOpacity = useSharedValue(0);
@@ -81,77 +158,3 @@ export const DifficultyModal = ({ visible, onSelect, onClose }) => {
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modal: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 32,
-    paddingBottom: 40,
-    alignItems: 'center',
-    shadowColor: COLORS.text,
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 12,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: COLORS.border,
-    borderRadius: 2,
-    marginBottom: 24,
-    marginTop: -8,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: 24,
-    textAlign: 'center',
-    letterSpacing: 0.5,
-  },
-  buttonContainer: {
-    width: '100%',
-    gap: 12,
-    marginBottom: 20,
-  },
-  button: {
-    width: '100%',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    backgroundColor: COLORS.accent,
-    alignItems: 'center',
-    shadowColor: COLORS.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  buttonText: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  cancelButton: {
-    marginTop: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-  },
-  cancelButtonText: {
-    color: COLORS.textLight,
-    fontSize: 16,
-    fontWeight: '500',
-  },
-});

@@ -1,19 +1,89 @@
-export const COLORS = {
-  // Pastel color scheme
-  background: '#FFF8F5', // Warm cream/paper
-  paperTexture: '#FDF6F0', // Slightly darker for texture layers
-  accent: '#B8A9D9', // Soft lavender
-  accentLight: '#D4C7E8', // Lighter lavender
-  softHighlight: '#F0E6FF', // Very light lavender
-  text: '#5A5A5A', // Soft gray instead of harsh black
-  textLight: '#8A8A8A', // Lighter gray for secondary text
-  white: '#FFFFFF',
-  success: '#A8E6CF', // Pastel mint green
-  pastelGreen: '#A8E6CF', // Pastel green for second selection
-  error: '#FFB3BA', // Pastel pink
-  border: '#E8DCC6', // Warm beige border
-  buttonBg: '#BDE0FE', // Pastel blue for buttons
-  buttonText: '#5A7B9F', // Muted blue-gray for button text
-  pastelBlue: '#BDE0FE', // Pastel blue
-  pastelBlueLight: '#CAE9FF', // Lighter pastel blue
+/**
+ * Global theme palettes. Use THEMES[themeKey] and ensure every UI uses
+ * theme.* so the app responds to light / normal / dark.
+ */
+export const THEMES = {
+  light: {
+    mode: 'light',
+    background: '#F9FAFB',
+    surface: '#FFFFFF',
+    surfaceAlt: '#F3F4F6',
+    text: '#111827',
+    textMuted: '#6B7280',
+    accent: '#2563EB',
+    accentAlt: '#10B981',
+    success: '#16A34A',
+    danger: '#DC2626',
+    error: '#DC2626',
+    border: '#E5E7EB',
+    gridLine: 'rgba(148, 163, 184, 0.4)',
+    shadow: '#111827',
+    holderBackground: '#E5E7EB',
+    paperTexture: '#F3F4F6',
+    buttonBg: '#2563EB',
+    buttonText: '#FFFFFF',
+    white: '#FFFFFF',
+    pastelGreen: '#10B981',
+    pastelBlue: '#3B82F6',
+    pastelBlueLight: '#60A5FA',
+    accentLight: '#60A5FA',
+    softHighlight: '#EFF6FF',
+  },
+  dark: {
+    mode: 'dark',
+    background: '#020617',
+    surface: '#020617',
+    surfaceAlt: '#0F172A',
+    text: '#E5E7EB',
+    textMuted: '#9CA3AF',
+    accent: '#38BDF8',
+    accentAlt: '#22C55E',
+    success: '#4ADE80',
+    danger: '#F97373',
+    error: '#F97373',
+    border: '#1F2937',
+    gridLine: 'rgba(148, 163, 184, 0.35)',
+    shadow: '#000000',
+    holderBackground: '#0F172A',
+    paperTexture: '#0F172A',
+    buttonBg: '#38BDF8',
+    buttonText: '#020617',
+    white: '#FFFFFF',
+    pastelGreen: '#22C55E',
+    pastelBlue: '#38BDF8',
+    pastelBlueLight: '#7DD3FC',
+    accentLight: '#7DD3FC',
+    softHighlight: '#0F172A',
+  },
+  normal: {
+    mode: 'normal',
+    background: '#E0F2FE',
+    surface: '#ECFDF5',
+    surfaceAlt: '#DBEAFE',
+    text: '#1F2933',
+    textMuted: '#6B7280',
+    accent: '#38BDF8',
+    accentAlt: '#34D399',
+    success: '#16A34A',
+    danger: '#F97373',
+    error: '#F97373',
+    border: '#BFDBFE',
+    gridLine: 'rgba(129, 140, 248, 0.45)',
+    shadow: '#1F2933',
+    holderBackground: '#CCFBF1',
+    paperTexture: '#DBEAFE',
+    buttonBg: '#38BDF8',
+    buttonText: '#FFFFFF',
+    white: '#FFFFFF',
+    pastelGreen: '#34D399',
+    pastelBlue: '#38BDF8',
+    pastelBlueLight: '#7DD3FC',
+    accentLight: '#7DD3FC',
+    softHighlight: '#EFF6FF',
+  },
 };
+
+export const DEFAULT_THEME_KEY = 'normal';
+
+/** @deprecated Use THEMES[themeKey] or theme from context. Kept for one-off fallbacks only. */
+export const COLORS = THEMES[DEFAULT_THEME_KEY];

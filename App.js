@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -28,13 +28,90 @@ import { SettingsScreen } from './src/components/SettingsScreen';
 import { CalendarScreen } from './src/components/CalendarScreen';
 import { NavigationBar } from './src/components/NavigationBar';
 import { generatePuzzle, shuffleArray } from './src/utils/puzzleUtils';
-import { COLORS } from './src/constants/colors';
+import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const Stack = createStackNavigator();
 
-export default function App() {
+const makeStyles = (theme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background },
+    background: { flex: 1 },
+    contentWrapper: { flex: 1 },
+    gameScreen: { flex: 1, width: '100%', paddingHorizontal: 20 },
+    headerSection: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingTop: 50,
+      paddingBottom: 0,
+      width: '100%',
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: theme.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    gameContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 0 },
+    holderContainer: { width: '100%', alignItems: 'center', marginBottom: 16 },
+    actionButtonsContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: 0,
+      paddingBottom: 40,
+      width: '100%',
+    },
+    actionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.buttonBg,
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2,
+      gap: 8,
+      flex: 0,
+    },
+    actionButtonText: { color: theme.buttonText, fontSize: 14, fontWeight: '600' },
+    loadingOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: theme.surface,
+      opacity: 0.95,
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 1000,
+    },
+    loadingText: { fontSize: 18, fontWeight: '600', color: theme.text },
+    screenContainer: { flex: 1, width: '100%' },
+    navigationWrapper: { flex: 1, width: '100%' },
+  });
+
+function AppContent() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   const HEADER_HEIGHT = 100;
   const HOLDER_HEIGHT = 140;
   const ACTION_BUTTONS_HEIGHT = 70;
@@ -744,7 +821,7 @@ export default function App() {
   };
 
   return (
-    <GestureHandlerRootView style={styles.container}>
+    <>
       <StatusBar style="dark" />
       <PaperBackground style={styles.background}>
         {showLoadingScreen && (
@@ -819,7 +896,7 @@ export default function App() {
                   style={styles.backButton}
                   onPress={resetGameState}
                 >
-                  <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+                  <Ionicons name="arrow-back" size={24} color={theme.text} />
                 </TouchableOpacity>
                 <GameStats timer={timer} moveCount={moveCount} />
               </View>
@@ -864,21 +941,21 @@ export default function App() {
                   style={styles.actionButton}
                   onPress={handleHint}
                 >
-                  <Ionicons name="bulb" size={18} color={COLORS.buttonText} />
+                  <Ionicons name="bulb" size={18} color={theme.buttonText} />
                   <Text style={styles.actionButtonText}>Hint</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.actionButton}
                   onPress={handleTest}
                 >
-                  <Ionicons name="checkmark-circle" size={18} color={COLORS.buttonText} />
+                  <Ionicons name="checkmark-circle" size={18} color={theme.buttonText} />
                   <Text style={styles.actionButtonText}>Test</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.actionButton}
                   onPress={handleReset}
                 >
-                  <Ionicons name="refresh" size={18} color={COLORS.buttonText} />
+                  <Ionicons name="refresh" size={18} color={theme.buttonText} />
                   <Text style={styles.actionButtonText}>Reset</Text>
                 </TouchableOpacity>
               </View>
@@ -894,113 +971,16 @@ export default function App() {
           </Animated.View>
         )}
       </PaperBackground>
-    </GestureHandlerRootView>
+    </>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  background: {
-    flex: 1,
-  },
-  contentWrapper: {
-    flex: 1,
-  },
-  gameScreen: {
-    flex: 1,
-    width: '100%',
-    paddingHorizontal: 20,
-  },
-  headerSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 50,
-    paddingBottom: 0,
-    width: '100%',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: COLORS.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  gameContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    minHeight: 0,
-  },
-  holderContainer: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  actionButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 0,
-    paddingBottom: 40,
-    width: '100%',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.buttonBg,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: COLORS.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    gap: 8,
-    flex: 0,
-  },
-  actionButtonText: {
-    color: COLORS.buttonText,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  loadingText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  screenContainer: {
-    flex: 1,
-    width: '100%',
-  },
-  navigationWrapper: {
-    flex: 1,
-    width: '100%',
-  },
-});
+export default function App() {
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
+    </GestureHandlerRootView>
+  );
+}
