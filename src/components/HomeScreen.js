@@ -12,7 +12,7 @@ export const HomeScreen = ({ onNewGame }) => {
             <Ionicons name="grid" size={48} color={COLORS.accent} />
           </View>
           <Text style={styles.title}>Puzzles</Text>
-          <Text style={styles.subtitle}>Create beautiful puzzles from your photos</Text>
+          <Text style={styles.subtitle}>Dolphins and Noggins</Text>
         </View>
 
         <View style={styles.buttonContainer}>
@@ -26,7 +26,7 @@ export const HomeScreen = ({ onNewGame }) => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.featuresContainer}>
+        {/* <View style={styles.featuresContainer}>
           <View style={styles.feature}>
             <Ionicons name="image-outline" size={20} color={COLORS.accent} />
             <Text style={styles.featureText}>Choose your own image</Text>
@@ -39,7 +39,7 @@ export const HomeScreen = ({ onNewGame }) => {
             <Ionicons name="bulb-outline" size={20} color={COLORS.accent} />
             <Text style={styles.featureText}>Hints available</Text>
           </View>
-        </View>
+        </View> */}
       </View>
     </View>
   );
