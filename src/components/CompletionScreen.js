@@ -266,7 +266,7 @@ export const CompletionScreen = ({
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconButton}
-            onPress={onSettings}
+            onPress={typeof onSettings === 'function' ? onSettings : undefined}
             activeOpacity={0.8}
           >
             <Ionicons name="settings" size={26} color={COLORS.text} />

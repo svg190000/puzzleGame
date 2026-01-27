@@ -11,10 +11,6 @@ const ENTRANCE_DURATION = 250;
 const BORDER_COLOR_DURATION = 600;
 const LOCK_ANIMATION_DELAY = 900;
 
-// NOTE: To reduce visible seams between pieces, a small visual overlap (e.g., 0.5-1px) could be added
-// by slightly increasing piece rendering size or adjusting grid line positions. However, this must NOT
-// affect hit-testing logic - handleBoardTap, checkCorrectPosition, and isPieceLocked must continue
-// to use the logical pieceWidth/pieceHeight and row/col grid calculations for precise tap detection.
 
 const createEntranceAnimation = (scaleAnim, opacityAnim, callback) => {
   requestAnimationFrame(() => {
@@ -207,6 +203,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
     );
   };
 
+  // Track piece state changes for animations
   const prevPiecesMap = new Map(prevBoardPiecesRef.current.map(p => [p.id, p]));
   const newlyPlacedIds = new Set();
   const newlyLockedIds = new Set();
@@ -216,12 +213,10 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
     if (!knownPieceIdsRef.current.has(piece.id)) {
       newlyPlacedIds.add(piece.id);
     }
-
     const prevPiece = prevPiecesMap.get(piece.id);
     if (prevPiece && (prevPiece.boardX !== piece.boardX || prevPiece.boardY !== piece.boardY)) {
       currentSwapped.push(piece.id);
     }
-
     if (checkCorrectPosition(piece) && !lockedPieceIdsRef.current.has(piece.id)) {
       newlyLockedIds.add(piece.id);
     }
@@ -229,7 +224,8 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
 
   useEffect(() => {
     const currentBoardIds = new Set(boardPieces.map(p => p.id));
-
+    
+    // Clean up removed pieces
     knownPieceIdsRef.current.forEach(id => {
       if (!currentBoardIds.has(id)) {
         knownPieceIdsRef.current.delete(id);
@@ -237,6 +233,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
       }
     });
 
+    // Track new pieces and locked state
     boardPieces.forEach(piece => {
       knownPieceIdsRef.current.add(piece.id);
       if (checkCorrectPosition(piece)) {
@@ -263,7 +260,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
       const CORNER_SQUARE_DURATION = 1000;
       const CONFETTI_START_DELAY = 400;
       const COMPLETE_IMAGE_START_DELAY = 500;
-      const CONFETTI_DURATION = 3400; // LAUNCH_DURATION + FALL_DURATION
+      const CONFETTI_DURATION = 3400;
       const MODAL_SHOW_DELAY = CONFETTI_START_DELAY + CONFETTI_DURATION;
       
       setTimeout(() => {
@@ -276,25 +273,16 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
           setHideGrid(true);
         });
 
+        const cornerAnimationConfig = {
+          duration: CORNER_SQUARE_DURATION,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        };
+
         Animated.parallel([
-          Animated.timing(pieceBorderRadius, {
-            toValue: 0,
-            duration: CORNER_SQUARE_DURATION,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(lockedPieceBorderRadius, {
-            toValue: 0,
-            duration: CORNER_SQUARE_DURATION,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(lockIndicatorOpacity, {
-            toValue: 0,
-            duration: CORNER_SQUARE_DURATION,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-          }),
+          Animated.timing(pieceBorderRadius, { ...cornerAnimationConfig, toValue: 0 }),
+          Animated.timing(lockedPieceBorderRadius, { ...cornerAnimationConfig, toValue: 0 }),
+          Animated.timing(lockIndicatorOpacity, { ...cornerAnimationConfig, toValue: 0 }),
         ]).start(() => {
           setTimeout(() => {
             setShowConfetti(true);
@@ -302,19 +290,14 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
 
           setTimeout(() => {
             setShowCompleteImage(true);
+            const fadeAnimationConfig = {
+              duration: 1000,
+              easing: Easing.out(Easing.ease),
+              useNativeDriver: true,
+            };
             Animated.parallel([
-              Animated.timing(piecesOpacity, {
-                toValue: 0,
-                duration: 1000,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: true,
-              }),
-              Animated.timing(completeImageOpacity, {
-                toValue: 1,
-                duration: 1000,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: true,
-              }),
+              Animated.timing(piecesOpacity, { ...fadeAnimationConfig, toValue: 0 }),
+              Animated.timing(completeImageOpacity, { ...fadeAnimationConfig, toValue: 1 }),
             ]).start();
           }, COMPLETE_IMAGE_START_DELAY);
 

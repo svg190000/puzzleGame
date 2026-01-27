@@ -1,5 +1,55 @@
 import * as ImageManipulator from 'expo-image-manipulator';
 
+/**
+ * Creates manipulation actions for scaling and cropping an image to fit target dimensions.
+ * Uses quality scaling (2x then downscale) when source image is large enough.
+ */
+const createScaleAndCropActions = (originalWidth, originalHeight, targetWidth, targetHeight, isWider) => {
+  const QUALITY_SCALE_FACTOR = 2;
+  
+  if (isWider) {
+    const scaleFactor = targetHeight / originalHeight;
+    const scaledWidth = originalWidth * scaleFactor;
+    const cropWidth = targetWidth;
+    const cropX = (scaledWidth - cropWidth) / 2;
+    
+    const useQualityScaling = originalWidth >= cropWidth * QUALITY_SCALE_FACTOR && 
+                               originalHeight >= targetHeight * QUALITY_SCALE_FACTOR;
+    
+    if (useQualityScaling) {
+      return [
+        { resize: { width: scaledWidth * QUALITY_SCALE_FACTOR, height: targetHeight * QUALITY_SCALE_FACTOR } },
+        { crop: { originX: cropX * QUALITY_SCALE_FACTOR, originY: 0, width: cropWidth * QUALITY_SCALE_FACTOR, height: targetHeight * QUALITY_SCALE_FACTOR } },
+        { resize: { width: cropWidth, height: targetHeight } }
+      ];
+    }
+    return [
+      { resize: { width: scaledWidth, height: targetHeight } },
+      { crop: { originX: cropX, originY: 0, width: cropWidth, height: targetHeight } }
+    ];
+  } else {
+    const scaleFactor = targetWidth / originalWidth;
+    const scaledHeight = originalHeight * scaleFactor;
+    const cropHeight = targetHeight;
+    const cropY = (scaledHeight - cropHeight) / 2;
+    
+    const useQualityScaling = originalWidth >= targetWidth * QUALITY_SCALE_FACTOR && 
+                               originalHeight >= cropHeight * QUALITY_SCALE_FACTOR;
+    
+    if (useQualityScaling) {
+      return [
+        { resize: { width: targetWidth * QUALITY_SCALE_FACTOR, height: scaledHeight * QUALITY_SCALE_FACTOR } },
+        { crop: { originX: 0, originY: cropY * QUALITY_SCALE_FACTOR, width: targetWidth * QUALITY_SCALE_FACTOR, height: cropHeight * QUALITY_SCALE_FACTOR } },
+        { resize: { width: targetWidth, height: cropHeight } }
+      ];
+    }
+    return [
+      { resize: { width: targetWidth, height: scaledHeight } },
+      { crop: { originX: 0, originY: cropY, width: targetWidth, height: cropHeight } }
+    ];
+  }
+};
+
 export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, targetBoardHeight) => {
   try {
     if (!imageUri || !rows || !cols || rows <= 0 || cols <= 0) {
@@ -22,192 +72,80 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
 
     const originalWidth = imageInfo.width;
     const originalHeight = imageInfo.height;
-    const originalAspectRatio = originalWidth / originalHeight;
-    
-    // Calculate target aspect ratio for the board
-    const targetAspectRatio = targetBoardWidth / targetBoardHeight;
-    
-    let processedImageUri = imageUri;
-    let processedWidth = originalWidth;
-    let processedHeight = originalHeight;
+    const isWider = (originalWidth / originalHeight) > (targetBoardWidth / targetBoardHeight);
     
     // Scale and crop image to fit board dimensions, keeping center in focus
-    // Use a two-step scaling process to maintain HD quality: scale to 2x first, then downscale
-    // Only use 2x scaling if the original image is large enough to avoid upscaling artifacts
-    const QUALITY_SCALE_FACTOR = 2; // Scale to 2x resolution first for better quality
+    const manipulationActions = createScaleAndCropActions(
+      originalWidth,
+      originalHeight,
+      targetBoardWidth,
+      targetBoardHeight,
+      isWider
+    );
     
-    if (originalAspectRatio > targetAspectRatio) {
-      // Image is wider than target - scale to fit height, then crop from sides
-      const scaleFactor = targetBoardHeight / originalHeight;
-      const scaledWidth = originalWidth * scaleFactor;
-      const scaledHeight = targetBoardHeight;
-      
-      // Crop from center (trim evenly from left and right)
-      const cropWidth = targetBoardWidth;
-      const cropX = (scaledWidth - cropWidth) / 2;
-      
-      // Use 2x scaling only if original image is large enough (at least 2x the target)
-      const useQualityScaling = originalWidth >= cropWidth * QUALITY_SCALE_FACTOR && 
-                                 originalHeight >= scaledHeight * QUALITY_SCALE_FACTOR;
-      
-      let manipulationActions = [];
-      if (useQualityScaling) {
-        // First scale to 2x resolution for better quality preservation
-        const highResWidth = scaledWidth * QUALITY_SCALE_FACTOR;
-        const highResHeight = scaledHeight * QUALITY_SCALE_FACTOR;
-        const highResCropWidth = cropWidth * QUALITY_SCALE_FACTOR;
-        const highResCropX = cropX * QUALITY_SCALE_FACTOR;
-        
-        manipulationActions = [
-          { resize: { width: highResWidth, height: highResHeight } },
-          { crop: { originX: highResCropX, originY: 0, width: highResCropWidth, height: highResHeight } },
-          { resize: { width: cropWidth, height: scaledHeight } } // Final scale down to target size
-        ];
-      } else {
-        // Direct scaling if original is not large enough for 2x scaling
-        manipulationActions = [
-          { resize: { width: scaledWidth, height: scaledHeight } },
-          { crop: { originX: cropX, originY: 0, width: cropWidth, height: scaledHeight } }
-        ];
-      }
-      
-      const scaledImage = await ImageManipulator.manipulateAsync(
-        imageUri,
-        manipulationActions,
-        { format: ImageManipulator.SaveFormat.PNG, compress: 1 }
-      );
-      
-      processedImageUri = scaledImage.uri;
-      processedWidth = cropWidth;
-      processedHeight = scaledHeight;
-    } else {
-      // Image is taller than target - scale to fit width, then crop from top/bottom
-      const scaleFactor = targetBoardWidth / originalWidth;
-      const scaledWidth = targetBoardWidth;
-      const scaledHeight = originalHeight * scaleFactor;
-      
-      // Crop from center (trim evenly from top and bottom)
-      const cropHeight = targetBoardHeight;
-      const cropY = (scaledHeight - cropHeight) / 2;
-      
-      // Use 2x scaling only if original image is large enough (at least 2x the target)
-      const useQualityScaling = originalWidth >= scaledWidth * QUALITY_SCALE_FACTOR && 
-                                 originalHeight >= cropHeight * QUALITY_SCALE_FACTOR;
-      
-      let manipulationActions = [];
-      if (useQualityScaling) {
-        // First scale to 2x resolution for better quality preservation
-        const highResWidth = scaledWidth * QUALITY_SCALE_FACTOR;
-        const highResHeight = scaledHeight * QUALITY_SCALE_FACTOR;
-        const highResCropHeight = cropHeight * QUALITY_SCALE_FACTOR;
-        const highResCropY = cropY * QUALITY_SCALE_FACTOR;
-        
-        manipulationActions = [
-          { resize: { width: highResWidth, height: highResHeight } },
-          { crop: { originX: 0, originY: highResCropY, width: highResWidth, height: highResCropHeight } },
-          { resize: { width: scaledWidth, height: cropHeight } } // Final scale down to target size
-        ];
-      } else {
-        // Direct scaling if original is not large enough for 2x scaling
-        manipulationActions = [
-          { resize: { width: scaledWidth, height: scaledHeight } },
-          { crop: { originX: 0, originY: cropY, width: scaledWidth, height: cropHeight } }
-        ];
-      }
-      
-      const scaledImage = await ImageManipulator.manipulateAsync(
-        imageUri,
-        manipulationActions,
-        { format: ImageManipulator.SaveFormat.PNG, compress: 1 }
-      );
-      
-      processedImageUri = scaledImage.uri;
-      processedWidth = scaledWidth;
-      processedHeight = cropHeight;
-    }
+    const scaledImage = await ImageManipulator.manipulateAsync(
+      imageUri,
+      manipulationActions,
+      { format: ImageManipulator.SaveFormat.PNG, compress: 1 }
+    );
+    
+    let processedImageUri = scaledImage.uri;
+    let processedWidth = targetBoardWidth;
+    let processedHeight = targetBoardHeight;
 
-    // Calculate integer piece dimensions in pixels
-    // targetBoardWidth and targetBoardHeight are pixel dimensions
+    // Calculate integer piece dimensions and exact coverage
     const pieceWidth = Math.floor(targetBoardWidth / cols);
     const pieceHeight = Math.floor(targetBoardHeight / rows);
-    
-    // Calculate exact dimensions that pieces will cover
     const exactWidth = pieceWidth * cols;
     const exactHeight = pieceHeight * rows;
     
-    // Avoid unnecessary final resize that can blur the image
-    // Only resize if there's a significant mismatch (> 3-4 pixels) to prevent quality degradation
-    // The initial resize/crop should already be very close to exact dimensions
-    const RESIZE_THRESHOLD = 4; // Only resize if mismatch exceeds this many pixels
+    // Only resize if there's a significant mismatch to avoid quality degradation
+    const RESIZE_THRESHOLD = 4;
     if (Math.abs(processedWidth - exactWidth) > RESIZE_THRESHOLD || 
         Math.abs(processedHeight - exactHeight) > RESIZE_THRESHOLD) {
-      // Significant mismatch - resize to exact dimensions
       const finalImage = await ImageManipulator.manipulateAsync(
         processedImageUri,
-        [
-          { resize: { width: exactWidth, height: exactHeight } }
-        ],
+        [{ resize: { width: exactWidth, height: exactHeight } }],
         { format: ImageManipulator.SaveFormat.PNG, compress: 1 }
       );
       processedImageUri = finalImage.uri;
       processedWidth = exactWidth;
       processedHeight = exactHeight;
     }
-    // If mismatch is small (<= RESIZE_THRESHOLD), keep the processed image as-is
-    // This preserves quality - the per-piece slicing will work correctly since
-    // we use exactWidth/exactHeight for piece calculations below
 
-    // Generate all piece crop operations in parallel for much faster processing
-    // This dramatically reduces generation time, especially for larger puzzles
+    // Generate all piece crops in parallel for faster processing
     const piecePromises = [];
     
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         const originX = Math.round(col * pieceWidth);
         const originY = Math.round(row * pieceHeight);
-        const cropWidth = Math.round(pieceWidth);
-        const cropHeight = Math.round(pieceHeight);
-
-        // Create promise for each piece crop (will execute in parallel)
+        
         const piecePromise = ImageManipulator.manipulateAsync(
           processedImageUri,
-          [
-            {
-              crop: {
-                originX,
-                originY,
-                width: cropWidth,
-                height: cropHeight,
-              },
-            },
-          ],
+          [{ crop: { originX, originY, width: Math.round(pieceWidth), height: Math.round(pieceHeight) } }],
           { format: ImageManipulator.SaveFormat.PNG, compress: 1 }
-        ).then((pieceImage) => {
-          const edgeTypes = {
+        ).then((pieceImage) => ({
+          id: `${row}-${col}`,
+          row,
+          col,
+          correctRow: row,
+          correctCol: col,
+          imageUri: pieceImage.uri,
+          edgeTypes: {
             top: row === 0 ? 'flat' : (row % 2 === 0 ? 'tab' : 'outlet'),
             right: col === cols - 1 ? 'flat' : (col % 2 === 0 ? 'tab' : 'outlet'),
             bottom: row === rows - 1 ? 'flat' : (row % 2 === 0 ? 'outlet' : 'tab'),
             left: col === 0 ? 'flat' : (col % 2 === 0 ? 'outlet' : 'tab'),
-          };
-
-          return {
-            id: `${row}-${col}`,
-            row,
-            col,
-            correctRow: row,
-            correctCol: col,
-            imageUri: pieceImage.uri,
-            edgeTypes,
-            currentX: 0,
-            currentY: 0,
-          };
-        });
+          },
+          currentX: 0,
+          currentY: 0,
+        }));
 
         piecePromises.push(piecePromise);
       }
     }
 
-    // Execute all piece crops in parallel - this is MUCH faster than sequential
     const pieces = await Promise.all(piecePromises);
 
     return {

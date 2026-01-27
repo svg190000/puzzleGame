@@ -7,7 +7,6 @@ import {
   TouchableWithoutFeedback,
   Dimensions,
   Alert,
-  Platform,
   PixelRatio,
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
@@ -43,6 +42,7 @@ export default function App() {
   const HORIZONTAL_PADDING = 40;
   const BOARD_BORDER_WIDTH = 2;
   const MIN_LOADING_TIME = 3000;
+  const POSITION_TOLERANCE = 2;
 
   const [difficulty, setDifficulty] = useState({ rows: 3, cols: 3 });
   const [showDifficultyModal, setShowDifficultyModal] = useState(false);
@@ -253,19 +253,17 @@ export default function App() {
     setShowGameScreen(false);
     clearGameState();
     setScrollResetKey((prev) => prev + 1);
-    
     await new Promise(resolve => setTimeout(resolve, 300));
     setIsTransitioning(false);
     setTimeout(() => setShowDifficultyModal(true), 100);
   };
 
   const handleBackToMenu = resetGameState;
+  const handleBackButton = resetGameState;
 
   const handleSettings = () => {
     // Settings functionality to be implemented
   };
-
-  const handleBackButton = resetGameState;
 
   const getBoardDimensions = () => {
     const availableHeight = SCREEN_HEIGHT - HEADER_HEIGHT - HOLDER_HEIGHT - ACTION_BUTTONS_HEIGHT - (EQUAL_SPACING * 3);
@@ -315,7 +313,6 @@ export default function App() {
 
     const { width: boardW, height: boardH } = getBoardDimensions();
     const { width: pieceWidth, height: pieceHeight } = getPieceDimensions(boardW, boardH);
-    const POSITION_TOLERANCE = 2;
     const correctX = correctCol * pieceWidth;
     const correctY = correctRow * pieceHeight;
     const isCorrectCol = Math.abs((pieceOnBoard.boardX || 0) - correctX) <= POSITION_TOLERANCE;
@@ -428,7 +425,7 @@ export default function App() {
         const { boardX, boardY, ...pieceWithoutPosition } = piece;
         return pieceWithoutPosition;
       })
-      .filter((piece) => piece !== null);
+      .filter(Boolean);
   };
 
   const handleBoardTap = (event) => {
@@ -492,7 +489,6 @@ export default function App() {
 
     const rows = puzzleData?.rows ?? difficulty.rows;
     const cols = puzzleData?.cols ?? difficulty.cols;
-    const POSITION_TOLERANCE = 2;
 
     const isCellOccupied = (cellX, cellY) => {
       return boardPieces.some((p) => {
@@ -599,29 +595,22 @@ export default function App() {
 
     const { width: boardW, height: boardH } = getBoardDimensions();
     const { width: pieceWidth, height: pieceHeight } = getPieceDimensions(boardW, boardH);
-    const unlockedPieces = boardPieces.filter((piece) => !isPieceLocked(piece));
+    
+    const pieceToHint = boardPieces.find((p) => !isPieceLocked(p)) || holderPieces[0];
+    if (!pieceToHint) return;
 
-    if (unlockedPieces.length > 0) {
-      const pieceToHint = unlockedPieces[0];
-      const correctRow = pieceToHint.correctRow ?? pieceToHint.row;
-      const correctCol = pieceToHint.correctCol ?? pieceToHint.col;
+    const correctRow = pieceToHint.correctRow ?? pieceToHint.row;
+    const correctCol = pieceToHint.correctCol ?? pieceToHint.col;
+    const correctX = correctCol * pieceWidth;
+    const correctY = correctRow * pieceHeight;
 
-      setBoardPieces((prev) => prev.map((piece) =>
-        piece.id === pieceToHint.id
-          ? { ...piece, boardX: correctCol * pieceWidth, boardY: correctRow * pieceHeight }
-          : piece
+    if (boardPieces.some((p) => p.id === pieceToHint.id)) {
+      setBoardPieces((prev) => prev.map((p) =>
+        p.id === pieceToHint.id ? { ...p, boardX: correctX, boardY: correctY } : p
       ));
-    } else if (holderPieces.length > 0) {
-      const pieceToHint = holderPieces[0];
-      const correctRow = pieceToHint.correctRow ?? pieceToHint.row;
-      const correctCol = pieceToHint.correctCol ?? pieceToHint.col;
-
+    } else {
       setHolderPieces((prev) => prev.filter((p) => p.id !== pieceToHint.id));
-      setBoardPieces((prev) => [...prev, {
-        ...pieceToHint,
-        boardX: correctCol * pieceWidth,
-        boardY: correctRow * pieceHeight,
-      }]);
+      setBoardPieces((prev) => [...prev, { ...pieceToHint, boardX: correctX, boardY: correctY }]);
     }
 
     setSelectedPiece(null);
