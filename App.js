@@ -139,36 +139,48 @@ export default function App() {
     originalHolderOrderRef.current = [];
   };
 
+  const calculateBoardDimensions = (rows, cols) => {
+    const availableHeight = SCREEN_HEIGHT - HEADER_HEIGHT - HOLDER_HEIGHT - ACTION_BUTTONS_HEIGHT - (EQUAL_SPACING * 3);
+    const maxBoardWidth = SCREEN_WIDTH - HORIZONTAL_PADDING;
+    const maxBoardHeight = Math.max(availableHeight * 0.9, maxBoardWidth * 0.8);
+    const calculatedPieceWidth = Math.floor(maxBoardWidth / cols);
+    const calculatedPieceHeight = Math.floor(maxBoardHeight / rows);
+    return {
+      width: calculatedPieceWidth * cols,
+      height: calculatedPieceHeight * rows,
+    };
+  };
+
   const handleDifficultySelected = async (selectedDifficulty) => {
     setDifficulty(selectedDifficulty);
+    
+    const startTime = Date.now();
+    const imageUri = await pickImageFromGallery();
+    if (!imageUri) {
+      return;
+    }
+    
     setShowDifficultyModal(false);
     contentOpacity.value = 0;
     setShowLoadingScreen(true);
     setIsTransitioning(true);
     setLoadingMessage('Preparing game...');
-    
-    const startTime = Date.now();
-    const imageUri = await pickImageFromGallery();
-    if (!imageUri) {
-      setIsTransitioning(false);
-      setShowLoadingScreen(false);
-      contentOpacity.value = 1;
-      return;
-    }
 
     setIsGeneratingPuzzle(true);
     setLoadingMessage('Generating puzzle...');
     try {
-      const availableHeight = SCREEN_HEIGHT - HEADER_HEIGHT - HOLDER_HEIGHT - ACTION_BUTTONS_HEIGHT - (EQUAL_SPACING * 3);
-      const maxBoardWidth = SCREEN_WIDTH - HORIZONTAL_PADDING;
-      const maxBoardHeight = Math.max(availableHeight * 0.9, maxBoardWidth * 0.8);
+      const { width: targetBoardWidth, height: targetBoardHeight } = calculateBoardDimensions(
+        selectedDifficulty.rows,
+        selectedDifficulty.cols
+      );
       
-      const calculatedPieceWidth = Math.floor(maxBoardWidth / selectedDifficulty.cols);
-      const calculatedPieceHeight = Math.floor(maxBoardHeight / selectedDifficulty.rows);
-      const targetBoardWidth = calculatedPieceWidth * selectedDifficulty.cols;
-      const targetBoardHeight = calculatedPieceHeight * selectedDifficulty.rows;
-      
-      const puzzle = await generatePuzzle(imageUri, selectedDifficulty.rows, selectedDifficulty.cols, targetBoardWidth, targetBoardHeight);
+      const puzzle = await generatePuzzle(
+        imageUri,
+        selectedDifficulty.rows,
+        selectedDifficulty.cols,
+        targetBoardWidth,
+        targetBoardHeight
+      );
       const shuffledPieces = shuffleArray(puzzle.pieces);
       setPuzzleData(puzzle);
       setHolderPieces(shuffledPieces);
