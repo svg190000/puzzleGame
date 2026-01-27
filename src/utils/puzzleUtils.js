@@ -6,6 +6,9 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
       throw new Error('Invalid parameters for puzzle generation');
     }
 
+    // targetBoardWidth and targetBoardHeight are now pixel dimensions (not layout units)
+    // This ensures the generated bitmap matches device pixel density for maximum sharpness
+
     // Get image dimensions
     const imageInfo = await ImageManipulator.manipulateAsync(
       imageUri,
@@ -123,19 +126,22 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
       processedHeight = cropHeight;
     }
 
-    // Calculate integer piece dimensions
-    // targetBoardWidth and targetBoardHeight should already be multiples of the grid size
-    // ensuring integer piece dimensions
+    // Calculate integer piece dimensions in pixels
+    // targetBoardWidth and targetBoardHeight are pixel dimensions
     const pieceWidth = Math.floor(targetBoardWidth / cols);
     const pieceHeight = Math.floor(targetBoardHeight / rows);
     
-    // Ensure the processed image exactly matches the target dimensions
-    // This guarantees all pieces will be the same integer size
+    // Calculate exact dimensions that pieces will cover
     const exactWidth = pieceWidth * cols;
     const exactHeight = pieceHeight * rows;
     
-    // If the processed image doesn't match exactly, resize it
-    if (Math.abs(processedWidth - exactWidth) > 0.5 || Math.abs(processedHeight - exactHeight) > 0.5) {
+    // Avoid unnecessary final resize that can blur the image
+    // Only resize if there's a significant mismatch (> 3-4 pixels) to prevent quality degradation
+    // The initial resize/crop should already be very close to exact dimensions
+    const RESIZE_THRESHOLD = 4; // Only resize if mismatch exceeds this many pixels
+    if (Math.abs(processedWidth - exactWidth) > RESIZE_THRESHOLD || 
+        Math.abs(processedHeight - exactHeight) > RESIZE_THRESHOLD) {
+      // Significant mismatch - resize to exact dimensions
       const finalImage = await ImageManipulator.manipulateAsync(
         processedImageUri,
         [
@@ -147,6 +153,9 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
       processedWidth = exactWidth;
       processedHeight = exactHeight;
     }
+    // If mismatch is small (<= RESIZE_THRESHOLD), keep the processed image as-is
+    // This preserves quality - the per-piece slicing will work correctly since
+    // we use exactWidth/exactHeight for piece calculations below
 
     const pieces = [];
     // Crop each piece on pixel boundaries (integer origin, integer size).

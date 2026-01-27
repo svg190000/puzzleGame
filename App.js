@@ -8,6 +8,7 @@ import {
   Dimensions,
   Alert,
   Platform,
+  PixelRatio,
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
@@ -183,17 +184,23 @@ export default function App() {
     setIsGeneratingPuzzle(true);
     setLoadingMessage('Generating puzzle...');
     try {
-      const { width: targetBoardWidth, height: targetBoardHeight } = calculateBoardDimensions(
+      // Calculate logical board dimensions (layout units)
+      const { width: logicalBoardWidth, height: logicalBoardHeight } = calculateBoardDimensions(
         selectedDifficulty.rows,
         selectedDifficulty.cols
       );
+      
+      // Convert to pixel dimensions for sharp image generation
+      const scale = PixelRatio.get();
+      const pixelBoardWidth = Math.round(logicalBoardWidth * scale);
+      const pixelBoardHeight = Math.round(logicalBoardHeight * scale);
       
       const puzzle = await generatePuzzle(
         imageUri,
         selectedDifficulty.rows,
         selectedDifficulty.cols,
-        targetBoardWidth,
-        targetBoardHeight
+        pixelBoardWidth,
+        pixelBoardHeight
       );
       const shuffledPieces = shuffleArray(puzzle.pieces);
       setPuzzleData(puzzle);

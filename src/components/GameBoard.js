@@ -11,6 +11,11 @@ const ENTRANCE_DURATION = 250;
 const BORDER_COLOR_DURATION = 600;
 const LOCK_ANIMATION_DELAY = 900;
 
+// NOTE: To reduce visible seams between pieces, a small visual overlap (e.g., 0.5-1px) could be added
+// by slightly increasing piece rendering size or adjusting grid line positions. However, this must NOT
+// affect hit-testing logic - handleBoardTap, checkCorrectPosition, and isPieceLocked must continue
+// to use the logical pieceWidth/pieceHeight and row/col grid calculations for precise tap detection.
+
 const createEntranceAnimation = (scaleAnim, opacityAnim, callback) => {
   requestAnimationFrame(() => {
     Animated.parallel([
