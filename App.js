@@ -8,7 +8,7 @@ import {
   Dimensions,
   Alert,
 } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, runOnJS } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,10 +21,32 @@ import { GameStats } from './src/components/GameStats';
 import { CompletionScreen } from './src/components/CompletionScreen';
 import { LoadingScreen } from './src/components/LoadingScreen';
 import { HomeScreen } from './src/components/HomeScreen';
+import { SettingsScreen } from './src/components/SettingsScreen';
+import { CalendarScreen } from './src/components/CalendarScreen';
+import { NavigationBar } from './src/components/NavigationBar';
 import { generatePuzzle, shuffleArray } from './src/utils/puzzleUtils';
 import { COLORS } from './src/constants/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+const screenOrder = { calendar: 0, home: 1, settings: 2 };
+
+const ScreenSlideWrapper = ({ screen, currentScreenIndex, screenTranslateX, children }) => {
+  const screenIndex = screenOrder[screen];
+
+  const animatedStyle = useAnimatedStyle(() => {
+    const offset = (screenIndex - currentScreenIndex.value) * SCREEN_WIDTH;
+    return {
+      transform: [{ translateX: screenTranslateX.value + offset }],
+    };
+  });
+
+  return (
+    <Animated.View style={[styles.screenWrapper, animatedStyle]}>
+      {children}
+    </Animated.View>
+  );
+};
 
 export default function App() {
   const HEADER_HEIGHT = 100;
@@ -51,9 +73,16 @@ export default function App() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showLoadingScreen, setShowLoadingScreen] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Loading...');
+  const [currentScreen, setCurrentScreen] = useState('home');
   const contentOpacity = useSharedValue(1);
+  const screenTranslateX = useSharedValue(0);
+  const currentScreenIndex = useSharedValue(screenOrder['home']);
   const originalHolderOrderRef = useRef([]);
   const timerIntervalRef = useRef(null);
+
+  useEffect(() => {
+    currentScreenIndex.value = screenOrder[currentScreen];
+  }, [currentScreen]);
 
   useEffect(() => {
     if (!showGameScreen) {
@@ -245,6 +274,31 @@ export default function App() {
 
   const handleSettings = () => {
     console.log('Settings pressed');
+  };
+
+  const handleNavigate = (screen) => {
+    if (screen === currentScreen) return;
+    
+    setShowGameScreen(false);
+    
+    const currentIndex = screenOrder[currentScreen];
+    const targetIndex = screenOrder[screen];
+    const delta = targetIndex - currentIndex;
+    
+    // Slide screens
+    screenTranslateX.value = withTiming(
+      -delta * SCREEN_WIDTH,
+      {
+        duration: 300,
+        easing: Easing.out(Easing.ease),
+      },
+      () => {
+        // Reset translateX and update current screen
+        screenTranslateX.value = 0;
+        currentScreenIndex.value = targetIndex;
+        runOnJS(setCurrentScreen)(screen);
+      }
+    );
   };
 
   const handleBackButton = resetGameState;
@@ -681,7 +735,32 @@ export default function App() {
               onSettings={handleSettings}
             />
           ) : !showGameScreen ? (
-            <HomeScreen onNewGame={handleNewGame} />
+            <>
+              <View style={styles.screensContainer}>
+                <ScreenSlideWrapper
+                  screen="calendar"
+                  currentScreenIndex={currentScreenIndex}
+                  screenTranslateX={screenTranslateX}
+                >
+                  <CalendarScreen />
+                </ScreenSlideWrapper>
+                <ScreenSlideWrapper
+                  screen="home"
+                  currentScreenIndex={currentScreenIndex}
+                  screenTranslateX={screenTranslateX}
+                >
+                  <HomeScreen onNewGame={handleNewGame} />
+                </ScreenSlideWrapper>
+                <ScreenSlideWrapper
+                  screen="settings"
+                  currentScreenIndex={currentScreenIndex}
+                  screenTranslateX={screenTranslateX}
+                >
+                  <SettingsScreen />
+                </ScreenSlideWrapper>
+              </View>
+              <NavigationBar currentScreen={currentScreen} onNavigate={handleNavigate} />
+            </>
           ) : (
           <TouchableWithoutFeedback onPress={handleOutsideTap}>
             <View style={styles.gameScreen}>
@@ -871,5 +950,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: COLORS.text,
+  },
+  screensContainer: {
+    flex: 1,
+    width: '100%',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  screenWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
   },
 });
