@@ -157,10 +157,10 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
     // This preserves quality - the per-piece slicing will work correctly since
     // we use exactWidth/exactHeight for piece calculations below
 
-    const pieces = [];
-    // Crop each piece on pixel boundaries (integer origin, integer size).
-    // Adjacent pieces share edges exactly; no "between pixels" slicing.
-
+    // Generate all piece crop operations in parallel for much faster processing
+    // This dramatically reduces generation time, especially for larger puzzles
+    const piecePromises = [];
+    
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         const originX = Math.round(col * pieceWidth);
@@ -168,7 +168,8 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
         const cropWidth = Math.round(pieceWidth);
         const cropHeight = Math.round(pieceHeight);
 
-        const pieceImage = await ImageManipulator.manipulateAsync(
+        // Create promise for each piece crop (will execute in parallel)
+        const piecePromise = ImageManipulator.manipulateAsync(
           processedImageUri,
           [
             {
@@ -181,28 +182,33 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
             },
           ],
           { format: ImageManipulator.SaveFormat.PNG, compress: 1 }
-        );
+        ).then((pieceImage) => {
+          const edgeTypes = {
+            top: row === 0 ? 'flat' : (row % 2 === 0 ? 'tab' : 'outlet'),
+            right: col === cols - 1 ? 'flat' : (col % 2 === 0 ? 'tab' : 'outlet'),
+            bottom: row === rows - 1 ? 'flat' : (row % 2 === 0 ? 'outlet' : 'tab'),
+            left: col === 0 ? 'flat' : (col % 2 === 0 ? 'outlet' : 'tab'),
+          };
 
-        const edgeTypes = {
-          top: row === 0 ? 'flat' : (row % 2 === 0 ? 'tab' : 'outlet'),
-          right: col === cols - 1 ? 'flat' : (col % 2 === 0 ? 'tab' : 'outlet'),
-          bottom: row === rows - 1 ? 'flat' : (row % 2 === 0 ? 'outlet' : 'tab'),
-          left: col === 0 ? 'flat' : (col % 2 === 0 ? 'outlet' : 'tab'),
-        };
-
-        pieces.push({
-          id: `${row}-${col}`,
-          row,
-          col,
-          correctRow: row,
-          correctCol: col,
-          imageUri: pieceImage.uri,
-          edgeTypes,
-          currentX: 0,
-          currentY: 0,
+          return {
+            id: `${row}-${col}`,
+            row,
+            col,
+            correctRow: row,
+            correctCol: col,
+            imageUri: pieceImage.uri,
+            edgeTypes,
+            currentX: 0,
+            currentY: 0,
+          };
         });
+
+        piecePromises.push(piecePromise);
       }
     }
+
+    // Execute all piece crops in parallel - this is MUCH faster than sequential
+    const pieces = await Promise.all(piecePromises);
 
     return {
       pieces,

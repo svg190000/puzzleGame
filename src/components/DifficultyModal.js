@@ -12,6 +12,7 @@ const DIFFICULTIES = [
   { label: 'Easy', rows: 3, cols: 3 },
   { label: 'Medium', rows: 4, cols: 4 },
   { label: 'Hard', rows: 6, cols: 6 },
+  { label: 'Very Hard', rows: 8, cols: 8 },
 ];
 
 export const DifficultyModal = ({ visible, onSelect, onClose }) => {
