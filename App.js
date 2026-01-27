@@ -13,7 +13,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-na
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { DifficultyModal } from './src/components/DifficultyModal';
@@ -32,7 +32,7 @@ import { COLORS } from './src/constants/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const Stack = createNativeStackNavigator();
+const Stack = createStackNavigator();
 
 export default function App() {
   const HEADER_HEIGHT = 100;
@@ -674,16 +674,69 @@ export default function App() {
     </View>
   );
 
-  // Platform-specific animation configuration
-  // Native stack uses platform defaults for optimal performance:
-  // - iOS: Native slide animation (UINavigationController)
-  // - Android: Native Fragment transitions (subtle fade/scale)
+  // Custom card style interpolators for directional slide animations
+  // Calendar: slides in from left (Home exits right)
+  // Settings: slides in from right (Home exits left)
+  const slideFromLeftInterpolator = ({ current, layouts }) => {
+    return {
+      cardStyle: {
+        transform: [
+          {
+            translateX: current.progress.interpolate({
+              inputRange: [0, 1],
+              outputRange: [-layouts.screen.width, 0],
+            }),
+          },
+        ],
+      },
+    };
+  };
+
+  const slideFromRightInterpolator = ({ current, layouts }) => {
+    return {
+      cardStyle: {
+        transform: [
+          {
+            translateX: current.progress.interpolate({
+              inputRange: [0, 1],
+              outputRange: [layouts.screen.width, 0],
+            }),
+          },
+        ],
+      },
+    };
+  };
+
+  // Base screen options
   const screenOptions = {
     headerShown: false,
-    // Use platform defaults - native-stack provides optimal animations
-    // iOS: slide from right (native)
-    // Android: Fragment transition with fade/scale (native)
-    animation: 'default',
+    cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+    transitionSpec: {
+      open: {
+        animation: 'timing',
+        config: {
+          duration: 300,
+        },
+      },
+      close: {
+        animation: 'timing',
+        config: {
+          duration: 300,
+        },
+      },
+    },
+  };
+
+  // Calendar screen: slides from left
+  const calendarScreenOptions = {
+    ...screenOptions,
+    cardStyleInterpolator: slideFromLeftInterpolator,
+  };
+
+  // Settings screen: slides from right
+  const settingsScreenOptions = {
+    ...screenOptions,
+    cardStyleInterpolator: slideFromRightInterpolator,
   };
 
   return (
@@ -729,9 +782,17 @@ export default function App() {
                   initialRouteName="Home"
                   screenOptions={screenOptions}
                 >
-                  <Stack.Screen name="Calendar" component={CalendarScreenWrapper} />
+                  <Stack.Screen 
+                    name="Calendar" 
+                    component={CalendarScreenWrapper}
+                    options={calendarScreenOptions}
+                  />
                   <Stack.Screen name="Home" component={HomeScreenWrapper} />
-                  <Stack.Screen name="Settings" component={SettingsScreenWrapper} />
+                  <Stack.Screen 
+                    name="Settings" 
+                    component={SettingsScreenWrapper}
+                    options={settingsScreenOptions}
+                  />
                 </Stack.Navigator>
               </NavigationContainer>
               {navigationRef.isReady() && (
