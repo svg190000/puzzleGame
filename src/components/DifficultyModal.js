@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
 import { COLORS } from '../constants/colors';
 
@@ -13,10 +14,12 @@ export const DifficultyModal = ({ visible, onSelect, onClose }) => {
   return (
     <Modal
       visible={visible}
-      transparent
+      transparent={false}
       animationType="fade"
       onRequestClose={onClose}
+      statusBarTranslucent={true}
     >
+      <StatusBar style="dark" />
       <View style={styles.overlay}>
         <View style={styles.modal}>
           <Text style={styles.title}>Select Difficulty</Text>
@@ -46,21 +49,16 @@ export const DifficultyModal = ({ visible, onSelect, onClose }) => {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(90, 90, 90, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    margin: 0,
+    padding: 0,
   },
   modal: {
-    width: '75%',
+    flex: 1,
     padding: 32,
-    borderRadius: 24,
-    backgroundColor: COLORS.white,
     alignItems: 'center',
-    shadowColor: COLORS.text,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 12,
+    justifyContent: 'center',
+    margin: 0,
   },
   title: {
     fontSize: 24,

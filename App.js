@@ -20,6 +20,7 @@ import { PuzzlePieceHolder } from './src/components/PuzzlePieceHolder';
 import { GameStats } from './src/components/GameStats';
 import { CompletionScreen } from './src/components/CompletionScreen';
 import { LoadingScreen } from './src/components/LoadingScreen';
+import { HomeScreen } from './src/components/HomeScreen';
 import { generatePuzzle, shuffleArray } from './src/utils/puzzleUtils';
 import { COLORS } from './src/constants/colors';
 
@@ -668,19 +669,8 @@ export default function App() {
               onSettings={handleSettings}
             />
           ) : !showGameScreen ? (
-          <View style={styles.scrollView}>
-            <View style={styles.initialState}>
-              <View style={styles.welcomeContainer}>
-                <Text style={styles.welcomeText}>Puzzles</Text>
-              </View>
-              <View style={styles.buttonContainer}>
-                <TouchableOpacity style={styles.newGameButton} onPress={handleNewGame}>
-                  <Text style={styles.newGameButtonText}>New Game</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        ) : (
+            <HomeScreen onNewGame={handleNewGame} />
+          ) : (
           <TouchableWithoutFeedback onPress={handleOutsideTap}>
             <View style={styles.gameScreen}>
               {isGeneratingPuzzle && (
@@ -783,55 +773,6 @@ const styles = StyleSheet.create({
   },
   contentWrapper: {
     flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  initialState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 30,
-    minHeight: 500,
-  },
-  welcomeContainer: {
-    alignItems: 'center',
-    marginBottom: 50,
-    width: '100%',
-  },
-  welcomeText: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: 50,
-    textAlign: 'center',
-    letterSpacing: 1,
-  },
-  buttonContainer: {
-    width: '100%',
-    alignItems: 'center',
-    gap: 16,
-  },
-  newGameButton: {
-    backgroundColor: COLORS.pastelBlue,
-    paddingVertical: 16,
-    paddingHorizontal: 40,
-    borderRadius: 20,
-    elevation: 3,
-    shadowColor: COLORS.text,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    minWidth: 200,
-    alignItems: 'center',
-  },
-  newGameButtonText: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-    letterSpacing: 0.5,
   },
   gameScreen: {
     flex: 1,
