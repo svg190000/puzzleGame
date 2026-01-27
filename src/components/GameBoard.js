@@ -69,7 +69,7 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, bo
 
   return (
     <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-      {/* Outer Animated.View for border color animation (non-native driver) */}
+      {/* Outer Animated.View for positioning */}
       <Animated.View
         style={[
           styles.boardPiece,
@@ -80,9 +80,7 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, bo
             top: exactY,
             width: pieceWidth,
             height: pieceHeight,
-            borderWidth: BORDER_WIDTH,
-            borderColor: animatedBorderColor,
-            borderRadius: borderRadius || 8,
+            borderRadius: borderRadius,
           },
         ]}
       >
@@ -93,12 +91,28 @@ const AnimatedLockedPiece = ({ piece, pieceWidth, pieceHeight, isNewlyLocked, bo
             height: '100%',
             transform: [{ scale: scaleAnim }],
             opacity: opacityAnim,
+            borderRadius: borderRadius,
+            overflow: 'hidden',
           }}
         >
           <Image
             source={{ uri: piece.imageUri }}
             style={styles.boardPieceImage}
             resizeMode="cover"
+          />
+          {/* Border overlay on top of image */}
+          <Animated.View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              borderWidth: 2,
+              borderColor: animatedBorderColor,
+              borderRadius: borderRadius,
+              pointerEvents: 'none',
+            }}
           />
         </Animated.View>
       </Animated.View>
@@ -176,6 +190,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
   
   const piecesScale = useRef(new Animated.Value(1)).current;
   const pieceBorderRadius = useRef(new Animated.Value(8)).current;
+  const lockedPieceBorderRadius = useRef(new Animated.Value(6)).current;
   const piecesOpacity = useRef(new Animated.Value(1)).current;
   const completeImageOpacity = useRef(new Animated.Value(0)).current;
   const lockIndicatorOpacity = useRef(new Animated.Value(1)).current;
@@ -235,6 +250,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
     prevBoardPiecesRef.current = boardPieces;
   }, [boardPieces, pieceWidth, pieceHeight]);
 
+
   useEffect(() => {
     if (currentSwapped.length > 0) {
       setSwappedIds(new Set(currentSwapped));
@@ -257,9 +273,25 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
       const MODAL_SHOW_DELAY = CONFETTI_START_DELAY + CONFETTI_DURATION;
       
       setTimeout(() => {
+        // Fade out grid lines
+        Animated.timing(gridOpacity, {
+          toValue: 0,
+          duration: 800,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }).start(() => {
+          setHideGrid(true);
+        });
+
         // Square corners and fade out lock indicators simultaneously
         Animated.parallel([
           Animated.timing(pieceBorderRadius, {
+            toValue: 0,
+            duration: 1000,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(lockedPieceBorderRadius, {
             toValue: 0,
             duration: 1000,
             easing: Easing.out(Easing.ease),
@@ -272,15 +304,6 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
             useNativeDriver: true,
           }),
         ]).start(() => {
-          // Fade out grid lines
-          Animated.timing(gridOpacity, {
-            toValue: 0,
-            duration: FADE_DURATION,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-          }).start(() => {
-            setHideGrid(true);
-          });
 
           // Start confetti during grid fade
           setTimeout(() => {
@@ -321,13 +344,14 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
       setHideGrid(false);
       piecesScale.setValue(1);
       pieceBorderRadius.setValue(8);
+      lockedPieceBorderRadius.setValue(6);
       piecesOpacity.setValue(1);
       completeImageOpacity.setValue(0);
       lockIndicatorOpacity.setValue(1);
       gridOpacity.setValue(1);
     }
     prevIsCompleteRef.current = isComplete;
-  }, [isComplete, lockIndicatorOpacity, gridOpacity, piecesOpacity, completeImageOpacity, pieceBorderRadius]);
+  }, [isComplete, lockIndicatorOpacity, gridOpacity, piecesOpacity, completeImageOpacity, pieceBorderRadius, lockedPieceBorderRadius]);
 
   const renderGrid = (gridOpacity) => {
     if (rows === 0 || cols === 0 || pieceWidth === 0 || pieceHeight === 0) return null;
@@ -425,7 +449,7 @@ export const GameBoard = ({ boardWidth, boardHeight, boardPieces = [], pieceWidt
               pieceWidth={pieceWidth}
               pieceHeight={pieceHeight}
               isNewlyLocked={newlyLockedIds.has(piece.id)}
-              borderRadius={pieceBorderRadius}
+              borderRadius={lockedPieceBorderRadius}
               lockIndicatorOpacity={lockIndicatorOpacity}
             />
           );
