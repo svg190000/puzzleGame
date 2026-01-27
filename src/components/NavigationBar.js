@@ -39,26 +39,26 @@ const NavButton = ({ icon, label, isActive, onPress }) => {
   );
 };
 
-export const NavigationBar = ({ currentScreen, onNavigate }) => {
+export const NavigationBar = ({ navigation, currentRouteName }) => {
   return (
     <View style={styles.container}>
       <NavButton
         icon="calendar-outline"
         label="Calendar"
-        isActive={currentScreen === 'calendar'}
-        onPress={() => onNavigate('calendar')}
+        isActive={currentRouteName === 'Calendar'}
+        onPress={() => navigation.navigate('Calendar')}
       />
       <NavButton
         icon="home"
         label="Home"
-        isActive={currentScreen === 'home'}
-        onPress={() => onNavigate('home')}
+        isActive={currentRouteName === 'Home'}
+        onPress={() => navigation.navigate('Home')}
       />
       <NavButton
         icon="settings-outline"
         label="Settings"
-        isActive={currentScreen === 'settings'}
-        onPress={() => onNavigate('settings')}
+        isActive={currentRouteName === 'Settings'}
+        onPress={() => navigation.navigate('Settings')}
       />
     </View>
   );

@@ -7,10 +7,13 @@ import {
   TouchableWithoutFeedback,
   Dimensions,
   Alert,
+  Platform,
 } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { DifficultyModal } from './src/components/DifficultyModal';
@@ -29,24 +32,7 @@ import { COLORS } from './src/constants/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const screenOrder = { calendar: 0, home: 1, settings: 2 };
-
-const ScreenSlideWrapper = ({ screen, currentScreenIndex, screenTranslateX, children }) => {
-  const screenIndex = screenOrder[screen];
-
-  const animatedStyle = useAnimatedStyle(() => {
-    const offset = (screenIndex - currentScreenIndex.value) * SCREEN_WIDTH;
-    return {
-      transform: [{ translateX: screenTranslateX.value + offset }],
-    };
-  });
-
-  return (
-    <Animated.View style={[styles.screenWrapper, animatedStyle]}>
-      {children}
-    </Animated.View>
-  );
-};
+const Stack = createNativeStackNavigator();
 
 export default function App() {
   const HEADER_HEIGHT = 100;
@@ -73,16 +59,11 @@ export default function App() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showLoadingScreen, setShowLoadingScreen] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Loading...');
-  const [currentScreen, setCurrentScreen] = useState('home');
   const contentOpacity = useSharedValue(1);
-  const screenTranslateX = useSharedValue(0);
-  const currentScreenIndex = useSharedValue(screenOrder['home']);
   const originalHolderOrderRef = useRef([]);
   const timerIntervalRef = useRef(null);
-
-  useEffect(() => {
-    currentScreenIndex.value = screenOrder[currentScreen];
-  }, [currentScreen]);
+  const navigationRef = useNavigationContainerRef();
+  const [currentRouteName, setCurrentRouteName] = useState('Home');
 
   useEffect(() => {
     if (!showGameScreen) {
@@ -267,36 +248,6 @@ export default function App() {
 
   const handleSettings = () => {
     // Settings functionality to be implemented
-  };
-
-  const handleNavigate = (screen) => {
-    if (screen === currentScreen) return;
-    
-    setShowGameScreen(false);
-    
-    // Store the previous screen for animation calculation
-    const previousScreen = currentScreen;
-    
-    // Update current screen immediately so button states change in parallel
-    setCurrentScreen(screen);
-    
-    const currentIndex = screenOrder[previousScreen];
-    const targetIndex = screenOrder[screen];
-    const delta = targetIndex - currentIndex;
-    
-    // Slide screens
-    screenTranslateX.value = withTiming(
-      -delta * SCREEN_WIDTH,
-      {
-        duration: 300,
-        easing: Easing.out(Easing.ease),
-      },
-      () => {
-        // Reset translateX and update current screen index
-        screenTranslateX.value = 0;
-        currentScreenIndex.value = targetIndex;
-      }
-    );
   };
 
   const handleBackButton = resetGameState;
@@ -704,6 +655,37 @@ export default function App() {
     opacity: contentOpacity.value,
   }));
 
+  // Screen wrapper components (without NavigationBar - it's rendered separately)
+  const HomeScreenWrapper = () => (
+    <View style={styles.screenContainer}>
+      <HomeScreen onNewGame={handleNewGame} />
+    </View>
+  );
+
+  const CalendarScreenWrapper = () => (
+    <View style={styles.screenContainer}>
+      <CalendarScreen />
+    </View>
+  );
+
+  const SettingsScreenWrapper = () => (
+    <View style={styles.screenContainer}>
+      <SettingsScreen />
+    </View>
+  );
+
+  // Platform-specific animation configuration
+  // Native stack uses platform defaults for optimal performance:
+  // - iOS: Native slide animation (UINavigationController)
+  // - Android: Native Fragment transitions (subtle fade/scale)
+  const screenOptions = {
+    headerShown: false,
+    // Use platform defaults - native-stack provides optimal animations
+    // iOS: slide from right (native)
+    // Android: Fragment transition with fade/scale (native)
+    animation: 'default',
+  };
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <StatusBar style="dark" />
@@ -731,32 +713,31 @@ export default function App() {
             />
           ) : null}
           {!showGameScreen && !showCompletionModal && (
-            <>
-              <View style={styles.screensContainer}>
-                <ScreenSlideWrapper
-                  screen="calendar"
-                  currentScreenIndex={currentScreenIndex}
-                  screenTranslateX={screenTranslateX}
+            <View style={styles.navigationWrapper}>
+              <NavigationContainer 
+                ref={navigationRef}
+                onReady={() => {
+                  const route = navigationRef.getCurrentRoute();
+                  if (route) setCurrentRouteName(route.name);
+                }}
+                onStateChange={() => {
+                  const route = navigationRef.getCurrentRoute();
+                  if (route) setCurrentRouteName(route.name);
+                }}
+              >
+                <Stack.Navigator
+                  initialRouteName="Home"
+                  screenOptions={screenOptions}
                 >
-                  <CalendarScreen />
-                </ScreenSlideWrapper>
-                <ScreenSlideWrapper
-                  screen="home"
-                  currentScreenIndex={currentScreenIndex}
-                  screenTranslateX={screenTranslateX}
-                >
-                  <HomeScreen onNewGame={handleNewGame} />
-                </ScreenSlideWrapper>
-                <ScreenSlideWrapper
-                  screen="settings"
-                  currentScreenIndex={currentScreenIndex}
-                  screenTranslateX={screenTranslateX}
-                >
-                  <SettingsScreen />
-                </ScreenSlideWrapper>
-              </View>
-              <NavigationBar currentScreen={currentScreen} onNavigate={handleNavigate} />
-            </>
+                  <Stack.Screen name="Calendar" component={CalendarScreenWrapper} />
+                  <Stack.Screen name="Home" component={HomeScreenWrapper} />
+                  <Stack.Screen name="Settings" component={SettingsScreenWrapper} />
+                </Stack.Navigator>
+              </NavigationContainer>
+              {navigationRef.isReady() && (
+                <NavigationBar navigation={navigationRef} currentRouteName={currentRouteName} />
+              )}
+            </View>
           )}
           {showGameScreen && !showCompletionModal && (
             <TouchableWithoutFeedback onPress={handleOutsideTap}>
@@ -948,18 +929,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.text,
   },
-  screensContainer: {
+  screenContainer: {
     flex: 1,
     width: '100%',
-    position: 'relative',
-    overflow: 'hidden',
   },
-  screenWrapper: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  navigationWrapper: {
+    flex: 1,
     width: '100%',
   },
 });
