@@ -23,7 +23,7 @@ const makeStyles = (theme) =>
       marginHorizontal: 0,
       borderTopWidth: 1,
       borderTopColor: theme.border,
-      backgroundColor: theme.surface,
+      backgroundColor: theme.navBarBackground,
       shadowColor: theme.shadow,
       shadowOffset: { width: 0, height: -2 },
       shadowOpacity: 0.1,

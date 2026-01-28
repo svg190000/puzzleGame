@@ -104,7 +104,7 @@ const makeStyles = (theme) =>
       zIndex: 1000,
     },
     loadingText: { fontSize: 18, fontWeight: '600', color: theme.text },
-    screenContainer: { flex: 1, width: '100%' },
+    screenContainer: { flex: 1, width: '100%', backgroundColor: theme.screenBackground },
     navigationWrapper: { flex: 1, width: '100%' },
   });
 
@@ -791,6 +791,7 @@ function AppContent() {
   // Base screen options
   const screenOptions = {
     headerShown: false,
+    cardStyle: { backgroundColor: theme.screenBackground },
     cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
     transitionSpec: {
       open: {
@@ -822,7 +823,7 @@ function AppContent() {
 
   return (
     <>
-      <StatusBar style="dark" />
+      <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
       <PaperBackground style={styles.background}>
         {showLoadingScreen && (
           <LoadingScreen 
@@ -848,7 +849,17 @@ function AppContent() {
           ) : null}
           {!showGameScreen && !showCompletionModal && (
             <View style={styles.navigationWrapper}>
-              <NavigationContainer 
+              <NavigationContainer
+                theme={{
+                  dark: theme.mode === 'dark',
+                  colors: {
+                    primary: theme.accent,
+                    background: theme.screenBackground,
+                    card: theme.screenBackground,
+                    text: theme.text,
+                    border: theme.border,
+                  },
+                }}
                 ref={navigationRef}
                 onReady={() => {
                   setIsNavigationReady(true);

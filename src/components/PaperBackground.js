@@ -6,7 +6,7 @@ const makeStyles = (theme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.background,
+      backgroundColor: theme.screenBackground ?? theme.background,
       position: 'relative',
     },
     textureLayer1: {
