@@ -511,17 +511,11 @@ export const CalendarScreen = () => {
 
   useEffect(() => {
     if (selectedDate) {
-      setShowSectionContent(false);
-      daySectionHeight.value = withTiming(DAY_SECTION_HEIGHT, { duration: 300 }, (finished) => {
-        if (finished) {
-          runOnJS(setShowSectionContent)(true);
-        }
-      });
+      daySectionHeight.value = withTiming(DAY_SECTION_HEIGHT, { duration: 300 });
     } else {
-      setShowSectionContent(false);
       daySectionHeight.value = withTiming(0, { duration: 300 });
     }
-  }, [selectedDate, daySectionHeight]);
+  }, [selectedDate]);
 
   const daySectionAnimatedStyle = useAnimatedStyle(() => ({
     height: daySectionHeight.value,
@@ -592,7 +586,6 @@ export const CalendarScreen = () => {
   const [selectedImageId, setSelectedImageId] = useState(null);
   const [showDifficultyModal, setShowDifficultyModal] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState(null);
-  const [showSectionContent, setShowSectionContent] = useState(false);
   const dayScrollRef = useRef(null);
 
   useEffect(() => {
@@ -600,7 +593,6 @@ export const CalendarScreen = () => {
     setSelectedImageId(null);
     setShowDifficultyModal(false);
     setSelectedImageUri(null);
-    setShowSectionContent(false);
   }, [selectedKey]);
 
   const handlePlayPress = useCallback((imageUri) => {
@@ -760,94 +752,88 @@ export const CalendarScreen = () => {
                 <Ionicons name="chevron-down" size={22} color={theme.text} />
               </TouchableOpacity>
             </View>
-            {showSectionContent && (
+            {dayImages.length === 0 ? (
+              <ScrollView
+                style={styles.daySectionList}
+                contentContainerStyle={styles.daySectionListContent}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled
+              >
+                <View style={styles.daySectionEmpty}>
+                  <Text style={styles.daySectionEmptyText}>
+                    No items for this day
+                  </Text>
+                </View>
+              </ScrollView>
+            ) : (
               <>
-                {dayImages.length === 0 ? (
-                  <ScrollView
-                    style={styles.daySectionList}
-                    contentContainerStyle={styles.daySectionListContent}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    showsVerticalScrollIndicator={false}
-                    nestedScrollEnabled
-                  >
-                    <View style={styles.daySectionEmpty}>
-                      <Text style={styles.daySectionEmptyText}>
-                        No items for this day
-                      </Text>
-                    </View>
-                  </ScrollView>
-                ) : (
-                  <>
-                    <ScrollView
-                      ref={dayScrollRef}
-                      style={styles.daySectionList}
-                      pagingEnabled
-                      showsHorizontalScrollIndicator={false}
-                      showsVerticalScrollIndicator={false}
-                      nestedScrollEnabled
-                      scrollEventThrottle={16}
-                      onLayout={(e) =>
-                        setListHeight(e.nativeEvent.layout.height)
-                      }
-                      onScroll={handleDayScroll}
-                      onMomentumScrollEnd={handleDayScrollEnd}
-                      onScrollEndDrag={handleDayScrollEnd}
+                <ScrollView
+                  ref={dayScrollRef}
+                  style={styles.daySectionList}
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  showsVerticalScrollIndicator={false}
+                  nestedScrollEnabled
+                  scrollEventThrottle={16}
+                  onLayout={(e) =>
+                    setListHeight(e.nativeEvent.layout.height)
+                  }
+                  onScroll={handleDayScroll}
+                  onMomentumScrollEnd={handleDayScrollEnd}
+                  onScrollEndDrag={handleDayScrollEnd}
+                >
+                  {pages.map((page, pi) => (
+                    <View
+                      key={pi}
+                      style={[
+                        styles.daySectionPage,
+                        { height: pageHeight },
+                      ]}
                     >
-                      {pages.map((page, pi) => (
-                        <View
-                          key={pi}
-                          style={[
-                            styles.daySectionPage,
-                            { height: pageHeight },
-                          ]}
-                        >
-                          {page.map(({ id, uri }, index) => {
-                            const isSelected = selectedImageId === id;
-                            const selectedIndex = page.findIndex(item => item.id === selectedImageId);
-                            const shiftLeft = selectedIndex !== -1 && index === selectedIndex - 1;
-                            const shiftRight = selectedIndex !== -1 && index === selectedIndex + 1;
-                            
-                            return (
-                              <DaySectionImage
-                                key={id}
-                                id={id}
-                                uri={uri}
-                                isSelected={isSelected}
-                                shiftLeft={shiftLeft}
-                                shiftRight={shiftRight}
-                                onPress={() => setSelectedImageId(isSelected ? null : id)}
-                                onPlayPress={() => handlePlayPress(uri)}
-                                styles={styles}
-                              />
-                            );
-                          })}
-                        </View>
-                      ))}
-                    </ScrollView>
-                    <View style={styles.pageIndicators}>
-                      {Array.from({ length: totalPages }, (_, i) => (
-                        <PageIndicatorDot
-                          key={i}
-                          active={i === pageIndex}
-                          baseStyle={styles.pageIndicatorDot}
-                        />
-                      ))}
+                      {page.map(({ id, uri }, index) => {
+                        const isSelected = selectedImageId === id;
+                        const selectedIndex = page.findIndex(item => item.id === selectedImageId);
+                        const shiftLeft = selectedIndex !== -1 && index === selectedIndex - 1;
+                        const shiftRight = selectedIndex !== -1 && index === selectedIndex + 1;
+                        
+                        return (
+                          <DaySectionImage
+                            key={id}
+                            id={id}
+                            uri={uri}
+                            isSelected={isSelected}
+                            shiftLeft={shiftLeft}
+                            shiftRight={shiftRight}
+                            onPress={() => setSelectedImageId(isSelected ? null : id)}
+                            onPlayPress={() => handlePlayPress(uri)}
+                            styles={styles}
+                          />
+                        );
+                      })}
                     </View>
-                  </>
-                )}
+                  ))}
+                </ScrollView>
+                <View style={styles.pageIndicators}>
+                  {Array.from({ length: totalPages }, (_, i) => (
+                    <PageIndicatorDot
+                      key={i}
+                      active={i === pageIndex}
+                      baseStyle={styles.pageIndicatorDot}
+                    />
+                  ))}
+                </View>
               </>
             )}
-            {showSectionContent && (
-              <TouchableOpacity
-                style={styles.addToDateButton}
-                onPress={handleAddToDate}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="images-outline" size={20} color={theme.buttonText} />
-                <Text style={styles.addToDateButtonText}>Add to date</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              style={styles.addToDateButton}
+              onPress={handleAddToDate}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="images-outline" size={20} color={theme.buttonText} />
+              <Text style={styles.addToDateButtonText}>Add to date</Text>
+            </TouchableOpacity>
           </>
         ) : null}
       </Animated.View>
