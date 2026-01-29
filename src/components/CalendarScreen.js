@@ -261,7 +261,7 @@ const makeStyles = (theme) =>
     daySectionPage: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'flex-start',
+      justifyContent: 'center',
       gap: 10,
       paddingHorizontal: 16,
       paddingVertical: 16,
@@ -492,7 +492,7 @@ export const CalendarScreen = () => {
   const pages = useMemo(() => chunk(dayImages, IMAGES_PER_PAGE), [dayImages]);
   const totalPages = pages.length;
 
-  const [listWidth, setListWidth] = useState(null);
+  const [listHeight, setListHeight] = useState(null);
   const [pageIndex, setPageIndex] = useState(0);
   const dayScrollRef = useRef(null);
 
@@ -506,16 +506,26 @@ export const CalendarScreen = () => {
     }
   }, [totalPages, pageIndex]);
 
-  const pageWidth = listWidth ?? Math.max(1, SCREEN_WIDTH);
+  const pageHeight = listHeight ?? Math.max(1, DAY_SECTION_HEIGHT - 100);
 
-  const handleDayScrollEnd = useCallback(
+  const handleDayScroll = useCallback(
     (e) => {
-      const x = e.nativeEvent.contentOffset.x;
-      const i = Math.round(x / pageWidth);
+      const y = e.nativeEvent.contentOffset.y;
+      const i = Math.round(y / pageHeight);
       const clamped = Math.max(0, Math.min(i, totalPages - 1));
       if (clamped !== pageIndex) setPageIndex(clamped);
     },
-    [pageWidth, totalPages, pageIndex]
+    [pageHeight, totalPages, pageIndex]
+  );
+
+  const handleDayScrollEnd = useCallback(
+    (e) => {
+      const y = e.nativeEvent.contentOffset.y;
+      const i = Math.round(y / pageHeight);
+      const clamped = Math.max(0, Math.min(i, totalPages - 1));
+      if (clamped !== pageIndex) setPageIndex(clamped);
+    },
+    [pageHeight, totalPages, pageIndex]
   );
 
   const panGesture = useMemo(
@@ -651,14 +661,15 @@ export const CalendarScreen = () => {
                 <ScrollView
                   ref={dayScrollRef}
                   style={styles.daySectionList}
-                  horizontal
                   pagingEnabled
                   showsHorizontalScrollIndicator={false}
                   showsVerticalScrollIndicator={false}
                   nestedScrollEnabled
+                  scrollEventThrottle={16}
                   onLayout={(e) =>
-                    setListWidth(e.nativeEvent.layout.width)
+                    setListHeight(e.nativeEvent.layout.height)
                   }
+                  onScroll={handleDayScroll}
                   onMomentumScrollEnd={handleDayScrollEnd}
                   onScrollEndDrag={handleDayScrollEnd}
                 >
@@ -667,7 +678,7 @@ export const CalendarScreen = () => {
                       key={pi}
                       style={[
                         styles.daySectionPage,
-                        { width: pageWidth },
+                        { height: pageHeight },
                       ]}
                     >
                       {page.map(({ id, uri }) => (
