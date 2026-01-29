@@ -363,9 +363,16 @@ export const CalendarScreen = () => {
   }));
 
   const onDatePress = (day) => {
-    if (!day.isCurrentMonth) return;
     const same = selectedDate && day.date.getTime() === selectedDate.getTime();
-    setSelectedDate(same ? null : day.date);
+    if (same) {
+      setSelectedDate(null);
+      return;
+    }
+    setSelectedDate(day.date);
+    if (!day.isCurrentMonth) {
+      const d = day.date;
+      setViewDate(new Date(d.getFullYear(), d.getMonth(), 1));
+    }
   };
 
   const itemsForSelectedDay = useMemo(() => [], [selectedDate]);
