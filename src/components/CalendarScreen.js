@@ -8,12 +8,15 @@ import {
   ScrollView,
   Modal,
   TouchableWithoutFeedback,
+  Image,
+  Alert,
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../contexts/ThemeContext';
 import { useCalendar } from '../contexts/CalendarContext';
 
@@ -206,9 +209,10 @@ const makeStyles = (theme) =>
       backgroundColor: theme.surface,
     },
     daySectionList: {
+      flex: 1,
+      minHeight: 100,
       paddingHorizontal: 16,
       paddingBottom: 16,
-      height: DAY_SECTION_HEIGHT - 56,
     },
     daySectionEmpty: {
       paddingVertical: 24,
@@ -218,6 +222,39 @@ const makeStyles = (theme) =>
     daySectionEmptyText: {
       fontSize: 15,
       color: theme.textMuted,
+    },
+    addToDateButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 12,
+      backgroundColor: theme.accent,
+      marginHorizontal: 16,
+      marginTop: 12,
+      marginBottom: 16,
+    },
+    addToDateButtonText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.buttonText,
+    },
+    daySectionImages: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+    },
+    daySectionThumb: {
+      width: 112,
+      height: 112,
+      borderRadius: 10,
+      borderWidth: 2,
+      borderColor: theme.border,
+      backgroundColor: theme.surfaceAlt,
     },
     pickerBackdrop: {
       ...StyleSheet.absoluteFillObject,
@@ -322,6 +359,9 @@ export const CalendarScreen = () => {
     setPickerVisible,
     pickerYear,
     setPickerYear,
+    imagesByDate,
+    addImagesToDate,
+    dateKey,
   } = useCalendar();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const daySectionHeight = useSharedValue(0);
@@ -383,6 +423,31 @@ export const CalendarScreen = () => {
 
   const goToPrevMonth = useCallback(() => goToMonth(-1), [goToMonth]);
   const goToNextMonth = useCallback(() => goToMonth(1), [goToMonth]);
+
+  const handleAddToDate = useCallback(async () => {
+    if (!selectedDate) return;
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission needed',
+        'Photo library access is required to add images to a date.'
+      );
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      quality: 1,
+    });
+    if (result.canceled || !result.assets?.length) return;
+    const key = dateKey(selectedDate);
+    const uris = result.assets.map((a) => a.uri).filter(Boolean);
+    if (uris.length) addImagesToDate(key, uris);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [selectedDate, dateKey, addImagesToDate]);
+
+  const selectedKey = selectedDate ? dateKey(selectedDate) : null;
+  const dayImages = selectedKey ? (imagesByDate[selectedKey] ?? []) : [];
 
   const panGesture = useMemo(
     () =>
@@ -502,12 +567,33 @@ export const CalendarScreen = () => {
               showsVerticalScrollIndicator={false}
               nestedScrollEnabled
             >
-              <View style={styles.daySectionEmpty}>
-                <Text style={styles.daySectionEmptyText}>
-                  No items for this day
-                </Text>
-              </View>
+              {dayImages.length === 0 ? (
+                <View style={styles.daySectionEmpty}>
+                  <Text style={styles.daySectionEmptyText}>
+                    No items for this day
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.daySectionImages}>
+                  {dayImages.map(({ id, uri }) => (
+                    <Image
+                      key={id}
+                      source={{ uri }}
+                      style={styles.daySectionThumb}
+                      resizeMode="cover"
+                    />
+                  ))}
+                </View>
+              )}
             </ScrollView>
+            <TouchableOpacity
+              style={styles.addToDateButton}
+              onPress={handleAddToDate}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="images-outline" size={20} color={theme.buttonText} />
+              <Text style={styles.addToDateButtonText}>Add to date</Text>
+            </TouchableOpacity>
           </>
         ) : null}
       </Animated.View>
