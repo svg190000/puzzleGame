@@ -17,8 +17,11 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../contexts/ThemeContext';
 import { useCalendar } from '../contexts/CalendarContext';
+import { useGame } from '../contexts/GameContext';
+import { DifficultyModal } from './DifficultyModal';
 
 const DAY_SECTION_HEIGHT = 300;
 const SWIPE_THRESHOLD = 60;
@@ -277,6 +280,21 @@ const makeStyles = (theme) =>
     daySectionThumbSelected: {
       borderColor: theme.accent,
     },
+    daySectionThumbOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    glossGradient: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: 10,
+    },
+    playButton: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 8,
+    },
     pageIndicators: {
       flexDirection: 'row',
       justifyContent: 'center',
@@ -392,16 +410,18 @@ function PageIndicatorDot({ active, baseStyle }) {
   );
 }
 
-function DaySectionImage({ id, uri, isSelected, shiftLeft, shiftRight, onPress, styles }) {
+function DaySectionImage({ id, uri, isSelected, shiftLeft, shiftRight, onPress, onPlayPress, styles }) {
   const scale = useSharedValue(isSelected ? 1.1 : 1);
   const translateX = useSharedValue(0);
+  const overlayOpacity = useSharedValue(isSelected ? 1 : 0);
   
   useEffect(() => {
     scale.value = withTiming(isSelected ? 1.1 : 1, { duration: 200 });
+    overlayOpacity.value = withTiming(isSelected ? 1 : 0, { duration: 200 });
     // Calculate shift: when selected image scales to 1.1x, adjacent images shift away to maintain uniform gaps
     const shiftAmount = shiftLeft ? -3 : shiftRight ? 3 : 0;
     translateX.value = withTiming(shiftAmount, { duration: 200 });
-  }, [isSelected, shiftLeft, shiftRight, scale, translateX]);
+  }, [isSelected, shiftLeft, shiftRight, scale, translateX, overlayOpacity]);
   
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
@@ -410,20 +430,43 @@ function DaySectionImage({ id, uri, isSelected, shiftLeft, shiftRight, onPress, 
     ],
   }));
   
+  const overlayAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
+  }));
+  
   return (
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.8}
     >
       <Animated.View style={animatedStyle}>
-        <Image
-          source={{ uri }}
-          style={[
-            styles.daySectionThumb,
-            isSelected && styles.daySectionThumbSelected,
-          ]}
-          resizeMode="cover"
-        />
+        <View style={{ position: 'relative' }}>
+          <Image
+            source={{ uri }}
+            style={[
+              styles.daySectionThumb,
+              isSelected && styles.daySectionThumbSelected,
+            ]}
+            resizeMode="cover"
+          />
+          {isSelected && (
+            <Animated.View style={[styles.daySectionThumbOverlay, overlayAnimatedStyle]}>
+              <LinearGradient
+                colors={['rgba(255, 255, 255, 0.4)', 'rgba(255, 255, 255, 0.1)', 'transparent']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.glossGradient}
+              />
+              <TouchableOpacity
+                style={styles.playButton}
+                onPress={onPlayPress}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="play" size={32} color="#FFFFFF" />
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+        </View>
       </Animated.View>
     </TouchableOpacity>
   );
@@ -444,6 +487,7 @@ export const CalendarScreen = () => {
     addImagesToDate,
     dateKey,
   } = useCalendar();
+  const { startPuzzleWithImage } = useGame();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const daySectionHeight = useSharedValue(0);
 
@@ -535,12 +579,32 @@ export const CalendarScreen = () => {
   const [listHeight, setListHeight] = useState(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [selectedImageId, setSelectedImageId] = useState(null);
+  const [showDifficultyModal, setShowDifficultyModal] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState(null);
   const dayScrollRef = useRef(null);
 
   useEffect(() => {
     setPageIndex(0);
     setSelectedImageId(null);
+    setShowDifficultyModal(false);
+    setSelectedImageUri(null);
   }, [selectedKey]);
+
+  const handlePlayPress = useCallback((imageUri) => {
+    setSelectedImageUri(imageUri);
+    setShowDifficultyModal(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const handleDifficultySelected = useCallback(async (difficulty) => {
+    setShowDifficultyModal(false);
+    if (selectedImageUri && startPuzzleWithImage) {
+      await startPuzzleWithImage(selectedImageUri, difficulty);
+      setSelectedImageUri(null);
+      setSelectedImageId(null);
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, [selectedImageUri, startPuzzleWithImage]);
 
   useEffect(() => {
     if (pageIndex >= totalPages && totalPages > 0) {
@@ -738,6 +802,7 @@ export const CalendarScreen = () => {
                             shiftLeft={shiftLeft}
                             shiftRight={shiftRight}
                             onPress={() => setSelectedImageId(isSelected ? null : id)}
+                            onPlayPress={() => handlePlayPress(uri)}
                             styles={styles}
                           />
                         );
@@ -826,6 +891,15 @@ export const CalendarScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <DifficultyModal
+        visible={showDifficultyModal}
+        onSelect={handleDifficultySelected}
+        onClose={() => {
+          setShowDifficultyModal(false);
+          setSelectedImageUri(null);
+        }}
+      />
     </View>
   );
 };

@@ -27,6 +27,7 @@ import { HomeScreen } from './src/components/HomeScreen';
 import { SettingsScreen } from './src/components/SettingsScreen';
 import { CalendarScreen } from './src/components/CalendarScreen';
 import { CalendarProvider } from './src/contexts/CalendarContext';
+import { GameProvider } from './src/contexts/GameContext';
 import { NavigationBar } from './src/components/NavigationBar';
 import { generatePuzzle, shuffleArray } from './src/utils/puzzleUtils';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
@@ -248,15 +249,12 @@ function AppContent() {
     };
   };
 
-  const handleDifficultySelected = async (selectedDifficulty) => {
-    setDifficulty(selectedDifficulty);
-    
-    const imageUri = await pickImageFromGallery();
+  const startPuzzleWithImage = async (imageUri, selectedDifficulty) => {
     if (!imageUri) {
       return;
     }
     
-    setShowDifficultyModal(false);
+    setDifficulty(selectedDifficulty);
     contentOpacity.value = 0;
     showLoadingScreenWithMessage('Preparing game...');
 
@@ -314,6 +312,16 @@ function AppContent() {
       // Start exit animation - handleLoadingExitComplete will hide the loading screen
       setIsTransitioning(false);
     }
+  };
+
+  const handleDifficultySelected = async (selectedDifficulty) => {
+    const imageUri = await pickImageFromGallery();
+    if (!imageUri) {
+      return;
+    }
+    
+    setShowDifficultyModal(false);
+    await startPuzzleWithImage(imageUri, selectedDifficulty);
   };
 
   const resetGameState = async () => {
@@ -777,7 +785,9 @@ function AppContent() {
 
   const CalendarScreenWrapper = () => (
     <ScreenWrapper>
-      <CalendarScreen />
+      <GameProvider startPuzzleWithImage={startPuzzleWithImage}>
+        <CalendarScreen />
+      </GameProvider>
     </ScreenWrapper>
   );
 
