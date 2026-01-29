@@ -11,7 +11,7 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, runOnJS } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -410,10 +410,11 @@ function PageIndicatorDot({ active, baseStyle }) {
   );
 }
 
-function DaySectionImage({ id, uri, isSelected, shiftLeft, shiftRight, onPress, onPlayPress, styles }) {
+function DaySectionImage({ id, uri, isSelected, shiftLeft, shiftRight, onPress, onPlayPress, styles, animationIndex, shouldAnimate }) {
   const scale = useSharedValue(isSelected ? 1.1 : 1);
   const translateX = useSharedValue(0);
   const overlayOpacity = useSharedValue(isSelected ? 1 : 0);
+  const imageOpacity = useSharedValue(0);
   
   useEffect(() => {
     scale.value = withTiming(isSelected ? 1.1 : 1, { duration: 200 });
@@ -423,11 +424,22 @@ function DaySectionImage({ id, uri, isSelected, shiftLeft, shiftRight, onPress, 
     translateX.value = withTiming(shiftAmount, { duration: 200 });
   }, [isSelected, shiftLeft, shiftRight, scale, translateX, overlayOpacity]);
   
+  useEffect(() => {
+    if (shouldAnimate && animationIndex !== undefined) {
+      // Stagger animation: each image fades in with a delay based on its index
+      const delay = animationIndex * 100; // 100ms delay between each image
+      imageOpacity.value = withDelay(delay, withTiming(1, { duration: 300 }));
+    } else {
+      imageOpacity.value = 0;
+    }
+  }, [shouldAnimate, animationIndex, imageOpacity]);
+  
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
       { scale: scale.value },
       { translateX: translateX.value },
     ],
+    opacity: imageOpacity.value,
   }));
   
   const overlayAnimatedStyle = useAnimatedStyle(() => ({
@@ -511,11 +523,17 @@ export const CalendarScreen = () => {
 
   useEffect(() => {
     if (selectedDate) {
-      daySectionHeight.value = withTiming(DAY_SECTION_HEIGHT, { duration: 300 });
+      setImagesShouldAnimate(false);
+      daySectionHeight.value = withTiming(DAY_SECTION_HEIGHT, { duration: 300 }, (finished) => {
+        if (finished) {
+          runOnJS(setImagesShouldAnimate)(true);
+        }
+      });
     } else {
+      setImagesShouldAnimate(false);
       daySectionHeight.value = withTiming(0, { duration: 300 });
     }
-  }, [selectedDate]);
+  }, [selectedDate, daySectionHeight]);
 
   const daySectionAnimatedStyle = useAnimatedStyle(() => ({
     height: daySectionHeight.value,
@@ -586,6 +604,7 @@ export const CalendarScreen = () => {
   const [selectedImageId, setSelectedImageId] = useState(null);
   const [showDifficultyModal, setShowDifficultyModal] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState(null);
+  const [imagesShouldAnimate, setImagesShouldAnimate] = useState(false);
   const dayScrollRef = useRef(null);
 
   useEffect(() => {
@@ -593,6 +612,7 @@ export const CalendarScreen = () => {
     setSelectedImageId(null);
     setShowDifficultyModal(false);
     setSelectedImageUri(null);
+    setImagesShouldAnimate(false);
   }, [selectedKey]);
 
   const handlePlayPress = useCallback((imageUri) => {
@@ -784,36 +804,40 @@ export const CalendarScreen = () => {
                   onMomentumScrollEnd={handleDayScrollEnd}
                   onScrollEndDrag={handleDayScrollEnd}
                 >
-                  {pages.map((page, pi) => (
-                    <View
-                      key={pi}
-                      style={[
-                        styles.daySectionPage,
-                        { height: pageHeight },
-                      ]}
-                    >
-                      {page.map(({ id, uri }, index) => {
-                        const isSelected = selectedImageId === id;
-                        const selectedIndex = page.findIndex(item => item.id === selectedImageId);
-                        const shiftLeft = selectedIndex !== -1 && index === selectedIndex - 1;
-                        const shiftRight = selectedIndex !== -1 && index === selectedIndex + 1;
-                        
-                        return (
-                          <DaySectionImage
-                            key={id}
-                            id={id}
-                            uri={uri}
-                            isSelected={isSelected}
-                            shiftLeft={shiftLeft}
-                            shiftRight={shiftRight}
-                            onPress={() => setSelectedImageId(isSelected ? null : id)}
-                            onPlayPress={() => handlePlayPress(uri)}
-                            styles={styles}
-                          />
-                        );
-                      })}
-                    </View>
-                  ))}
+                      {pages.map((page, pi) => (
+                        <View
+                          key={pi}
+                          style={[
+                            styles.daySectionPage,
+                            { height: pageHeight },
+                          ]}
+                        >
+                          {page.map(({ id, uri }, index) => {
+                            const isSelected = selectedImageId === id;
+                            const selectedIndex = page.findIndex(item => item.id === selectedImageId);
+                            const shiftLeft = selectedIndex !== -1 && index === selectedIndex - 1;
+                            const shiftRight = selectedIndex !== -1 && index === selectedIndex + 1;
+                            // Calculate global index across all pages for staggered animation
+                            const globalIndex = pi * IMAGES_PER_PAGE + index;
+                            
+                            return (
+                              <DaySectionImage
+                                key={id}
+                                id={id}
+                                uri={uri}
+                                isSelected={isSelected}
+                                shiftLeft={shiftLeft}
+                                shiftRight={shiftRight}
+                                onPress={() => setSelectedImageId(isSelected ? null : id)}
+                                onPlayPress={() => handlePlayPress(uri)}
+                                styles={styles}
+                                animationIndex={globalIndex}
+                                shouldAnimate={imagesShouldAnimate}
+                              />
+                            );
+                          })}
+                        </View>
+                      ))}
                 </ScrollView>
                 <View style={styles.pageIndicators}>
                   {Array.from({ length: totalPages }, (_, i) => (
