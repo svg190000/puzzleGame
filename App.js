@@ -222,14 +222,18 @@ function AppContent() {
     }
   };
 
+  const clearSelection = () => {
+    setSelectedPiece(null);
+    setSelectedPiece2(null);
+  };
+
   const clearGameState = () => {
     setTimer(0);
     setMoveCount(0);
     setPuzzleData(null);
     setHolderPieces([]);
     setBoardPieces([]);
-    setSelectedPiece(null);
-    setSelectedPiece2(null);
+    clearSelection();
     originalHolderOrderRef.current = [];
   };
 
@@ -237,11 +241,9 @@ function AppContent() {
     const availableHeight = SCREEN_HEIGHT - HEADER_HEIGHT - HOLDER_HEIGHT - ACTION_BUTTONS_HEIGHT - (EQUAL_SPACING * 3);
     const maxBoardWidth = SCREEN_WIDTH - HORIZONTAL_PADDING;
     const maxBoardHeight = Math.max(availableHeight * 0.9, maxBoardWidth * 0.8);
-    const pieceWidth = Math.floor(maxBoardWidth / cols);
-    const pieceHeight = Math.floor(maxBoardHeight / rows);
     return {
-      width: pieceWidth * cols,
-      height: pieceHeight * rows,
+      width: Math.floor(maxBoardWidth / cols) * cols,
+      height: Math.floor(maxBoardHeight / rows) * rows,
     };
   };
 
@@ -255,12 +257,7 @@ function AppContent() {
     
     setShowDifficultyModal(false);
     contentOpacity.value = 0;
-    
-    // Mark when loading screen starts showing
-    loadingStartTimeRef.current = Date.now();
-    setShowLoadingScreen(true);
-    setIsTransitioning(true);
-    setLoadingMessage('Preparing game...');
+    showLoadingScreenWithMessage('Preparing game...');
 
     setIsGeneratingPuzzle(true);
     setLoadingMessage('Generating puzzle...');
@@ -320,9 +317,7 @@ function AppContent() {
 
   const resetGameState = async () => {
     contentOpacity.value = 0;
-    setShowLoadingScreen(true);
-    setIsTransitioning(true);
-    setLoadingMessage('Returning to menu...');
+    showLoadingScreenWithMessage('Returning to menu...');
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     setShowGameScreen(false);
@@ -348,9 +343,7 @@ function AppContent() {
 
   const handlePlayAgain = async () => {
     contentOpacity.value = 0;
-    setShowLoadingScreen(true);
-    setIsTransitioning(true);
-    setLoadingMessage('Starting new game...');
+    showLoadingScreenWithMessage('Starting new game...');
     setShowCompletionModal(false);
     setShowGameScreen(false);
     clearGameState();
@@ -360,11 +353,27 @@ function AppContent() {
     setTimeout(() => setShowDifficultyModal(true), 100);
   };
 
+  const showLoadingScreenWithMessage = (message) => {
+    loadingStartTimeRef.current = Date.now();
+    setShowLoadingScreen(true);
+    setIsTransitioning(true);
+    setLoadingMessage(message);
+  };
+
   const handleBackToMenu = resetGameState;
   const handleBackButton = resetGameState;
 
   const handleSettings = () => {
-    // Settings functionality to be implemented
+    // Close completion modal and navigate to settings
+    setShowCompletionModal(false);
+    setShowGameScreen(false);
+    clearGameState();
+    // Small delay to ensure state updates before navigation
+    setTimeout(() => {
+      if (navigationRef.isReady()) {
+        navigationRef.navigate('Settings');
+      }
+    }, 100);
   };
 
   const getBoardDimensions = () => {
@@ -450,8 +459,7 @@ function AppContent() {
       });
     });
 
-    setSelectedPiece(null);
-    setSelectedPiece2(null);
+    clearSelection();
     setMoveCount((prev) => prev + 1);
   };
 
@@ -489,14 +497,12 @@ function AppContent() {
         const { boardX, boardY, ...pieceWithoutPosition } = selectedPiece;
         return restoreHolderOrder([...prev, pieceWithoutPosition]);
       });
-      setSelectedPiece(null);
-      setSelectedPiece2(null);
+      clearSelection();
       return;
     }
 
     if (fullPiece.id === selectedPiece?.id) {
-      setSelectedPiece(null);
-      setSelectedPiece2(null);
+      clearSelection();
       return;
     }
 
@@ -559,8 +565,7 @@ function AppContent() {
     if (tappedPiece) {
       if (isPieceLocked(tappedPiece)) {
         if (selectedPiece || selectedPiece2) {
-          setSelectedPiece(null);
-          setSelectedPiece2(null);
+          clearSelection();
         }
         return;
       }
@@ -661,15 +666,13 @@ function AppContent() {
       setHolderPieces((prev) => prev.filter((p) => p.id !== selectedPiece.id));
     }
 
-    setSelectedPiece(null);
-    setSelectedPiece2(null);
+    clearSelection();
     setMoveCount((prev) => prev + 1);
   };
 
   const handleOutsideTap = () => {
     if (selectedPiece || selectedPiece2) {
-      setSelectedPiece(null);
-      setSelectedPiece2(null);
+      clearSelection();
     }
   };
 
@@ -692,6 +695,17 @@ function AppContent() {
     setSelectedPiece2(null);
   };
 
+  const movePieceToPosition = (piece, x, y) => {
+    if (boardPieces.some((p) => p.id === piece.id)) {
+      setBoardPieces((prev) => prev.map((p) =>
+        p.id === piece.id ? { ...p, boardX: x, boardY: y } : p
+      ));
+    } else {
+      setHolderPieces((prev) => prev.filter((p) => p.id !== piece.id));
+      setBoardPieces((prev) => [...prev, { ...piece, boardX: x, boardY: y }]);
+    }
+  };
+
   const handleHint = () => {
     if (!puzzleData) return;
 
@@ -706,17 +720,8 @@ function AppContent() {
     const correctX = correctCol * pieceWidth;
     const correctY = correctRow * pieceHeight;
 
-    if (boardPieces.some((p) => p.id === pieceToHint.id)) {
-      setBoardPieces((prev) => prev.map((p) =>
-        p.id === pieceToHint.id ? { ...p, boardX: correctX, boardY: correctY } : p
-      ));
-    } else {
-      setHolderPieces((prev) => prev.filter((p) => p.id !== pieceToHint.id));
-      setBoardPieces((prev) => [...prev, { ...pieceToHint, boardX: correctX, boardY: correctY }]);
-    }
-
-    setSelectedPiece(null);
-    setSelectedPiece2(null);
+    movePieceToPosition(pieceToHint, correctX, correctY);
+    clearSelection();
     setMoveCount((prev) => prev + 1);
   };
 
@@ -724,7 +729,7 @@ function AppContent() {
     if (!puzzleData) return;
 
     const { width: boardW, height: boardH } = getBoardDimensions();
-    const { width: pieceWidth, height: pieceHeight } = getPieceDimensions(boardW, boardH);
+    const { width: testPieceWidth, height: testPieceHeight } = getPieceDimensions(boardW, boardH);
     
     const allPieces = [...holderPieces, ...boardPieces];
     const piecesInCorrectPosition = allPieces.map((piece) => {
@@ -732,23 +737,21 @@ function AppContent() {
       const correctCol = piece.correctCol ?? piece.col;
       return {
         ...piece,
-        boardX: correctCol * pieceWidth,
-        boardY: correctRow * pieceHeight,
+        boardX: correctCol * testPieceWidth,
+        boardY: correctRow * testPieceHeight,
       };
     });
 
     setBoardPieces(piecesInCorrectPosition);
     setHolderPieces([]);
-    setSelectedPiece(null);
-    setSelectedPiece2(null);
+    clearSelection();
   };
 
   const handleReset = () => {
     const allPieces = [...holderPieces, ...boardPieces];
     setHolderPieces(restoreHolderOrder(allPieces));
     setBoardPieces([]);
-    setSelectedPiece(null);
-    setSelectedPiece2(null);
+    clearSelection();
     setMoveCount(0);
     setTimer(0);
     setScrollResetKey((prev) => prev + 1);
