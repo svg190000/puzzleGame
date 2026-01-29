@@ -118,7 +118,7 @@ function AppContent() {
   const EQUAL_SPACING = 16;
   const HORIZONTAL_PADDING = 40;
   const BOARD_BORDER_WIDTH = 2;
-  const MIN_LOADING_TIME = 3000;
+  const MIN_LOADING_TIME = 2000; // Minimum 2 seconds for loading screen visibility
   const POSITION_TOLERANCE = 2;
 
   const [difficulty, setDifficulty] = useState({ rows: 3, cols: 3 });
@@ -137,6 +137,8 @@ function AppContent() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showLoadingScreen, setShowLoadingScreen] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Loading...');
+  const loadingStartTimeRef = useRef(null);
+  const pendingGameScreenRef = useRef(false);
   const contentOpacity = useSharedValue(1);
   const originalHolderOrderRef = useRef([]);
   const timerIntervalRef = useRef(null);
@@ -246,7 +248,6 @@ function AppContent() {
   const handleDifficultySelected = async (selectedDifficulty) => {
     setDifficulty(selectedDifficulty);
     
-    const startTime = Date.now();
     const imageUri = await pickImageFromGallery();
     if (!imageUri) {
       return;
@@ -254,12 +255,16 @@ function AppContent() {
     
     setShowDifficultyModal(false);
     contentOpacity.value = 0;
+    
+    // Mark when loading screen starts showing
+    loadingStartTimeRef.current = Date.now();
     setShowLoadingScreen(true);
     setIsTransitioning(true);
     setLoadingMessage('Preparing game...');
 
     setIsGeneratingPuzzle(true);
     setLoadingMessage('Generating puzzle...');
+    
     try {
       // Calculate logical board dimensions (layout units)
       const { width: logicalBoardWidth, height: logicalBoardHeight } = calculateBoardDimensions(
@@ -285,19 +290,30 @@ function AppContent() {
       setHolderPieces(shuffledPieces);
       originalHolderOrderRef.current = shuffledPieces.map((p, index) => ({ id: p.id, index }));
       
-      const elapsedTime = Date.now() - startTime;
+      setIsGeneratingPuzzle(false);
+      
+      // Ensure loading screen stays visible for at least MIN_LOADING_TIME (2 seconds)
+      const elapsedTime = Date.now() - loadingStartTimeRef.current;
       const remainingTime = Math.max(0, MIN_LOADING_TIME - elapsedTime);
       await new Promise(resolve => setTimeout(resolve, remainingTime));
       
-      setShowGameScreen(true);
-      setMoveCount(0);
-      setTimer(0);
-      setScrollResetKey((prev) => prev + 1);
+      // Mark that we're ready to show game screen, then start exit animation
+      // The game screen will be shown when LoadingScreen calls onExitComplete
+      pendingGameScreenRef.current = true;
+      setIsTransitioning(false);
+      
     } catch (error) {
       Alert.alert('Error', 'Failed to generate puzzle. Please try again.');
       console.error(error);
-    } finally {
       setIsGeneratingPuzzle(false);
+      pendingGameScreenRef.current = false;
+      
+      // Wait minimum time even on error
+      const elapsedTime = Date.now() - loadingStartTimeRef.current;
+      const remainingTime = Math.max(0, MIN_LOADING_TIME - elapsedTime);
+      await new Promise(resolve => setTimeout(resolve, remainingTime));
+      
+      // Start exit animation - handleLoadingExitComplete will hide the loading screen
       setIsTransitioning(false);
     }
   };
@@ -316,10 +332,18 @@ function AppContent() {
   };
 
   const handleLoadingExitComplete = () => {
-    setTimeout(() => {
-      setShowLoadingScreen(false);
-      contentOpacity.value = withTiming(1, { duration: 300 });
-    }, 50);
+    // Loading screen exit animation is complete
+    setShowLoadingScreen(false);
+    contentOpacity.value = withTiming(1, { duration: 300 });
+    
+    // Show game screen if we're ready
+    if (pendingGameScreenRef.current) {
+      setShowGameScreen(true);
+      setMoveCount(0);
+      setTimer(0);
+      setScrollResetKey((prev) => prev + 1);
+      pendingGameScreenRef.current = false;
+    }
   };
 
   const handlePlayAgain = async () => {
