@@ -26,6 +26,7 @@ import { LoadingScreen } from './src/components/LoadingScreen';
 import { HomeScreen } from './src/components/HomeScreen';
 import { SettingsScreen } from './src/components/SettingsScreen';
 import { CalendarScreen } from './src/components/CalendarScreen';
+import { CalendarProvider } from './src/contexts/CalendarContext';
 import { NavigationBar } from './src/components/NavigationBar';
 import { generatePuzzle, shuffleArray } from './src/utils/puzzleUtils';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
@@ -1018,7 +1019,9 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
-        <AppContent />
+        <CalendarProvider>
+          <AppContent />
+        </CalendarProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );

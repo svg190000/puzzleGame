@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,9 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
+import { useCalendar } from '../contexts/CalendarContext';
 
 const DAY_SECTION_HEIGHT = 300;
 const SWIPE_THRESHOLD = 60;
@@ -321,13 +323,24 @@ const makeStyles = (theme) =>
 
 export const CalendarScreen = () => {
   const { theme } = useTheme();
+  const {
+    viewDate,
+    setViewDate,
+    selectedDate,
+    setSelectedDate,
+    pickerVisible,
+    setPickerVisible,
+    pickerYear,
+    setPickerYear,
+  } = useCalendar();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-
-  const [viewDate, setViewDate] = useState(() => new Date());
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [pickerVisible, setPickerVisible] = useState(false);
-  const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
   const daySectionHeight = useSharedValue(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => setPickerVisible(false);
+    }, [setPickerVisible])
+  );
 
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
