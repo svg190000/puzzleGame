@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,12 +6,17 @@ import {
   TouchableOpacity,
   Dimensions,
   ScrollView,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '../contexts/ThemeContext';
 
 const DAY_SECTION_HEIGHT = 220;
+const SWIPE_THRESHOLD = 60;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CELL_SIZE = (SCREEN_WIDTH - 32) / 7;
@@ -134,7 +139,7 @@ const makeStyles = (theme) =>
       color: theme.text,
       textAlign: 'center',
       letterSpacing: 2,
-      marginBottom: 16,
+      marginBottom: 4,
     },
     weekdayRow: {
       flexDirection: 'row',
@@ -154,6 +159,9 @@ const makeStyles = (theme) =>
       backgroundColor: theme.border,
       marginHorizontal: 16,
       marginBottom: 8,
+    },
+    calendarSwipeArea: {
+      flex: 1,
     },
     grid: {
       flex: 1,
@@ -243,14 +251,106 @@ const makeStyles = (theme) =>
       fontSize: 15,
       color: theme.textMuted,
     },
+    pickerBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    },
+    pickerCard: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: theme.surface,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingHorizontal: 24,
+      paddingTop: 8,
+      paddingBottom: 40,
+      alignItems: 'center',
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      elevation: 12,
+    },
+    pickerHandle: {
+      width: 40,
+      height: 4,
+      backgroundColor: theme.border,
+      borderRadius: 2,
+      marginBottom: 20,
+    },
+    pickerTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: theme.textMuted,
+      marginBottom: 16,
+    },
+    pickerYearRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 20,
+      gap: 24,
+    },
+    pickerYearText: {
+      fontSize: 28,
+      fontWeight: '800',
+      color: theme.text,
+      minWidth: 80,
+      textAlign: 'center',
+    },
+    pickerYearBtn: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: theme.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    pickerMonthGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: 10,
+    },
+    pickerMonthChip: {
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 14,
+      backgroundColor: theme.surfaceAlt,
+      minWidth: '30%',
+    },
+    pickerMonthChipActive: {
+      backgroundColor: theme.accent,
+    },
+    pickerMonthChipText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.text,
+      textAlign: 'center',
+    },
+    pickerMonthChipTextActive: {
+      color: theme.buttonText,
+    },
+    monthTitleTouchable: {
+      alignSelf: 'center',
+      alignItems: 'center',
+      paddingVertical: 8,
+      paddingHorizontal: 20,
+      borderRadius: 14,
+      marginBottom: 16,
+    },
   });
 
 export const CalendarScreen = () => {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
-  const [viewDate] = useState(() => new Date());
+  const [viewDate, setViewDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(null);
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
   const daySectionHeight = useSharedValue(0);
 
   const year = viewDate.getFullYear();
@@ -275,15 +375,49 @@ export const CalendarScreen = () => {
 
   const onDatePress = (day) => {
     if (!day.isCurrentMonth) return;
-    const same =
-      selectedDate &&
-      selectedDate.getDate() === day.day &&
-      selectedDate.getMonth() === month &&
-      selectedDate.getFullYear() === year;
+    const same = selectedDate && day.date.getTime() === selectedDate.getTime();
     setSelectedDate(same ? null : day.date);
   };
 
   const itemsForSelectedDay = useMemo(() => [], [selectedDate]);
+
+  const openPicker = useCallback(() => {
+    setPickerYear(year);
+    setPickerVisible(true);
+  }, [year]);
+
+  const applyMonthYear = useCallback((m, y) => {
+    setViewDate(new Date(y, m, 1));
+    setPickerVisible(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const goToPrevMonth = useCallback(() => {
+    setViewDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const goToNextMonth = useCallback(() => {
+    setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetX([-30, 30])
+        .failOffsetY([-24, 24])
+        .onEnd((e) => {
+          'worklet';
+          const { translationX, velocityX } = e;
+          if (translationX < -SWIPE_THRESHOLD || velocityX < -300) {
+            runOnJS(goToNextMonth)();
+          } else if (translationX > SWIPE_THRESHOLD || velocityX > 300) {
+            runOnJS(goToPrevMonth)();
+          }
+        }),
+    [goToPrevMonth, goToNextMonth]
+  );
 
   return (
     <View style={styles.container}>
@@ -304,33 +438,37 @@ export const CalendarScreen = () => {
         </View>
       </View>
 
-      {/* Month */}
-      <Text style={styles.monthTitle}>{monthLabel}</Text>
-
-      {/* Weekday headers */}
-      <View style={styles.weekdayRow}>
-        {WEEKDAYS.map((d, i) => (
-          <Text key={`wday-${i}`} style={styles.weekday}>
-            {d}
-          </Text>
-        ))}
-      </View>
-      <View style={styles.divider} />
-
-      {/* Calendar grid */}
-      <ScrollView
-        style={styles.grid}
-        contentContainerStyle={styles.gridContent}
-        showsVerticalScrollIndicator={false}
+      {/* Month — tap to open picker */}
+      <TouchableOpacity
+        style={styles.monthTitleTouchable}
+        onPress={openPicker}
+        activeOpacity={0.7}
       >
+        <Text style={styles.monthTitle}>{monthLabel} · {year}</Text>
+        <Ionicons name="chevron-down" size={20} color={theme.textMuted} />
+      </TouchableOpacity>
+
+      <GestureDetector gesture={panGesture}>
+        <View style={styles.calendarSwipeArea}>
+          <View style={styles.weekdayRow}>
+            {WEEKDAYS.map((d, i) => (
+              <Text key={`wday-${i}`} style={styles.weekday}>
+                {d}
+              </Text>
+            ))}
+          </View>
+          <View style={styles.divider} />
+
+          <ScrollView
+            style={styles.grid}
+            contentContainerStyle={styles.gridContent}
+            showsVerticalScrollIndicator={false}
+          >
         {weeks.map((week, wi) => (
           <View key={`week-${year}-${month}-${wi}`} style={styles.weekRow}>
             {week.map((day, di) => {
               const isSelected =
-                selectedDate &&
-                selectedDate.getDate() === day.day &&
-                selectedDate.getMonth() === month &&
-                selectedDate.getFullYear() === year;
+                selectedDate && day.date.getTime() === selectedDate.getTime();
               return (
                 <TouchableOpacity
                   key={di}
@@ -366,7 +504,9 @@ export const CalendarScreen = () => {
             })}
           </View>
         ))}
-      </ScrollView>
+          </ScrollView>
+        </View>
+      </GestureDetector>
 
       <Animated.View style={[styles.daySection, daySectionAnimatedStyle]}>
         {selectedDate ? (
@@ -405,6 +545,65 @@ export const CalendarScreen = () => {
           </>
         ) : null}
       </Animated.View>
+
+      <Modal
+        visible={pickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPickerVisible(false)}
+      >
+        <View style={StyleSheet.absoluteFill}>
+          <TouchableWithoutFeedback onPress={() => setPickerVisible(false)}>
+            <View style={styles.pickerBackdrop} />
+          </TouchableWithoutFeedback>
+          <View style={styles.pickerCard}>
+            <View style={styles.pickerHandle} />
+            <Text style={styles.pickerTitle}>Select month & year</Text>
+            <View style={styles.pickerYearRow}>
+              <TouchableOpacity
+                style={styles.pickerYearBtn}
+                onPress={() => setPickerYear((y) => Math.max(1970, y - 1))}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="chevron-back" size={22} color={theme.text} />
+              </TouchableOpacity>
+              <Text style={styles.pickerYearText}>{pickerYear}</Text>
+              <TouchableOpacity
+                style={styles.pickerYearBtn}
+                onPress={() => setPickerYear((y) => Math.min(2100, y + 1))}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="chevron-forward" size={22} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.pickerMonthGrid}>
+              {MONTHS.map((label, idx) => {
+                const isActive = month === idx && pickerYear === year;
+                return (
+                  <TouchableOpacity
+                    key={label}
+                    style={[
+                      styles.pickerMonthChip,
+                      isActive && styles.pickerMonthChipActive,
+                    ]}
+                    onPress={() => applyMonthYear(idx, pickerYear)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerMonthChipText,
+                        isActive && styles.pickerMonthChipTextActive,
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
