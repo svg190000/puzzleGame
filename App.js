@@ -268,7 +268,8 @@ function AppContent() {
       );
       
       // Convert to pixel dimensions for sharp image generation
-      const scale = PixelRatio.get();
+      // Cap scale at 2x to prevent processing oversized images (2x is sufficient for retina displays)
+      const scale = Math.min(PixelRatio.get(), 2);
       const pixelBoardWidth = Math.round(logicalBoardWidth * scale);
       const pixelBoardHeight = Math.round(logicalBoardHeight * scale);
       
