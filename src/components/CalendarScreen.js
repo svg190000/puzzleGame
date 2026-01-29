@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../contexts/ThemeContext';
 
-const DAY_SECTION_HEIGHT = 220;
+const DAY_SECTION_HEIGHT = 300;
 const SWIPE_THRESHOLD = 60;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -111,27 +111,12 @@ const makeStyles = (theme) =>
     topBarRight: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 16,
     },
     iconButton: {
       width: 40,
       height: 40,
       alignItems: 'center',
       justifyContent: 'center',
-    },
-    dayCircleNav: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      borderWidth: 2,
-      borderColor: theme.text,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    dayCircleNavText: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: theme.text,
     },
     monthTitle: {
       fontSize: 32,
@@ -162,6 +147,7 @@ const makeStyles = (theme) =>
     },
     calendarSwipeArea: {
       flex: 1,
+      paddingBottom: 10,
     },
     grid: {
       flex: 1,
@@ -196,19 +182,9 @@ const makeStyles = (theme) =>
       fontSize: 15,
       color: theme.textMuted,
     },
-    dayCircle: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      borderWidth: 2,
-      borderColor: theme.text,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    dayCircleText: {
-      fontSize: 14,
+    dateTextToday: {
       fontWeight: '700',
-      color: theme.text,
+      textDecorationLine: 'underline',
     },
     daySection: {
       borderTopWidth: 1,
@@ -358,7 +334,7 @@ export const CalendarScreen = () => {
   const weeks = useMemo(() => getCalendarWeeks(year, month), [year, month]);
   const monthLabel = MONTHS[month];
   const today = new Date();
-  const todayDay = today.getDate();
+  const isCurrentYear = year === today.getFullYear();
 
   useEffect(() => {
     if (selectedDate) {
@@ -432,9 +408,6 @@ export const CalendarScreen = () => {
           <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
             <Ionicons name="search" size={22} color={theme.text} />
           </TouchableOpacity>
-          <View style={styles.dayCircleNav}>
-            <Text style={styles.dayCircleNavText}>{todayDay}</Text>
-          </View>
         </View>
       </View>
 
@@ -444,7 +417,9 @@ export const CalendarScreen = () => {
         onPress={openPicker}
         activeOpacity={0.7}
       >
-        <Text style={styles.monthTitle}>{monthLabel} · {year}</Text>
+        <Text style={styles.monthTitle}>
+          {monthLabel}{isCurrentYear ? '' : ` · ${year}`}
+        </Text>
         <Ionicons name="chevron-down" size={20} color={theme.textMuted} />
       </TouchableOpacity>
 
@@ -483,21 +458,16 @@ export const CalendarScreen = () => {
                   activeOpacity={0.7}
                 >
                   <View style={styles.cellContent}>
-                    {day.isToday ? (
-                      <View style={styles.dayCircle}>
-                        <Text style={styles.dayCircleText}>{day.day}</Text>
-                      </View>
-                    ) : (
-                      <Text
-                        style={
-                          day.isCurrentMonth
-                            ? styles.dateText
-                            : styles.dateTextMuted
-                        }
-                      >
-                        {day.day}
-                      </Text>
-                    )}
+                    <Text
+                      style={[
+                        day.isCurrentMonth
+                          ? styles.dateText
+                          : styles.dateTextMuted,
+                        day.isToday && styles.dateTextToday,
+                      ]}
+                    >
+                      {day.day}
+                    </Text>
                   </View>
                 </TouchableOpacity>
               );
