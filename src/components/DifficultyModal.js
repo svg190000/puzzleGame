@@ -125,7 +125,7 @@ export const DifficultyModal = ({ visible, onSelect, onClose }) => {
   return (
     <Modal
       visible={modalVisible}
-      transparent={true}
+      transparent
       animationType="none"
       onRequestClose={onClose}
       statusBarTranslucent={true}

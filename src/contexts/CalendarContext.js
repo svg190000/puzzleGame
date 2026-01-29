@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useMemo } from 'react';
 
 const CalendarContext = createContext(null);
 
@@ -8,16 +8,24 @@ export function CalendarProvider({ children }) {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
 
-  const value = {
-    viewDate,
-    setViewDate,
-    selectedDate,
-    setSelectedDate,
-    pickerVisible,
-    setPickerVisible,
-    pickerYear,
-    setPickerYear,
-  };
+  const value = useMemo(
+    () => ({
+      viewDate,
+      setViewDate,
+      selectedDate,
+      setSelectedDate,
+      pickerVisible,
+      setPickerVisible,
+      pickerYear,
+      setPickerYear,
+    }),
+    [
+      viewDate,
+      selectedDate,
+      pickerVisible,
+      pickerYear,
+    ]
+  );
 
   return (
     <CalendarContext.Provider value={value}>

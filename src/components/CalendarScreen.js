@@ -30,14 +30,14 @@ function getCalendarWeeks(year, month) {
   const last = new Date(year, month + 1, 0);
   const startDow = first.getDay();
   const daysInMonth = last.getDate();
+  const prevLast = new Date(year, month, 0).getDate();
+  const today = new Date();
 
   const weeks = [];
   let week = [];
-  const leading = startDow;
-  const prevLast = new Date(year, month, 0).getDate();
 
-  for (let i = 0; i < leading; i++) {
-    const d = prevLast - leading + 1 + i;
+  for (let i = 0; i < startDow; i++) {
+    const d = prevLast - startDow + 1 + i;
     week.push({
       date: new Date(year, month - 1, d),
       day: d,
@@ -47,7 +47,6 @@ function getCalendarWeeks(year, month) {
   }
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, month, d);
-    const today = new Date();
     week.push({
       date,
       day: d,
@@ -63,26 +62,17 @@ function getCalendarWeeks(year, month) {
     }
   }
   if (week.length) {
-    let next = 1;
-    while (week.length < 7) {
+    for (let next = 1; week.length < 7; next++) {
       week.push({
         date: new Date(year, month + 1, next),
         day: next,
         isCurrentMonth: false,
         isToday: false,
       });
-      next++;
     }
     weeks.push(week);
   }
   return weeks;
-}
-
-function dateKey(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
 }
 
 function formatDayHeader(d) {
@@ -362,7 +352,7 @@ export const CalendarScreen = () => {
     opacity: daySectionHeight.value > 0 ? 1 : 0,
   }));
 
-  const onDatePress = (day) => {
+  const onDatePress = useCallback((day) => {
     const same = selectedDate && day.date.getTime() === selectedDate.getTime();
     if (same) {
       setSelectedDate(null);
@@ -373,30 +363,26 @@ export const CalendarScreen = () => {
       const d = day.date;
       setViewDate(new Date(d.getFullYear(), d.getMonth(), 1));
     }
-  };
-
-  const itemsForSelectedDay = useMemo(() => [], [selectedDate]);
+  }, [selectedDate, setSelectedDate, setViewDate]);
 
   const openPicker = useCallback(() => {
     setPickerYear(year);
     setPickerVisible(true);
-  }, [year]);
+  }, [year, setPickerYear, setPickerVisible]);
 
   const applyMonthYear = useCallback((m, y) => {
     setViewDate(new Date(y, m, 1));
     setPickerVisible(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, []);
+  }, [setViewDate, setPickerVisible]);
 
-  const goToPrevMonth = useCallback(() => {
-    setViewDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1));
+  const goToMonth = useCallback((delta) => {
+    setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + delta, 1));
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, []);
+  }, [setViewDate]);
 
-  const goToNextMonth = useCallback(() => {
-    setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1));
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, []);
+  const goToPrevMonth = useCallback(() => goToMonth(-1), [goToMonth]);
+  const goToNextMonth = useCallback(() => goToMonth(1), [goToMonth]);
 
   const panGesture = useMemo(
     () =>
@@ -417,7 +403,6 @@ export const CalendarScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* Top nav bar */}
       <View style={styles.topBar}>
         <View style={styles.topBarLeft}>
           <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
@@ -431,7 +416,6 @@ export const CalendarScreen = () => {
         </View>
       </View>
 
-      {/* Month — tap to open picker */}
       <TouchableOpacity
         style={styles.monthTitleTouchable}
         onPress={openPicker}
@@ -459,41 +443,41 @@ export const CalendarScreen = () => {
             contentContainerStyle={styles.gridContent}
             showsVerticalScrollIndicator={false}
           >
-        {weeks.map((week, wi) => (
-          <View key={`week-${year}-${month}-${wi}`} style={styles.weekRow}>
-            {week.map((day, di) => {
-              const isSelected =
-                selectedDate && day.date.getTime() === selectedDate.getTime();
-              return (
-                <TouchableOpacity
-                  key={di}
-                  style={[
-                    styles.cell,
-                    isSelected && {
-                      backgroundColor: theme.softHighlight,
-                      borderRadius: 8,
-                    },
-                  ]}
-                  onPress={() => onDatePress(day)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.cellContent}>
-                    <Text
+            {weeks.map((week, wi) => (
+              <View key={`week-${year}-${month}-${wi}`} style={styles.weekRow}>
+                {week.map((day, di) => {
+                  const isSelected =
+                    selectedDate && day.date.getTime() === selectedDate.getTime();
+                  return (
+                    <TouchableOpacity
+                      key={di}
                       style={[
-                        day.isCurrentMonth
-                          ? styles.dateText
-                          : styles.dateTextMuted,
-                        day.isToday && styles.dateTextToday,
+                        styles.cell,
+                        isSelected && {
+                          backgroundColor: theme.softHighlight,
+                          borderRadius: 8,
+                        },
                       ]}
+                      onPress={() => onDatePress(day)}
+                      activeOpacity={0.7}
                     >
-                      {day.day}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        ))}
+                      <View style={styles.cellContent}>
+                        <Text
+                          style={[
+                            day.isCurrentMonth
+                              ? styles.dateText
+                              : styles.dateTextMuted,
+                            day.isToday && styles.dateTextToday,
+                          ]}
+                        >
+                          {day.day}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
           </ScrollView>
         </View>
       </GestureDetector>
@@ -518,19 +502,11 @@ export const CalendarScreen = () => {
               showsVerticalScrollIndicator={false}
               nestedScrollEnabled
             >
-              {itemsForSelectedDay.length === 0 ? (
-                <View style={styles.daySectionEmpty}>
-                  <Text style={styles.daySectionEmptyText}>
-                    No items for this day
-                  </Text>
-                </View>
-              ) : (
-                itemsForSelectedDay.map((item) => (
-                  <View key={item.id}>
-                    <Text style={styles.daySectionEmptyText}>{item.title}</Text>
-                  </View>
-                ))
-              )}
+              <View style={styles.daySectionEmpty}>
+                <Text style={styles.daySectionEmptyText}>
+                  No items for this day
+                </Text>
+              </View>
             </ScrollView>
           </>
         ) : null}

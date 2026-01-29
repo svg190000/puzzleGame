@@ -765,89 +765,61 @@ function AppContent() {
     opacity: contentOpacity.value,
   }));
 
-  // Screen wrapper components (without NavigationBar - it's rendered separately)
+  const ScreenWrapper = ({ children }) => (
+    <View style={styles.screenContainer}>{children}</View>
+  );
+
   const HomeScreenWrapper = () => (
-    <View style={styles.screenContainer}>
+    <ScreenWrapper>
       <HomeScreen onNewGame={handleNewGame} />
-    </View>
+    </ScreenWrapper>
   );
 
   const CalendarScreenWrapper = () => (
-    <View style={styles.screenContainer}>
+    <ScreenWrapper>
       <CalendarScreen />
-    </View>
+    </ScreenWrapper>
   );
 
   const SettingsScreenWrapper = () => (
-    <View style={styles.screenContainer}>
+    <ScreenWrapper>
       <SettingsScreen />
-    </View>
+    </ScreenWrapper>
   );
 
-  // Custom card style interpolators for directional slide animations
-  // Calendar: slides in from left (Home exits right)
-  // Settings: slides in from right (Home exits left)
-  const slideFromLeftInterpolator = ({ current, layouts }) => {
-    return {
-      cardStyle: {
-        transform: [
-          {
-            translateX: current.progress.interpolate({
-              inputRange: [0, 1],
-              outputRange: [-layouts.screen.width, 0],
-            }),
-          },
-        ],
-      },
-    };
+  const slideInterpolator = (fromRight) => ({ current, layouts }) => ({
+    cardStyle: {
+      transform: [
+        {
+          translateX: current.progress.interpolate({
+            inputRange: [0, 1],
+            outputRange: fromRight ? [layouts.screen.width, 0] : [-layouts.screen.width, 0],
+          }),
+        },
+      ],
+    },
+  });
+
+  const transitionSpec = {
+    open: { animation: 'timing', config: { duration: 300 } },
+    close: { animation: 'timing', config: { duration: 300 } },
   };
 
-  const slideFromRightInterpolator = ({ current, layouts }) => {
-    return {
-      cardStyle: {
-        transform: [
-          {
-            translateX: current.progress.interpolate({
-              inputRange: [0, 1],
-              outputRange: [layouts.screen.width, 0],
-            }),
-          },
-        ],
-      },
-    };
-  };
-
-  // Base screen options
   const screenOptions = {
     headerShown: false,
     cardStyle: { backgroundColor: theme.screenBackground },
     cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-    transitionSpec: {
-      open: {
-        animation: 'timing',
-        config: {
-          duration: 300,
-        },
-      },
-      close: {
-        animation: 'timing',
-        config: {
-          duration: 300,
-        },
-      },
-    },
+    transitionSpec,
   };
 
-  // Calendar screen: slides from left
   const calendarScreenOptions = {
     ...screenOptions,
-    cardStyleInterpolator: slideFromLeftInterpolator,
+    cardStyleInterpolator: slideInterpolator(false),
   };
 
-  // Settings screen: slides from right
   const settingsScreenOptions = {
     ...screenOptions,
-    cardStyleInterpolator: slideFromRightInterpolator,
+    cardStyleInterpolator: slideInterpolator(true),
   };
 
   return (
