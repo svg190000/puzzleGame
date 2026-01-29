@@ -493,8 +493,13 @@ export const CalendarScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      return () => setPickerVisible(false);
-    }, [setPickerVisible])
+      // Reset selected date when screen gains focus so section doesn't auto-open
+      setSelectedDate(null);
+      setPickerVisible(false);
+      return () => {
+        // State is saved in context when navigating away
+      };
+    }, [setSelectedDate, setPickerVisible])
   );
 
   const year = viewDate.getFullYear();
