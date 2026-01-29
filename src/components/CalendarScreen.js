@@ -502,6 +502,8 @@ export const CalendarScreen = () => {
   const { startPuzzleWithImage } = useGame();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const daySectionHeight = useSharedValue(0);
+  const indicatorsOpacity = useSharedValue(0);
+  const buttonOpacity = useSharedValue(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -521,23 +523,52 @@ export const CalendarScreen = () => {
   const today = new Date();
   const isCurrentYear = year === today.getFullYear();
 
+  const triggerImageAnimation = useCallback((shouldAnimateControls) => {
+    const delay = shouldAnimateControls ? 200 : 0; // Only delay if section is opening
+    setTimeout(() => {
+      setImagesShouldAnimate(true);
+      // Only animate indicators and button if section is opening (not just switching dates)
+      if (shouldAnimateControls) {
+        indicatorsOpacity.value = withTiming(1, { duration: 300 });
+        buttonOpacity.value = withTiming(1, { duration: 300 });
+      }
+    }, delay);
+  }, [indicatorsOpacity, buttonOpacity]);
+
   useEffect(() => {
     if (selectedDate) {
+      const wasSectionOpen = daySectionHeight.value > 0;
+      const shouldAnimateControls = !wasSectionOpen;
       setImagesShouldAnimate(false);
+      // Only reset indicators and button opacity if section is opening (was closed)
+      if (shouldAnimateControls) {
+        indicatorsOpacity.value = 0;
+        buttonOpacity.value = 0;
+      }
       daySectionHeight.value = withTiming(DAY_SECTION_HEIGHT, { duration: 300 }, (finished) => {
         if (finished) {
-          runOnJS(setImagesShouldAnimate)(true);
+          runOnJS(triggerImageAnimation)(shouldAnimateControls);
         }
       });
     } else {
       setImagesShouldAnimate(false);
+      indicatorsOpacity.value = 0;
+      buttonOpacity.value = 0;
       daySectionHeight.value = withTiming(0, { duration: 300 });
     }
-  }, [selectedDate, daySectionHeight]);
+  }, [selectedDate, daySectionHeight, triggerImageAnimation, indicatorsOpacity, buttonOpacity]);
 
   const daySectionAnimatedStyle = useAnimatedStyle(() => ({
     height: daySectionHeight.value,
     opacity: daySectionHeight.value > 0 ? 1 : 0,
+  }));
+
+  const indicatorsAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: indicatorsOpacity.value,
+  }));
+
+  const buttonAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: buttonOpacity.value,
   }));
 
   const onDatePress = useCallback((day) => {
@@ -613,6 +644,7 @@ export const CalendarScreen = () => {
     setShowDifficultyModal(false);
     setSelectedImageUri(null);
     setImagesShouldAnimate(false);
+    // Don't reset indicators or button opacity when switching dates - keep them visible
   }, [selectedKey]);
 
   const handlePlayPress = useCallback((imageUri) => {
@@ -839,25 +871,29 @@ export const CalendarScreen = () => {
                         </View>
                       ))}
                 </ScrollView>
-                <View style={styles.pageIndicators}>
-                  {Array.from({ length: totalPages }, (_, i) => (
-                    <PageIndicatorDot
-                      key={i}
-                      active={i === pageIndex}
-                      baseStyle={styles.pageIndicatorDot}
-                    />
-                  ))}
-                </View>
+                <Animated.View style={indicatorsAnimatedStyle}>
+                  <View style={styles.pageIndicators}>
+                    {Array.from({ length: totalPages }, (_, i) => (
+                      <PageIndicatorDot
+                        key={i}
+                        active={i === pageIndex}
+                        baseStyle={styles.pageIndicatorDot}
+                      />
+                    ))}
+                  </View>
+                </Animated.View>
               </>
             )}
-            <TouchableOpacity
-              style={styles.addToDateButton}
-              onPress={handleAddToDate}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="images-outline" size={20} color={theme.buttonText} />
-              <Text style={styles.addToDateButtonText}>Add to date</Text>
-            </TouchableOpacity>
+            <Animated.View style={buttonAnimatedStyle}>
+              <TouchableOpacity
+                style={styles.addToDateButton}
+                onPress={handleAddToDate}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="images-outline" size={20} color={theme.buttonText} />
+                <Text style={styles.addToDateButtonText}>Add to date</Text>
+              </TouchableOpacity>
+            </Animated.View>
           </>
         ) : null}
       </Animated.View>
