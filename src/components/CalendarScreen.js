@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useCallback } from 'react';
+import React, { useMemo, useEffect, useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -22,8 +22,15 @@ import { useCalendar } from '../contexts/CalendarContext';
 
 const DAY_SECTION_HEIGHT = 300;
 const SWIPE_THRESHOLD = 60;
+const IMAGES_PER_PAGE = 3;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
 const CELL_SIZE = (SCREEN_WIDTH - 32) / 7;
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -211,10 +218,16 @@ const makeStyles = (theme) =>
     daySectionList: {
       flex: 1,
       minHeight: 100,
+    },
+    daySectionListContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
       paddingHorizontal: 16,
-      paddingBottom: 16,
+      paddingVertical: 16,
+      gap: 10,
     },
     daySectionEmpty: {
+      minWidth: SCREEN_WIDTH - 32,
       paddingVertical: 24,
       alignItems: 'center',
       justifyContent: 'center',
@@ -243,10 +256,15 @@ const makeStyles = (theme) =>
     },
     daySectionImages: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
+      gap: 10,
+    },
+    daySectionPage: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
       gap: 10,
       paddingHorizontal: 16,
-      paddingBottom: 16,
+      paddingVertical: 16,
     },
     daySectionThumb: {
       width: 112,
@@ -255,6 +273,18 @@ const makeStyles = (theme) =>
       borderWidth: 2,
       borderColor: theme.border,
       backgroundColor: theme.surfaceAlt,
+    },
+    pageIndicators: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 10,
+    },
+    pageIndicatorDot: {
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: theme.textMuted,
     },
     pickerBackdrop: {
       ...StyleSheet.absoluteFillObject,
@@ -347,6 +377,17 @@ const makeStyles = (theme) =>
       marginBottom: 16,
     },
   });
+
+function PageIndicatorDot({ active, baseStyle }) {
+  const width = useSharedValue(active ? 24 : 6);
+  useEffect(() => {
+    width.value = withTiming(active ? 24 : 6, { duration: 200 });
+  }, [active, width]);
+  const animatedStyle = useAnimatedStyle(() => ({ width: width.value }));
+  return (
+    <Animated.View style={[baseStyle, animatedStyle]} />
+  );
+}
 
 export const CalendarScreen = () => {
   const { theme } = useTheme();
@@ -448,6 +489,34 @@ export const CalendarScreen = () => {
 
   const selectedKey = selectedDate ? dateKey(selectedDate) : null;
   const dayImages = selectedKey ? (imagesByDate[selectedKey] ?? []) : [];
+  const pages = useMemo(() => chunk(dayImages, IMAGES_PER_PAGE), [dayImages]);
+  const totalPages = pages.length;
+
+  const [listWidth, setListWidth] = useState(null);
+  const [pageIndex, setPageIndex] = useState(0);
+  const dayScrollRef = useRef(null);
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [selectedKey]);
+
+  useEffect(() => {
+    if (pageIndex >= totalPages && totalPages > 0) {
+      setPageIndex(Math.max(0, totalPages - 1));
+    }
+  }, [totalPages, pageIndex]);
+
+  const pageWidth = listWidth ?? Math.max(1, SCREEN_WIDTH);
+
+  const handleDayScrollEnd = useCallback(
+    (e) => {
+      const x = e.nativeEvent.contentOffset.x;
+      const i = Math.round(x / pageWidth);
+      const clamped = Math.max(0, Math.min(i, totalPages - 1));
+      if (clamped !== pageIndex) setPageIndex(clamped);
+    },
+    [pageWidth, totalPages, pageIndex]
+  );
 
   const panGesture = useMemo(
     () =>
@@ -562,30 +631,67 @@ export const CalendarScreen = () => {
                 <Ionicons name="chevron-down" size={22} color={theme.text} />
               </TouchableOpacity>
             </View>
-            <ScrollView
-              style={styles.daySectionList}
-              showsVerticalScrollIndicator={false}
-              nestedScrollEnabled
-            >
-              {dayImages.length === 0 ? (
+            {dayImages.length === 0 ? (
+              <ScrollView
+                style={styles.daySectionList}
+                contentContainerStyle={styles.daySectionListContent}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled
+              >
                 <View style={styles.daySectionEmpty}>
                   <Text style={styles.daySectionEmptyText}>
                     No items for this day
                   </Text>
                 </View>
-              ) : (
-                <View style={styles.daySectionImages}>
-                  {dayImages.map(({ id, uri }) => (
-                    <Image
-                      key={id}
-                      source={{ uri }}
-                      style={styles.daySectionThumb}
-                      resizeMode="cover"
+              </ScrollView>
+            ) : (
+              <>
+                <ScrollView
+                  ref={dayScrollRef}
+                  style={styles.daySectionList}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  showsVerticalScrollIndicator={false}
+                  nestedScrollEnabled
+                  onLayout={(e) =>
+                    setListWidth(e.nativeEvent.layout.width)
+                  }
+                  onMomentumScrollEnd={handleDayScrollEnd}
+                  onScrollEndDrag={handleDayScrollEnd}
+                >
+                  {pages.map((page, pi) => (
+                    <View
+                      key={pi}
+                      style={[
+                        styles.daySectionPage,
+                        { width: pageWidth },
+                      ]}
+                    >
+                      {page.map(({ id, uri }) => (
+                        <Image
+                          key={id}
+                          source={{ uri }}
+                          style={styles.daySectionThumb}
+                          resizeMode="cover"
+                        />
+                      ))}
+                    </View>
+                  ))}
+                </ScrollView>
+                <View style={styles.pageIndicators}>
+                  {Array.from({ length: totalPages }, (_, i) => (
+                    <PageIndicatorDot
+                      key={i}
+                      active={i === pageIndex}
+                      baseStyle={styles.pageIndicatorDot}
                     />
                   ))}
                 </View>
-              )}
-            </ScrollView>
+              </>
+            )}
             <TouchableOpacity
               style={styles.addToDateButton}
               onPress={handleAddToDate}
