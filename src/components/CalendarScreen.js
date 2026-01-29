@@ -274,6 +274,9 @@ const makeStyles = (theme) =>
       borderColor: theme.border,
       backgroundColor: theme.surfaceAlt,
     },
+    daySectionThumbSelected: {
+      borderColor: theme.accent,
+    },
     pageIndicators: {
       flexDirection: 'row',
       justifyContent: 'center',
@@ -389,6 +392,43 @@ function PageIndicatorDot({ active, baseStyle }) {
   );
 }
 
+function DaySectionImage({ id, uri, isSelected, shiftLeft, shiftRight, onPress, styles }) {
+  const scale = useSharedValue(isSelected ? 1.1 : 1);
+  const translateX = useSharedValue(0);
+  
+  useEffect(() => {
+    scale.value = withTiming(isSelected ? 1.1 : 1, { duration: 200 });
+    // Calculate shift: when selected image scales to 1.1x, adjacent images shift away to maintain uniform gaps
+    const shiftAmount = shiftLeft ? -3 : shiftRight ? 3 : 0;
+    translateX.value = withTiming(shiftAmount, { duration: 200 });
+  }, [isSelected, shiftLeft, shiftRight, scale, translateX]);
+  
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: scale.value },
+      { translateX: translateX.value },
+    ],
+  }));
+  
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      <Animated.View style={animatedStyle}>
+        <Image
+          source={{ uri }}
+          style={[
+            styles.daySectionThumb,
+            isSelected && styles.daySectionThumbSelected,
+          ]}
+          resizeMode="cover"
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
 export const CalendarScreen = () => {
   const { theme } = useTheme();
   const {
@@ -494,10 +534,12 @@ export const CalendarScreen = () => {
 
   const [listHeight, setListHeight] = useState(null);
   const [pageIndex, setPageIndex] = useState(0);
+  const [selectedImageId, setSelectedImageId] = useState(null);
   const dayScrollRef = useRef(null);
 
   useEffect(() => {
     setPageIndex(0);
+    setSelectedImageId(null);
   }, [selectedKey]);
 
   useEffect(() => {
@@ -681,14 +723,25 @@ export const CalendarScreen = () => {
                         { height: pageHeight },
                       ]}
                     >
-                      {page.map(({ id, uri }) => (
-                        <Image
-                          key={id}
-                          source={{ uri }}
-                          style={styles.daySectionThumb}
-                          resizeMode="cover"
-                        />
-                      ))}
+                      {page.map(({ id, uri }, index) => {
+                        const isSelected = selectedImageId === id;
+                        const selectedIndex = page.findIndex(item => item.id === selectedImageId);
+                        const shiftLeft = selectedIndex !== -1 && index === selectedIndex - 1;
+                        const shiftRight = selectedIndex !== -1 && index === selectedIndex + 1;
+                        
+                        return (
+                          <DaySectionImage
+                            key={id}
+                            id={id}
+                            uri={uri}
+                            isSelected={isSelected}
+                            shiftLeft={shiftLeft}
+                            shiftRight={shiftRight}
+                            onPress={() => setSelectedImageId(isSelected ? null : id)}
+                            styles={styles}
+                          />
+                        );
+                      })}
                     </View>
                   ))}
                 </ScrollView>
