@@ -22,7 +22,7 @@ export function CalendarProvider({ children }) {
   const [imagesByDate, setImagesByDate] = useState({});
 
   const addImagesToDate = useCallback((key, images) => {
-    // images is array of { uri, assetId } objects
+    // images is array of { uri, assetId, fileName } objects
     if (!images.length) return;
     const ddmmyyyy = keyToDDMMYYYY(key);
     const timestamp = Date.now();
@@ -32,6 +32,7 @@ export function CalendarProvider({ children }) {
         id: `${ddmmyyyy}#${timestamp}_${i}`,
         uri: img.uri,
         assetId: img.assetId,
+        fileName: img.fileName,
       }));
       return { ...prev, [key]: [...list, ...next] };
     });
@@ -67,6 +68,7 @@ export function CalendarProvider({ children }) {
         id: `${ddmmyyyy}#${uniqueSuffix}`,
         uri: imageToMove.uri,
         assetId: imageToMove.assetId,
+        fileName: imageToMove.fileName,
       };
 
       const result = { ...prev, [toKey]: [...toList, newImage] };

@@ -772,25 +772,33 @@ export const CalendarScreen = () => {
     });
 
     if (!result.canceled && result.assets?.length) {
-      // Get all existing assetIds across all dates in calendar
+      // Get all existing identifiers across all dates in calendar
       const existingAssetIds = new Set(
         Object.values(imagesByDate).flatMap((images) =>
           images.map((img) => img.assetId).filter(Boolean)
         )
       );
+      const existingFileNames = new Set(
+        Object.values(imagesByDate).flatMap((images) =>
+          images.map((img) => img.fileName).filter(Boolean)
+        )
+      );
 
-      // Extract assetId and filter duplicates
+      // Extract identifiers and filter duplicates
       const newImages = result.assets
         .map((asset) => ({
           uri: asset.uri,
           assetId: asset.assetId || null,
+          fileName: asset.fileName || null,
         }))
         .filter((img) => {
           if (!img.uri) return false;
-          // If no assetId, allow the image (rare case)
-          if (!img.assetId) return true;
-          // Filter out duplicates
-          return !existingAssetIds.has(img.assetId);
+          // Check assetId first (most reliable)
+          if (img.assetId && existingAssetIds.has(img.assetId)) return false;
+          // Fallback to fileName check
+          if (img.fileName && existingFileNames.has(img.fileName)) return false;
+          // Allow if we can't verify
+          return true;
         });
 
       if (newImages.length > 0) {
