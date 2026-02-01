@@ -327,7 +327,6 @@ function AppContent() {
     setShowGameScreen(false);
     setShowCompletionModal(false);
     clearGameState();
-    setCurrentRouteName('Home'); // Always navigate to Home screen
     setIsTransitioning(false);
   };
 
