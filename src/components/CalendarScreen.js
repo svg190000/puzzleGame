@@ -768,16 +768,44 @@ export const CalendarScreen = () => {
       mediaTypes: ['images'],
       allowsMultipleSelection: true,
       quality: 1,
+      exif: true,
     });
 
     if (!result.canceled && result.assets?.length) {
-      const uris = result.assets.map((a) => a.uri).filter(Boolean);
-      if (uris.length) {
-        addImagesToDate(dateKey(selectedDate), uris);
+      // Get all existing assetIds across all dates in calendar
+      const existingAssetIds = new Set(
+        Object.values(imagesByDate).flatMap((images) =>
+          images.map((img) => img.assetId).filter(Boolean)
+        )
+      );
+
+      // Extract assetId and filter duplicates
+      const newImages = result.assets
+        .map((asset) => ({
+          uri: asset.uri,
+          assetId: asset.assetId || null,
+        }))
+        .filter((img) => {
+          if (!img.uri) return false;
+          // If no assetId, allow the image (rare case)
+          if (!img.assetId) return true;
+          // Filter out duplicates
+          return !existingAssetIds.has(img.assetId);
+        });
+
+      if (newImages.length > 0) {
+        addImagesToDate(dateKey(selectedDate), newImages);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } else if (result.assets.length > 0) {
+        Alert.alert(
+          'Already Added',
+          result.assets.length === 1
+            ? 'This image is already in the calendar.'
+            : 'All selected images are already in the calendar.'
+        );
       }
     }
-  }, [selectedDate, dateKey, addImagesToDate]);
+  }, [selectedDate, dateKey, addImagesToDate, imagesByDate]);
 
   const handlePlayPress = useCallback((imageUri) => {
     setSelectedImageUri(imageUri);

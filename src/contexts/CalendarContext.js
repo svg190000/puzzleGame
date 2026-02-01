@@ -21,15 +21,17 @@ export function CalendarProvider({ children }) {
   const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
   const [imagesByDate, setImagesByDate] = useState({});
 
-  const addImagesToDate = useCallback((key, uris) => {
-    if (!uris.length) return;
+  const addImagesToDate = useCallback((key, images) => {
+    // images is array of { uri, assetId } objects
+    if (!images.length) return;
     const ddmmyyyy = keyToDDMMYYYY(key);
     const timestamp = Date.now();
     setImagesByDate((prev) => {
       const list = prev[key] ?? [];
-      const next = uris.map((uri, i) => ({
+      const next = images.map((img, i) => ({
         id: `${ddmmyyyy}#${timestamp}_${i}`,
-        uri,
+        uri: img.uri,
+        assetId: img.assetId,
       }));
       return { ...prev, [key]: [...list, ...next] };
     });
@@ -64,6 +66,7 @@ export function CalendarProvider({ children }) {
       const newImage = {
         id: `${ddmmyyyy}#${uniqueSuffix}`,
         uri: imageToMove.uri,
+        assetId: imageToMove.assetId,
       };
 
       const result = { ...prev, [toKey]: [...toList, newImage] };
