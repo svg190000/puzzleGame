@@ -469,8 +469,7 @@ function PageIndicatorDot({ active, baseStyle }) {
 function DaySectionImage({
   uri,
   isSelected,
-  shiftLeft,
-  shiftRight,
+  selectedCount,
   onPress,
   onPlayPress,
   onActionPress,
@@ -480,17 +479,22 @@ function DaySectionImage({
   shouldAnimate,
   actionMode,
 }) {
-  const scale = useSharedValue(isSelected ? 1.1 : 1);
-  const translateX = useSharedValue(0);
+  // Adjust scale based on selection count: full scale for 1, smaller for multi-select
+  const getSelectedScale = () => {
+    if (!isSelected) return 1;
+    if (selectedCount === 1) return 1.1;
+    if (selectedCount === 2) return 1.06;
+    return 1.04; // 3 or more
+  };
+
+  const scale = useSharedValue(getSelectedScale());
   const overlayOpacity = useSharedValue(isSelected ? 1 : 0);
   const imageOpacity = useSharedValue(0);
 
   useEffect(() => {
-    scale.value = withTiming(isSelected ? 1.1 : 1, { duration: 200 });
+    scale.value = withTiming(getSelectedScale(), { duration: 200 });
     overlayOpacity.value = withTiming(isSelected ? 1 : 0, { duration: 200 });
-    const shiftAmount = shiftLeft ? -3 : shiftRight ? 3 : 0;
-    translateX.value = withTiming(shiftAmount, { duration: 200 });
-  }, [isSelected, shiftLeft, shiftRight, scale, translateX, overlayOpacity]);
+  }, [isSelected, selectedCount, scale, overlayOpacity]);
 
   useEffect(() => {
     if (shouldAnimate && animationIndex !== undefined) {
@@ -502,7 +506,7 @@ function DaySectionImage({
   }, [shouldAnimate, animationIndex, imageOpacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }, { translateX: translateX.value }],
+    transform: [{ scale: scale.value }],
     opacity: imageOpacity.value,
   }));
 
@@ -614,12 +618,12 @@ export const CalendarScreen = () => {
   // Local state
   const [listHeight, setListHeight] = useState(null);
   const [pageIndex, setPageIndex] = useState(0);
-  const [selectedImageId, setSelectedImageId] = useState(null);
+  const [selectedImageIds, setSelectedImageIds] = useState(new Set());
   const [showDifficultyModal, setShowDifficultyModal] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState(null);
   const [imagesShouldAnimate, setImagesShouldAnimate] = useState(false);
   const [actionMode, setActionMode] = useState(null); // 'edit' | 'move' | null
-  const [movingImage, setMovingImage] = useState(null); // { id, uri, fromKey }
+  const [movingImages, setMovingImages] = useState([]); // [{ id, uri, fromKey }, ...]
   const dayScrollRef = useRef(null);
 
   const pageHeight = listHeight ?? Math.max(1, DAY_SECTION_HEIGHT - 100);
@@ -667,12 +671,12 @@ export const CalendarScreen = () => {
   // Reset state when selected date changes
   useEffect(() => {
     setPageIndex(0);
-    setSelectedImageId(null);
+    setSelectedImageIds(new Set());
     setShowDifficultyModal(false);
     setSelectedImageUri(null);
     setImagesShouldAnimate(false);
     setActionMode(null);
-    setMovingImage(null);
+    setMovingImages([]);
   }, [selectedKey]);
 
   // Clamp page index when total pages changes
@@ -702,12 +706,14 @@ export const CalendarScreen = () => {
   // Handlers
   const onDatePress = useCallback(
     (day) => {
-      // If in move mode with an image selected, move it to the tapped date
-      if (actionMode === 'move' && movingImage) {
+      // If in move mode with images selected, move them to the tapped date
+      if (actionMode === 'move' && movingImages.length > 0) {
         const toKey = dateKey(day.date);
-        moveImageToDate(movingImage.fromKey, toKey, movingImage.id);
-        setMovingImage(null);
-        setSelectedImageId(null);
+        movingImages.forEach((img) => {
+          moveImageToDate(img.fromKey, toKey, img.id);
+        });
+        setMovingImages([]);
+        setSelectedImageIds(new Set());
         // Stay in move mode and on the original date section
         return;
       }
@@ -721,7 +727,7 @@ export const CalendarScreen = () => {
         setViewDate(new Date(day.date.getFullYear(), day.date.getMonth(), 1));
       }
     },
-    [selectedDate, setSelectedDate, setViewDate, actionMode, movingImage, moveImageToDate, dateKey]
+    [selectedDate, setSelectedDate, setViewDate, actionMode, movingImages, moveImageToDate, dateKey]
   );
 
   const openPicker = useCallback(() => {
@@ -794,38 +800,56 @@ export const CalendarScreen = () => {
 
   const toggleActionMode = useCallback((mode) => {
     setActionMode((current) => (current === mode ? null : mode));
-    setSelectedImageId(null);
-    setMovingImage(null);
+    setSelectedImageIds(new Set());
+    setMovingImages([]);
   }, []);
 
   const handleImageAction = useCallback(
     (imageId, imageUri) => {
       if (actionMode === 'edit') {
-        // Toggle selection - delete happens when X icon is tapped
-        setSelectedImageId((current) => (current === imageId ? null : imageId));
+        // Toggle selection - delete happens when X icon is tapped on any selected image
+        setSelectedImageIds((current) => {
+          const newSet = new Set(current);
+          if (newSet.has(imageId)) {
+            newSet.delete(imageId);
+          } else {
+            newSet.add(imageId);
+          }
+          return newSet;
+        });
       } else if (actionMode === 'move') {
-        // Select image for moving - toggle if same image tapped
-        if (movingImage?.id === imageId) {
-          setMovingImage(null);
-          setSelectedImageId(null);
-        } else {
-          setMovingImage({ id: imageId, uri: imageUri, fromKey: selectedKey });
-          setSelectedImageId(imageId);
-        }
+        // Toggle selection for moving
+        setSelectedImageIds((current) => {
+          const newSet = new Set(current);
+          if (newSet.has(imageId)) {
+            newSet.delete(imageId);
+          } else {
+            newSet.add(imageId);
+          }
+          return newSet;
+        });
+        // Update movingImages based on selection
+        setMovingImages((current) => {
+          const exists = current.some((img) => img.id === imageId);
+          if (exists) {
+            return current.filter((img) => img.id !== imageId);
+          } else {
+            return [...current, { id: imageId, uri: imageUri, fromKey: selectedKey }];
+          }
+        });
       }
     },
-    [actionMode, selectedKey, movingImage]
+    [actionMode, selectedKey]
   );
 
-  const handleDeleteImage = useCallback(
-    (imageId) => {
-      if (selectedKey) {
+  const handleDeleteImage = useCallback(() => {
+    if (selectedKey && selectedImageIds.size > 0) {
+      selectedImageIds.forEach((imageId) => {
         removeImageFromDate(selectedKey, imageId);
-        setSelectedImageId(null);
-      }
-    },
-    [selectedKey, removeImageFromDate]
-  );
+      });
+      setSelectedImageIds(new Set());
+    }
+  }, [selectedKey, removeImageFromDate, selectedImageIds]);
 
   const handleScroll = useCallback(
     (e) => {
@@ -931,17 +955,19 @@ export const CalendarScreen = () => {
           {selectedDate && (
             <>
               <View style={styles.daySectionHeader}>
-                <Text style={[styles.daySectionTitle, movingImage && { color: '#FF9800' }]}>
-                  {movingImage ? 'Tap a date to move to' : formatDayHeader(selectedDate)}
+                <Text style={[styles.daySectionTitle, movingImages.length > 0 && { color: '#FF9800' }]}>
+                  {movingImages.length > 0
+                    ? `Tap a date to move ${movingImages.length} image${movingImages.length > 1 ? 's' : ''}`
+                    : formatDayHeader(selectedDate)}
                 </Text>
                 <TouchableOpacity
                   style={styles.daySectionClose}
                   onPress={() => {
-                    if (movingImage) {
-                      setMovingImage(null);
-                      setSelectedImageId(null);
-                    } else if (actionMode === 'edit' && selectedImageId) {
-                      setSelectedImageId(null);
+                    if (movingImages.length > 0) {
+                      setMovingImages([]);
+                      setSelectedImageIds(new Set());
+                    } else if (actionMode === 'edit' && selectedImageIds.size > 0) {
+                      setSelectedImageIds(new Set());
                     } else {
                       setSelectedDate(null);
                     }
@@ -949,7 +975,7 @@ export const CalendarScreen = () => {
                   activeOpacity={0.7}
                 >
                   <Ionicons
-                    name={movingImage || (actionMode === 'edit' && selectedImageId) ? 'close' : 'chevron-down'}
+                    name={movingImages.length > 0 || (actionMode === 'edit' && selectedImageIds.size > 0) ? 'close' : 'chevron-down'}
                     size={22}
                     color={theme.text}
                   />
@@ -983,22 +1009,40 @@ export const CalendarScreen = () => {
                     {pages.map((page, pi) => (
                       <View key={pi} style={[styles.daySectionPage, { height: pageHeight }]}>
                         {page.map(({ id, uri }, index) => {
-                          const isImageSelected = selectedImageId === id;
-                          const selectedIndex = page.findIndex((item) => item.id === selectedImageId);
-                          const shiftLeft = selectedIndex !== -1 && index === selectedIndex - 1;
-                          const shiftRight = selectedIndex !== -1 && index === selectedIndex + 1;
+                          const isImageSelected = selectedImageIds.has(id);
 
                           return (
                             <DaySectionImage
                               key={id}
                               uri={uri}
                               isSelected={isImageSelected}
-                              shiftLeft={shiftLeft}
-                              shiftRight={shiftRight}
-                              onPress={() => setSelectedImageId(isImageSelected ? null : id)}
+                              selectedCount={selectedImageIds.size}
+                              onPress={() => {
+                                if (actionMode) {
+                                  // Multi-select in edit/move mode
+                                  setSelectedImageIds((current) => {
+                                    const newSet = new Set(current);
+                                    if (newSet.has(id)) {
+                                      newSet.delete(id);
+                                    } else {
+                                      newSet.add(id);
+                                    }
+                                    return newSet;
+                                  });
+                                } else {
+                                  // Single select in regular mode
+                                  setSelectedImageIds((current) => {
+                                    if (current.has(id)) {
+                                      return new Set();
+                                    } else {
+                                      return new Set([id]);
+                                    }
+                                  });
+                                }
+                              }}
                               onPlayPress={() => handlePlayPress(uri)}
                               onActionPress={() => handleImageAction(id, uri)}
-                              onDeletePress={() => handleDeleteImage(id)}
+                              onDeletePress={handleDeleteImage}
                               styles={styles}
                               animationIndex={pi * IMAGES_PER_PAGE + index}
                               shouldAnimate={imagesShouldAnimate}

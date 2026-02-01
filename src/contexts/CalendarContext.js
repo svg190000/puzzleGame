@@ -24,10 +24,11 @@ export function CalendarProvider({ children }) {
   const addImagesToDate = useCallback((key, uris) => {
     if (!uris.length) return;
     const ddmmyyyy = keyToDDMMYYYY(key);
+    const timestamp = Date.now();
     setImagesByDate((prev) => {
       const list = prev[key] ?? [];
       const next = uris.map((uri, i) => ({
-        id: `${ddmmyyyy}#${list.length + i + 1}`,
+        id: `${ddmmyyyy}#${timestamp}_${i}`,
         uri,
       }));
       return { ...prev, [key]: [...list, ...next] };
@@ -56,11 +57,12 @@ export function CalendarProvider({ children }) {
       // Remove from source
       const newFromList = fromList.filter((img) => img.id !== imageId);
       
-      // Add to destination with new id
+      // Add to destination with unique id (using timestamp + random to avoid collisions)
       const toList = prev[toKey] ?? [];
       const ddmmyyyy = keyToDDMMYYYY(toKey);
+      const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
       const newImage = {
-        id: `${ddmmyyyy}#${toList.length + 1}`,
+        id: `${ddmmyyyy}#${uniqueSuffix}`,
         uri: imageToMove.uri,
       };
 
