@@ -714,7 +714,7 @@ export const CalendarScreen = () => {
         });
         setMovingImages([]);
         setSelectedImageIds(new Set());
-        // Stay in move mode and on the original date section
+        setActionMode(null); // Reset to regular mode after move
         return;
       }
 
@@ -848,6 +848,7 @@ export const CalendarScreen = () => {
         removeImageFromDate(selectedKey, imageId);
       });
       setSelectedImageIds(new Set());
+      setActionMode(null); // Reset to regular mode after delete
     }
   }, [selectedKey, removeImageFromDate, selectedImageIds]);
 
