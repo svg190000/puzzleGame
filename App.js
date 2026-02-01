@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,6 @@ import {
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
-import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { DifficultyModal } from './src/components/DifficultyModal';
@@ -33,8 +31,6 @@ import { generatePuzzle, shuffleArray } from './src/utils/puzzleUtils';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-const Stack = createStackNavigator();
 
 const makeStyles = (theme) =>
   StyleSheet.create({
@@ -108,6 +104,15 @@ const makeStyles = (theme) =>
     loadingText: { fontSize: 18, fontWeight: '600', color: theme.text },
     screenContainer: { flex: 1, width: '100%', backgroundColor: theme.screenBackground },
     navigationWrapper: { flex: 1, width: '100%' },
+    screensContainer: { flex: 1, width: '100%' },
+    screenLayer: { 
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: theme.screenBackground,
+    },
+    screenLayerHidden: {
+      opacity: 0,
+      pointerEvents: 'none',
+    },
   });
 
 function AppContent() {
@@ -144,9 +149,7 @@ function AppContent() {
   const contentOpacity = useSharedValue(1);
   const originalHolderOrderRef = useRef([]);
   const timerIntervalRef = useRef(null);
-  const navigationRef = useNavigationContainerRef();
   const [currentRouteName, setCurrentRouteName] = useState('Home');
-  const [isNavigationReady, setIsNavigationReady] = useState(false);
 
   useEffect(() => {
     if (!showGameScreen) {
@@ -176,14 +179,6 @@ function AppContent() {
       timerIntervalRef.current = null;
     }
   }, [showGameScreen, boardPieces, holderPieces, puzzleData]);
-
-  // Reset navigation ready state when navigation container is unmounted
-  useEffect(() => {
-    if (showGameScreen || showCompletionModal) {
-      setIsNavigationReady(false);
-    }
-  }, [showGameScreen, showCompletionModal]);
-
 
   const handleNewGame = () => {
     setShowDifficultyModal(true);
@@ -379,9 +374,7 @@ function AppContent() {
     clearGameState();
     // Small delay to ensure state updates before navigation
     setTimeout(() => {
-      if (navigationRef.isReady()) {
-        navigationRef.navigate('Settings');
-      }
+      setCurrentRouteName('Settings');
     }, 100);
   };
 
@@ -773,64 +766,62 @@ function AppContent() {
     opacity: contentOpacity.value,
   }));
 
-  const ScreenWrapper = ({ children }) => (
-    <View style={styles.screenContainer}>{children}</View>
-  );
+  // Animated values for screen transitions
+  // Home stays in place, Calendar slides from left, Settings slides from right
+  const calendarTranslateX = useSharedValue(-SCREEN_WIDTH);
+  const settingsTranslateX = useSharedValue(SCREEN_WIDTH);
+  
+  // Z-index for layering (Calendar and Settings slide over Home)
+  const [calendarZIndex, setCalendarZIndex] = useState(1);
+  const [settingsZIndex, setSettingsZIndex] = useState(1);
+  const prevRouteRef = useRef('Home');
+  
+  // Handle screen transitions
+  useEffect(() => {
+    const duration = 300;
+    const prevRoute = prevRouteRef.current;
+    
+    if (currentRouteName === 'Calendar') {
+      // Calendar slides in from left
+      calendarTranslateX.value = withTiming(0, { duration });
+      // Settings slides out to right (if coming from Settings)
+      if (prevRoute === 'Settings') {
+        settingsTranslateX.value = withTiming(SCREEN_WIDTH, { duration });
+      }
+      // Calendar on top when sliding in
+      setCalendarZIndex(2);
+      setSettingsZIndex(1);
+    } else if (currentRouteName === 'Home') {
+      // Both Calendar and Settings slide out
+      calendarTranslateX.value = withTiming(-SCREEN_WIDTH, { duration });
+      settingsTranslateX.value = withTiming(SCREEN_WIDTH, { duration });
+    } else if (currentRouteName === 'Settings') {
+      // Settings slides in from right
+      settingsTranslateX.value = withTiming(0, { duration });
+      // Calendar slides out to left (if coming from Calendar)
+      if (prevRoute === 'Calendar') {
+        calendarTranslateX.value = withTiming(-SCREEN_WIDTH, { duration });
+      }
+      // Settings on top when sliding in
+      setSettingsZIndex(2);
+      setCalendarZIndex(1);
+    }
+    
+    prevRouteRef.current = currentRouteName;
+  }, [currentRouteName]);
+  
+  const calendarAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: calendarTranslateX.value }],
+  }));
+  
+  const settingsAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: settingsTranslateX.value }],
+  }));
 
-  const HomeScreenWrapper = () => (
-    <ScreenWrapper>
-      <HomeScreen onNewGame={handleNewGame} />
-    </ScreenWrapper>
-  );
-
-  const CalendarScreenWrapper = () => (
-    <ScreenWrapper>
-      <GameProvider startPuzzleWithImage={startPuzzleWithImage}>
-        <CalendarScreen />
-      </GameProvider>
-    </ScreenWrapper>
-  );
-
-  const SettingsScreenWrapper = () => (
-    <ScreenWrapper>
-      <SettingsScreen />
-    </ScreenWrapper>
-  );
-
-  const slideInterpolator = (fromRight) => ({ current, layouts }) => ({
-    cardStyle: {
-      transform: [
-        {
-          translateX: current.progress.interpolate({
-            inputRange: [0, 1],
-            outputRange: fromRight ? [layouts.screen.width, 0] : [-layouts.screen.width, 0],
-          }),
-        },
-      ],
-    },
-  });
-
-  const transitionSpec = {
-    open: { animation: 'timing', config: { duration: 300 } },
-    close: { animation: 'timing', config: { duration: 300 } },
-  };
-
-  const screenOptions = {
-    headerShown: false,
-    cardStyle: { backgroundColor: theme.screenBackground },
-    cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-    transitionSpec,
-  };
-
-  const calendarScreenOptions = {
-    ...screenOptions,
-    cardStyleInterpolator: slideInterpolator(false),
-  };
-
-  const settingsScreenOptions = {
-    ...screenOptions,
-    cardStyleInterpolator: slideInterpolator(true),
-  };
+  // Navigation helper for NavigationBar
+  const navigate = useCallback((routeName) => {
+    setCurrentRouteName(routeName);
+  }, []);
 
   return (
     <>
@@ -860,48 +851,31 @@ function AppContent() {
           ) : null}
           {!showGameScreen && !showCompletionModal && (
             <View style={styles.navigationWrapper}>
-              <NavigationContainer
-                theme={{
-                  dark: theme.mode === 'dark',
-                  colors: {
-                    primary: theme.accent,
-                    background: theme.screenBackground,
-                    card: theme.screenBackground,
-                    text: theme.text,
-                    border: theme.border,
-                  },
-                }}
-                ref={navigationRef}
-                onReady={() => {
-                  setIsNavigationReady(true);
-                  const route = navigationRef.getCurrentRoute();
-                  if (route) setCurrentRouteName(route.name);
-                }}
-                onStateChange={() => {
-                  const route = navigationRef.getCurrentRoute();
-                  if (route) setCurrentRouteName(route.name);
-                }}
-              >
-                <Stack.Navigator
-                  initialRouteName="Home"
-                  screenOptions={screenOptions}
-                >
-                  <Stack.Screen 
-                    name="Calendar" 
-                    component={CalendarScreenWrapper}
-                    options={calendarScreenOptions}
-                  />
-                  <Stack.Screen name="Home" component={HomeScreenWrapper} />
-                  <Stack.Screen 
-                    name="Settings" 
-                    component={SettingsScreenWrapper}
-                    options={settingsScreenOptions}
-                  />
-                </Stack.Navigator>
-              </NavigationContainer>
-              {isNavigationReady && (
-                <NavigationBar navigation={navigationRef} currentRouteName={currentRouteName} />
-              )}
+              <View style={styles.screensContainer}>
+                {/* Home Screen - stays in place at bottom layer */}
+                <View style={[styles.screenLayer, { zIndex: 0 }]}>
+                  <View style={styles.screenContainer}>
+                    <HomeScreen onNewGame={handleNewGame} />
+                  </View>
+                </View>
+                
+                {/* Calendar Screen - slides from left over Home */}
+                <Animated.View style={[styles.screenLayer, calendarAnimatedStyle, { zIndex: calendarZIndex }]}>
+                  <View style={styles.screenContainer}>
+                    <GameProvider startPuzzleWithImage={startPuzzleWithImage}>
+                      <CalendarScreen />
+                    </GameProvider>
+                  </View>
+                </Animated.View>
+                
+                {/* Settings Screen - slides from right over Home */}
+                <Animated.View style={[styles.screenLayer, settingsAnimatedStyle, { zIndex: settingsZIndex }]}>
+                  <View style={styles.screenContainer}>
+                    <SettingsScreen />
+                  </View>
+                </Animated.View>
+              </View>
+              <NavigationBar navigate={navigate} currentRouteName={currentRouteName} />
             </View>
           )}
           {showGameScreen && !showCompletionModal && (

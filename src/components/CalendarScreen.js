@@ -11,11 +11,10 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, runOnJS } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, Easing, runOnJS, interpolate } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../contexts/ThemeContext';
@@ -153,13 +152,11 @@ const makeStyles = (theme) =>
     calendarSwipeArea: {
       flex: 1,
       paddingBottom: 10,
+      overflow: 'hidden',
     },
     grid: {
       flex: 1,
       paddingHorizontal: 16,
-    },
-    gridContent: {
-      flexGrow: 1,
     },
     weekRow: {
       flexDirection: 'row',
@@ -191,7 +188,16 @@ const makeStyles = (theme) =>
       fontWeight: '700',
       textDecorationLine: 'underline',
     },
+    daySectionWrapper: {
+      position: 'absolute',
+      bottom: 80,
+      left: 0,
+      right: 0,
+      height: DAY_SECTION_HEIGHT,
+      overflow: 'hidden',
+    },
     daySection: {
+      height: DAY_SECTION_HEIGHT,
       borderTopWidth: 1,
       borderTopColor: theme.border,
       backgroundColor: theme.screenBackground,
@@ -501,20 +507,9 @@ export const CalendarScreen = () => {
   } = useCalendar();
   const { startPuzzleWithImage } = useGame();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const daySectionHeight = useSharedValue(0);
+  const daySectionTranslateY = useSharedValue(DAY_SECTION_HEIGHT);
   const indicatorsOpacity = useSharedValue(0);
   const buttonOpacity = useSharedValue(0);
-
-  useFocusEffect(
-    useCallback(() => {
-      // Reset selected date when screen gains focus so section doesn't auto-open
-      setSelectedDate(null);
-      setPickerVisible(false);
-      return () => {
-        // State is saved in context when navigating away
-      };
-    }, [setSelectedDate, setPickerVisible])
-  );
 
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
@@ -524,28 +519,29 @@ export const CalendarScreen = () => {
   const isCurrentYear = year === today.getFullYear();
 
   const triggerImageAnimation = useCallback((shouldAnimateControls) => {
-    const delay = shouldAnimateControls ? 200 : 0; // Only delay if section is opening
+    const delay = shouldAnimateControls ? 150 : 0; // Only delay if section is opening
     setTimeout(() => {
       setImagesShouldAnimate(true);
       // Only animate indicators and button if section is opening (not just switching dates)
       if (shouldAnimateControls) {
-        indicatorsOpacity.value = withTiming(1, { duration: 300 });
-        buttonOpacity.value = withTiming(1, { duration: 300 });
+        indicatorsOpacity.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.ease) });
+        buttonOpacity.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.ease) });
       }
     }, delay);
   }, [indicatorsOpacity, buttonOpacity]);
 
   useEffect(() => {
     if (selectedDate) {
-      const wasSectionOpen = daySectionHeight.value > 0;
+      const wasSectionOpen = daySectionTranslateY.value < DAY_SECTION_HEIGHT;
       const shouldAnimateControls = !wasSectionOpen;
       setImagesShouldAnimate(false);
-      // Only reset indicators and button opacity if section is opening (was closed)
+      
       if (shouldAnimateControls) {
         indicatorsOpacity.value = 0;
         buttonOpacity.value = 0;
       }
-      daySectionHeight.value = withTiming(DAY_SECTION_HEIGHT, { duration: 300 }, (finished) => {
+      
+      daySectionTranslateY.value = withTiming(0, { duration: 300 }, (finished) => {
         if (finished) {
           runOnJS(triggerImageAnimation)(shouldAnimateControls);
         }
@@ -554,13 +550,21 @@ export const CalendarScreen = () => {
       setImagesShouldAnimate(false);
       indicatorsOpacity.value = 0;
       buttonOpacity.value = 0;
-      daySectionHeight.value = withTiming(0, { duration: 300 });
+      daySectionTranslateY.value = withTiming(DAY_SECTION_HEIGHT, { duration: 300 });
     }
-  }, [selectedDate, daySectionHeight, triggerImageAnimation, indicatorsOpacity, buttonOpacity]);
+  }, [selectedDate, daySectionTranslateY, triggerImageAnimation, indicatorsOpacity, buttonOpacity]);
 
   const daySectionAnimatedStyle = useAnimatedStyle(() => ({
-    height: daySectionHeight.value,
-    opacity: daySectionHeight.value > 0 ? 1 : 0,
+    transform: [{ translateY: daySectionTranslateY.value }],
+  }));
+
+  // Calendar shrinks from flex 1 to 0.7 as section slides up
+  const calendarAnimatedStyle = useAnimatedStyle(() => ({
+    flex: interpolate(
+      daySectionTranslateY.value,
+      [DAY_SECTION_HEIGHT, 0],
+      [1, 0.5]
+    ),
   }));
 
   const indicatorsAnimatedStyle = useAnimatedStyle(() => ({
@@ -735,7 +739,7 @@ export const CalendarScreen = () => {
       </TouchableOpacity>
 
       <GestureDetector gesture={panGesture}>
-        <View style={styles.calendarSwipeArea}>
+        <Animated.View style={[styles.calendarSwipeArea, calendarAnimatedStyle]}>
           <View style={styles.weekdayRow}>
             {WEEKDAYS.map((d, i) => (
               <Text key={`wday-${i}`} style={styles.weekday}>
@@ -745,11 +749,7 @@ export const CalendarScreen = () => {
           </View>
           <View style={styles.divider} />
 
-          <ScrollView
-            style={styles.grid}
-            contentContainerStyle={styles.gridContent}
-            showsVerticalScrollIndicator={false}
-          >
+          <View style={styles.grid}>
             {weeks.map((week, wi) => (
               <View key={`week-${year}-${month}-${wi}`} style={styles.weekRow}>
                 {week.map((day, di) => {
@@ -785,118 +785,119 @@ export const CalendarScreen = () => {
                 })}
               </View>
             ))}
-          </ScrollView>
-        </View>
+          </View>
+        </Animated.View>
       </GestureDetector>
 
-      <Animated.View style={[styles.daySection, daySectionAnimatedStyle]}>
-        {selectedDate ? (
-          <>
-            <View style={styles.daySectionHeader}>
-              <Text style={styles.daySectionTitle}>
-                {formatDayHeader(selectedDate)}
-              </Text>
-              <TouchableOpacity
-                style={styles.daySectionClose}
-                onPress={() => setSelectedDate(null)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="chevron-down" size={22} color={theme.text} />
-              </TouchableOpacity>
-            </View>
-            {dayImages.length === 0 ? (
-              <ScrollView
-                style={styles.daySectionList}
-                contentContainerStyle={styles.daySectionListContent}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                showsVerticalScrollIndicator={false}
-                nestedScrollEnabled
-              >
-                <View style={styles.daySectionEmpty}>
-                  <Text style={styles.daySectionEmptyText}>
-                    No items for this day
-                  </Text>
-                </View>
-              </ScrollView>
-            ) : (
-              <>
+      <View style={styles.daySectionWrapper} pointerEvents={selectedDate ? 'auto' : 'none'}>
+        <Animated.View style={[styles.daySection, daySectionAnimatedStyle]}>
+          {selectedDate ? (
+            <>
+              <View style={styles.daySectionHeader}>
+                <Text style={styles.daySectionTitle}>
+                  {formatDayHeader(selectedDate)}
+                </Text>
+                <TouchableOpacity
+                  style={styles.daySectionClose}
+                  onPress={() => setSelectedDate(null)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="chevron-down" size={22} color={theme.text} />
+                </TouchableOpacity>
+              </View>
+              {dayImages.length === 0 ? (
                 <ScrollView
-                  ref={dayScrollRef}
                   style={styles.daySectionList}
-                  pagingEnabled
+                  contentContainerStyle={styles.daySectionListContent}
+                  horizontal
                   showsHorizontalScrollIndicator={false}
                   showsVerticalScrollIndicator={false}
                   nestedScrollEnabled
-                  scrollEventThrottle={16}
-                  onLayout={(e) =>
-                    setListHeight(e.nativeEvent.layout.height)
-                  }
-                  onScroll={handleDayScroll}
-                  onMomentumScrollEnd={handleDayScrollEnd}
-                  onScrollEndDrag={handleDayScrollEnd}
                 >
-                      {pages.map((page, pi) => (
-                        <View
-                          key={pi}
-                          style={[
-                            styles.daySectionPage,
-                            { height: pageHeight },
-                          ]}
-                        >
-                          {page.map(({ id, uri }, index) => {
-                            const isSelected = selectedImageId === id;
-                            const selectedIndex = page.findIndex(item => item.id === selectedImageId);
-                            const shiftLeft = selectedIndex !== -1 && index === selectedIndex - 1;
-                            const shiftRight = selectedIndex !== -1 && index === selectedIndex + 1;
-                            // Calculate global index across all pages for staggered animation
-                            const globalIndex = pi * IMAGES_PER_PAGE + index;
-                            
-                            return (
-                              <DaySectionImage
-                                key={id}
-                                id={id}
-                                uri={uri}
-                                isSelected={isSelected}
-                                shiftLeft={shiftLeft}
-                                shiftRight={shiftRight}
-                                onPress={() => setSelectedImageId(isSelected ? null : id)}
-                                onPlayPress={() => handlePlayPress(uri)}
-                                styles={styles}
-                                animationIndex={globalIndex}
-                                shouldAnimate={imagesShouldAnimate}
-                              />
-                            );
-                          })}
-                        </View>
-                      ))}
-                </ScrollView>
-                <Animated.View style={indicatorsAnimatedStyle}>
-                  <View style={styles.pageIndicators}>
-                    {Array.from({ length: totalPages }, (_, i) => (
-                      <PageIndicatorDot
-                        key={i}
-                        active={i === pageIndex}
-                        baseStyle={styles.pageIndicatorDot}
-                      />
-                    ))}
+                  <View style={styles.daySectionEmpty}>
+                    <Text style={styles.daySectionEmptyText}>
+                      No items for this day
+                    </Text>
                   </View>
-                </Animated.View>
-              </>
-            )}
-            <Animated.View style={buttonAnimatedStyle}>
-              <TouchableOpacity
-                style={styles.addToDateButton}
-                onPress={handleAddToDate}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="images-outline" size={20} color={theme.buttonText} />
-                <Text style={styles.addToDateButtonText}>Add to date</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          </>
-        ) : null}
-      </Animated.View>
+                </ScrollView>
+              ) : (
+                <>
+                  <ScrollView
+                    ref={dayScrollRef}
+                    style={styles.daySectionList}
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    showsVerticalScrollIndicator={false}
+                    nestedScrollEnabled
+                    scrollEventThrottle={16}
+                    onLayout={(e) =>
+                      setListHeight(e.nativeEvent.layout.height)
+                    }
+                    onScroll={handleDayScroll}
+                    onMomentumScrollEnd={handleDayScrollEnd}
+                    onScrollEndDrag={handleDayScrollEnd}
+                  >
+                    {pages.map((page, pi) => (
+                      <View
+                        key={pi}
+                        style={[
+                          styles.daySectionPage,
+                          { height: pageHeight },
+                        ]}
+                      >
+                        {page.map(({ id, uri }, index) => {
+                          const isSelected = selectedImageId === id;
+                          const selectedIndex = page.findIndex(item => item.id === selectedImageId);
+                          const shiftLeft = selectedIndex !== -1 && index === selectedIndex - 1;
+                          const shiftRight = selectedIndex !== -1 && index === selectedIndex + 1;
+                          const globalIndex = pi * IMAGES_PER_PAGE + index;
+                          
+                          return (
+                            <DaySectionImage
+                              key={id}
+                              id={id}
+                              uri={uri}
+                              isSelected={isSelected}
+                              shiftLeft={shiftLeft}
+                              shiftRight={shiftRight}
+                              onPress={() => setSelectedImageId(isSelected ? null : id)}
+                              onPlayPress={() => handlePlayPress(uri)}
+                              styles={styles}
+                              animationIndex={globalIndex}
+                              shouldAnimate={imagesShouldAnimate}
+                            />
+                          );
+                        })}
+                      </View>
+                    ))}
+                  </ScrollView>
+                  <Animated.View style={indicatorsAnimatedStyle}>
+                    <View style={styles.pageIndicators}>
+                      {Array.from({ length: totalPages }, (_, i) => (
+                        <PageIndicatorDot
+                          key={i}
+                          active={i === pageIndex}
+                          baseStyle={styles.pageIndicatorDot}
+                        />
+                      ))}
+                    </View>
+                  </Animated.View>
+                </>
+              )}
+              <Animated.View style={buttonAnimatedStyle}>
+                <TouchableOpacity
+                  style={styles.addToDateButton}
+                  onPress={handleAddToDate}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="images-outline" size={20} color={theme.buttonText} />
+                  <Text style={styles.addToDateButtonText}>Add to date</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            </>
+          ) : null}
+        </Animated.View>
+      </View>
 
       <Modal
         visible={pickerVisible}

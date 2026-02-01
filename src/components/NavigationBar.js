@@ -28,7 +28,8 @@ const makeStyles = (theme) =>
       shadowOffset: { width: 0, height: -2 },
       shadowOpacity: 0.1,
       shadowRadius: 8,
-      elevation: 4,
+      elevation: 10,
+      zIndex: 10,
     },
     navButton: {
       flex: 1,
@@ -90,7 +91,7 @@ const NavButton = ({ icon, label, isActive, onPress, theme }) => {
   );
 };
 
-export const NavigationBar = ({ navigation, currentRouteName }) => {
+export const NavigationBar = ({ navigate, currentRouteName }) => {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
@@ -100,21 +101,21 @@ export const NavigationBar = ({ navigation, currentRouteName }) => {
         icon="calendar-outline"
         label="Calendar"
         isActive={currentRouteName === 'Calendar'}
-        onPress={() => navigation.navigate('Calendar')}
+        onPress={() => navigate('Calendar')}
         theme={theme}
       />
       <NavButton
         icon="home"
         label="Home"
         isActive={currentRouteName === 'Home'}
-        onPress={() => navigation.navigate('Home')}
+        onPress={() => navigate('Home')}
         theme={theme}
       />
       <NavButton
         icon="settings-outline"
         label="Settings"
         isActive={currentRouteName === 'Settings'}
-        onPress={() => navigation.navigate('Settings')}
+        onPress={() => navigate('Settings')}
         theme={theme}
       />
     </View>
