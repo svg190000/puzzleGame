@@ -288,6 +288,12 @@ const makeStyles = (theme) =>
     daySectionThumbSelected: {
       borderColor: theme.accent,
     },
+    daySectionThumbEdit: {
+      borderColor: '#E53935',
+    },
+    daySectionThumbMove: {
+      borderColor: '#FF9800',
+    },
     daySectionThumbOverlay: {
       ...StyleSheet.absoluteFillObject,
       borderRadius: 10,
@@ -303,7 +309,39 @@ const makeStyles = (theme) =>
       justifyContent: 'center',
       padding: 8,
     },
+    daySectionActions: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 16,
+      marginTop: 12,
+      marginBottom: 16,
+    },
+    actionModeButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 12,
+      backgroundColor: theme.surface,
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    actionModeButtonEdit: {
+      borderColor: '#E53935',
+      backgroundColor: 'rgba(229, 57, 53, 0.1)',
+    },
+    actionModeButtonMove: {
+      borderColor: '#FF9800',
+      backgroundColor: 'rgba(255, 152, 0, 0.1)',
+    },
+    actionModeButtonPlaceholder: {
+      width: 44,
+      height: 44,
+    },
     addToDateButton: {
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
@@ -312,9 +350,6 @@ const makeStyles = (theme) =>
       paddingHorizontal: 20,
       borderRadius: 12,
       backgroundColor: theme.accent,
-      marginHorizontal: 16,
-      marginTop: 12,
-      marginBottom: 16,
     },
     addToDateButtonText: {
       fontSize: 15,
@@ -438,9 +473,12 @@ function DaySectionImage({
   shiftRight,
   onPress,
   onPlayPress,
+  onActionPress,
+  onDeletePress,
   styles,
   animationIndex,
   shouldAnimate,
+  actionMode,
 }) {
   const scale = useSharedValue(isSelected ? 1.1 : 1);
   const translateX = useSharedValue(0);
@@ -472,13 +510,38 @@ function DaySectionImage({
     opacity: overlayOpacity.value,
   }));
 
+  // Determine border style based on mode
+  const getBorderStyle = () => {
+    if (actionMode === 'edit') return styles.daySectionThumbEdit;
+    if (actionMode === 'move') return styles.daySectionThumbMove;
+    if (isSelected) return styles.daySectionThumbSelected;
+    return null;
+  };
+
+  // Determine overlay icon based on mode
+  const getOverlayIcon = () => {
+    if (actionMode === 'edit') return { name: 'close', color: '#FFFFFF' };
+    if (actionMode === 'move') return { name: 'move', color: '#FFFFFF' };
+    return { name: 'play', color: '#FFFFFF' };
+  };
+
+  const handlePress = () => {
+    if (actionMode) {
+      onActionPress?.();
+    } else {
+      onPress();
+    }
+  };
+
+  const overlayIcon = getOverlayIcon();
+
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+    <TouchableOpacity onPress={handlePress} activeOpacity={0.8}>
       <Animated.View style={animatedStyle}>
         <View style={{ position: 'relative' }}>
           <Image
             source={{ uri }}
-            style={[styles.daySectionThumb, isSelected && styles.daySectionThumbSelected]}
+            style={[styles.daySectionThumb, getBorderStyle()]}
             resizeMode="cover"
           />
           {isSelected && (
@@ -489,9 +552,19 @@ function DaySectionImage({
                 end={{ x: 1, y: 1 }}
                 style={styles.glossGradient}
               />
-              <TouchableOpacity style={styles.playButton} onPress={onPlayPress} activeOpacity={0.8}>
-                <Ionicons name="play" size={32} color="#FFFFFF" />
-              </TouchableOpacity>
+              {actionMode === 'edit' ? (
+                <TouchableOpacity style={styles.playButton} onPress={onDeletePress} activeOpacity={0.8}>
+                  <Ionicons name={overlayIcon.name} size={32} color={overlayIcon.color} />
+                </TouchableOpacity>
+              ) : actionMode === 'move' ? (
+                <View style={styles.playButton}>
+                  <Ionicons name={overlayIcon.name} size={32} color={overlayIcon.color} />
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.playButton} onPress={onPlayPress} activeOpacity={0.8}>
+                  <Ionicons name={overlayIcon.name} size={32} color={overlayIcon.color} />
+                </TouchableOpacity>
+              )}
             </Animated.View>
           )}
         </View>
@@ -514,6 +587,8 @@ export const CalendarScreen = () => {
     setPickerYear,
     imagesByDate,
     addImagesToDate,
+    removeImageFromDate,
+    moveImageToDate,
     dateKey,
   } = useCalendar();
   const { startPuzzleWithImage } = useGame();
@@ -543,6 +618,8 @@ export const CalendarScreen = () => {
   const [showDifficultyModal, setShowDifficultyModal] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState(null);
   const [imagesShouldAnimate, setImagesShouldAnimate] = useState(false);
+  const [actionMode, setActionMode] = useState(null); // 'edit' | 'move' | null
+  const [movingImage, setMovingImage] = useState(null); // { id, uri, fromKey }
   const dayScrollRef = useRef(null);
 
   const pageHeight = listHeight ?? Math.max(1, DAY_SECTION_HEIGHT - 100);
@@ -594,6 +671,11 @@ export const CalendarScreen = () => {
     setShowDifficultyModal(false);
     setSelectedImageUri(null);
     setImagesShouldAnimate(false);
+    // Only reset action mode if section is closing, not when switching dates in move mode
+    if (!selectedKey) {
+      setActionMode(null);
+      setMovingImage(null);
+    }
   }, [selectedKey]);
 
   // Clamp page index when total pages changes
@@ -623,6 +705,16 @@ export const CalendarScreen = () => {
   // Handlers
   const onDatePress = useCallback(
     (day) => {
+      // If in move mode with an image selected, move it to the tapped date
+      if (actionMode === 'move' && movingImage) {
+        const toKey = dateKey(day.date);
+        moveImageToDate(movingImage.fromKey, toKey, movingImage.id);
+        setMovingImage(null);
+        setSelectedImageId(null);
+        // Stay in move mode and on the original date section
+        return;
+      }
+
       if (selectedDate && day.date.getTime() === selectedDate.getTime()) {
         setSelectedDate(null);
         return;
@@ -632,7 +724,7 @@ export const CalendarScreen = () => {
         setViewDate(new Date(day.date.getFullYear(), day.date.getMonth(), 1));
       }
     },
-    [selectedDate, setSelectedDate, setViewDate]
+    [selectedDate, setSelectedDate, setViewDate, actionMode, movingImage, moveImageToDate, dateKey]
   );
 
   const openPicker = useCallback(() => {
@@ -701,6 +793,41 @@ export const CalendarScreen = () => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     },
     [selectedImageUri, startPuzzleWithImage]
+  );
+
+  const toggleActionMode = useCallback((mode) => {
+    setActionMode((current) => (current === mode ? null : mode));
+    setSelectedImageId(null);
+    setMovingImage(null);
+  }, []);
+
+  const handleImageAction = useCallback(
+    (imageId, imageUri) => {
+      if (actionMode === 'edit') {
+        // Toggle selection - delete happens when X icon is tapped
+        setSelectedImageId((current) => (current === imageId ? null : imageId));
+      } else if (actionMode === 'move') {
+        // Select image for moving - toggle if same image tapped
+        if (movingImage?.id === imageId) {
+          setMovingImage(null);
+          setSelectedImageId(null);
+        } else {
+          setMovingImage({ id: imageId, uri: imageUri, fromKey: selectedKey });
+          setSelectedImageId(imageId);
+        }
+      }
+    },
+    [actionMode, selectedKey, movingImage]
+  );
+
+  const handleDeleteImage = useCallback(
+    (imageId) => {
+      if (selectedKey) {
+        removeImageFromDate(selectedKey, imageId);
+        setSelectedImageId(null);
+      }
+    },
+    [selectedKey, removeImageFromDate]
   );
 
   const handleScroll = useCallback(
@@ -807,13 +934,28 @@ export const CalendarScreen = () => {
           {selectedDate && (
             <>
               <View style={styles.daySectionHeader}>
-                <Text style={styles.daySectionTitle}>{formatDayHeader(selectedDate)}</Text>
+                <Text style={[styles.daySectionTitle, movingImage && { color: '#FF9800' }]}>
+                  {movingImage ? 'Tap a date to move to' : formatDayHeader(selectedDate)}
+                </Text>
                 <TouchableOpacity
                   style={styles.daySectionClose}
-                  onPress={() => setSelectedDate(null)}
+                  onPress={() => {
+                    if (movingImage) {
+                      setMovingImage(null);
+                      setSelectedImageId(null);
+                    } else if (actionMode === 'edit' && selectedImageId) {
+                      setSelectedImageId(null);
+                    } else {
+                      setSelectedDate(null);
+                    }
+                  }}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="chevron-down" size={22} color={theme.text} />
+                  <Ionicons
+                    name={movingImage || (actionMode === 'edit' && selectedImageId) ? 'close' : 'chevron-down'}
+                    size={22}
+                    color={theme.text}
+                  />
                 </TouchableOpacity>
               </View>
 
@@ -858,9 +1000,12 @@ export const CalendarScreen = () => {
                               shiftRight={shiftRight}
                               onPress={() => setSelectedImageId(isImageSelected ? null : id)}
                               onPlayPress={() => handlePlayPress(uri)}
+                              onActionPress={() => handleImageAction(id, uri)}
+                              onDeletePress={() => handleDeleteImage(id)}
                               styles={styles}
                               animationIndex={pi * IMAGES_PER_PAGE + index}
                               shouldAnimate={imagesShouldAnimate}
+                              actionMode={actionMode}
                             />
                           );
                         })}
@@ -878,10 +1023,53 @@ export const CalendarScreen = () => {
               )}
 
               <Animated.View style={buttonAnimatedStyle}>
-                <TouchableOpacity style={styles.addToDateButton} onPress={handleAddToDate} activeOpacity={0.7}>
-                  <Ionicons name="images-outline" size={20} color={theme.buttonText} />
-                  <Text style={styles.addToDateButtonText}>Add to date</Text>
-                </TouchableOpacity>
+                <View style={styles.daySectionActions}>
+                  {/* Edit Button - show if images exist, placeholder otherwise */}
+                  {dayImages.length > 0 ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.actionModeButton,
+                        actionMode === 'edit' && styles.actionModeButtonEdit,
+                      ]}
+                      onPress={() => toggleActionMode('edit')}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={20}
+                        color={actionMode === 'edit' ? '#E53935' : theme.text}
+                      />
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.actionModeButtonPlaceholder} />
+                  )}
+
+                  {/* Add to Date Button */}
+                  <TouchableOpacity style={styles.addToDateButton} onPress={handleAddToDate} activeOpacity={0.7}>
+                    <Ionicons name="images-outline" size={20} color={theme.buttonText} />
+                    <Text style={styles.addToDateButtonText}>Add to date</Text>
+                  </TouchableOpacity>
+
+                  {/* Move Button - show if images exist, placeholder otherwise */}
+                  {dayImages.length > 0 ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.actionModeButton,
+                        actionMode === 'move' && styles.actionModeButtonMove,
+                      ]}
+                      onPress={() => toggleActionMode('move')}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name="swap-horizontal-outline"
+                        size={20}
+                        color={actionMode === 'move' ? '#FF9800' : theme.text}
+                      />
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.actionModeButtonPlaceholder} />
+                  )}
+                </View>
               </Animated.View>
             </>
           )}

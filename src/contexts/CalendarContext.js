@@ -34,6 +34,49 @@ export function CalendarProvider({ children }) {
     });
   }, []);
 
+  const removeImageFromDate = useCallback((key, imageId) => {
+    setImagesByDate((prev) => {
+      const list = prev[key] ?? [];
+      const filtered = list.filter((img) => img.id !== imageId);
+      if (filtered.length === 0) {
+        const { [key]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [key]: filtered };
+    });
+  }, []);
+
+  const moveImageToDate = useCallback((fromKey, toKey, imageId) => {
+    if (fromKey === toKey) return;
+    setImagesByDate((prev) => {
+      const fromList = prev[fromKey] ?? [];
+      const imageToMove = fromList.find((img) => img.id === imageId);
+      if (!imageToMove) return prev;
+
+      // Remove from source
+      const newFromList = fromList.filter((img) => img.id !== imageId);
+      
+      // Add to destination with new id
+      const toList = prev[toKey] ?? [];
+      const ddmmyyyy = keyToDDMMYYYY(toKey);
+      const newImage = {
+        id: `${ddmmyyyy}#${toList.length + 1}`,
+        uri: imageToMove.uri,
+      };
+
+      const result = { ...prev, [toKey]: [...toList, newImage] };
+      
+      // Remove source key if empty
+      if (newFromList.length === 0) {
+        delete result[fromKey];
+      } else {
+        result[fromKey] = newFromList;
+      }
+      
+      return result;
+    });
+  }, []);
+
   const value = useMemo(
     () => ({
       viewDate,
@@ -46,6 +89,8 @@ export function CalendarProvider({ children }) {
       setPickerYear,
       imagesByDate,
       addImagesToDate,
+      removeImageFromDate,
+      moveImageToDate,
       dateKey,
     }),
     [
@@ -55,6 +100,8 @@ export function CalendarProvider({ children }) {
       pickerYear,
       imagesByDate,
       addImagesToDate,
+      removeImageFromDate,
+      moveImageToDate,
     ]
   );
 
