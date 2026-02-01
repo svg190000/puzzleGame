@@ -451,6 +451,113 @@ const makeStyles = (theme) =>
     pickerMonthChipTextActive: {
       color: theme.buttonText,
     },
+    // Left Panel styles
+    leftPanelBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: '#000',
+      zIndex: 100,
+    },
+    leftPanel: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      bottom: 0,
+      backgroundColor: theme.surface,
+      zIndex: 101,
+      shadowColor: '#000',
+      shadowOffset: { width: 2, height: 0 },
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+      elevation: 10,
+    },
+    leftPanelHeader: {
+      paddingHorizontal: 20,
+      paddingTop: 60,
+      paddingBottom: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    leftPanelTitle: {
+      fontSize: 24,
+      fontWeight: '700',
+      color: theme.text,
+    },
+    leftPanelContent: {
+      flex: 1,
+      paddingTop: 16,
+    },
+    leftPanelMenuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 20,
+      gap: 14,
+    },
+    leftPanelMenuItemText: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: theme.text,
+    },
+    // All Photos view styles
+    allPhotosHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingTop: 50,
+      paddingBottom: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+      gap: 12,
+    },
+    allPhotosBackButton: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    allPhotosTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: theme.text,
+    },
+    allPhotosCount: {
+      fontSize: 14,
+      color: theme.textMuted,
+      marginLeft: 'auto',
+    },
+    allPhotosGrid: {
+      flex: 1,
+      padding: 2,
+    },
+    allPhotosGridContent: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+    },
+    allPhotosItem: {
+      width: (SCREEN_WIDTH - 8) / 3,
+      height: (SCREEN_WIDTH - 8) / 3,
+      padding: 2,
+    },
+    allPhotosImageWrapper: {
+      width: '100%',
+      height: '100%',
+    },
+    allPhotosImage: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 4,
+    },
+    allPhotosEmpty: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 60,
+    },
+    allPhotosEmptyText: {
+      fontSize: 16,
+      color: theme.textMuted,
+      marginTop: 12,
+    },
   });
 
 // Sub-components
@@ -577,6 +684,29 @@ function DaySectionImage({
   );
 }
 
+function AllPhotosImage({ uri, style, imageStyle, animationIndex, shouldAnimate }) {
+  const imageOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (shouldAnimate && animationIndex !== undefined) {
+      const delay = animationIndex * 80; // Slightly faster than day section
+      imageOpacity.value = withDelay(delay, withTiming(1, { duration: 300 }));
+    } else {
+      imageOpacity.value = 0;
+    }
+  }, [shouldAnimate, animationIndex, imageOpacity]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: imageOpacity.value,
+  }));
+
+  return (
+    <Animated.View style={[style, animatedStyle]}>
+      <Image source={{ uri }} style={imageStyle} resizeMode="cover" />
+    </Animated.View>
+  );
+}
+
 // Main Component
 export const CalendarScreen = () => {
   const { theme } = useTheme();
@@ -624,7 +754,28 @@ export const CalendarScreen = () => {
   const [imagesShouldAnimate, setImagesShouldAnimate] = useState(false);
   const [actionMode, setActionMode] = useState(null); // 'edit' | 'move' | null
   const [movingImages, setMovingImages] = useState([]); // [{ id, uri, fromKey }, ...]
+  const [leftPanelOpen, setLeftPanelOpen] = useState(false);
+  const [leftPanelView, setLeftPanelView] = useState('menu'); // 'menu' | 'allPhotos'
+  const [allPhotosReady, setAllPhotosReady] = useState(false);
   const dayScrollRef = useRef(null);
+
+  // Left panel animation
+  const leftPanelTranslateX = useSharedValue(-SCREEN_WIDTH);
+  const leftPanelWidth = useSharedValue(SCREEN_WIDTH * 0.75);
+  const leftPanelBackdropOpacity = useSharedValue(0);
+
+  // Get all photos from calendar
+  const allPhotos = useMemo(() => {
+    const photos = [];
+    Object.entries(imagesByDate).forEach(([dateKey, images]) => {
+      images.forEach((img) => {
+        photos.push({ ...img, dateKey });
+      });
+    });
+    // Sort by date key (most recent first)
+    photos.sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+    return photos;
+  }, [imagesByDate]);
 
   const pageHeight = listHeight ?? Math.max(1, DAY_SECTION_HEIGHT - 100);
 
@@ -702,6 +853,51 @@ export const CalendarScreen = () => {
   const buttonAnimatedStyle = useAnimatedStyle(() => ({
     opacity: buttonOpacity.value,
   }));
+
+  // Left panel animation
+  useEffect(() => {
+    if (leftPanelOpen) {
+      const targetWidth = leftPanelView === 'allPhotos' ? SCREEN_WIDTH : SCREEN_WIDTH * 0.75;
+      leftPanelTranslateX.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.ease) });
+      leftPanelWidth.value = withTiming(targetWidth, { duration: 300, easing: Easing.out(Easing.ease) });
+      leftPanelBackdropOpacity.value = withTiming(leftPanelView === 'allPhotos' ? 0 : 0.5, { duration: 300 });
+      // Set allPhotosReady after transition completes
+      if (leftPanelView === 'allPhotos') {
+        setTimeout(() => setAllPhotosReady(true), 320);
+      }
+    } else {
+      leftPanelTranslateX.value = withTiming(-SCREEN_WIDTH, { duration: 300, easing: Easing.in(Easing.ease) });
+      leftPanelBackdropOpacity.value = withTiming(0, { duration: 300 });
+      // Reset to menu view when closing
+      setTimeout(() => {
+        setLeftPanelView('menu');
+        setAllPhotosReady(false);
+      }, 300);
+    }
+  }, [leftPanelOpen, leftPanelView, leftPanelTranslateX, leftPanelWidth, leftPanelBackdropOpacity]);
+
+  const leftPanelAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: leftPanelTranslateX.value }],
+    width: leftPanelWidth.value,
+  }));
+
+  const leftPanelBackdropAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: leftPanelBackdropOpacity.value,
+  }));
+
+  const toggleLeftPanel = useCallback(() => {
+    setLeftPanelOpen((prev) => !prev);
+  }, []);
+
+  const openAllPhotos = useCallback(() => {
+    setAllPhotosReady(false);
+    setLeftPanelView('allPhotos');
+  }, []);
+
+  const backToMenu = useCallback(() => {
+    setAllPhotosReady(false);
+    setLeftPanelView('menu');
+  }, []);
 
   // Handlers
   const onDatePress = useCallback(
@@ -921,7 +1117,7 @@ export const CalendarScreen = () => {
       {/* Top Bar */}
       <View style={styles.topBar}>
         <View style={styles.topBarLeft}>
-          <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.iconButton} onPress={toggleLeftPanel} activeOpacity={0.7}>
             <Ionicons name="menu" size={24} color={theme.text} />
           </TouchableOpacity>
         </View>
@@ -1210,6 +1406,74 @@ export const CalendarScreen = () => {
           setSelectedImageUri(null);
         }}
       />
+
+      {/* Left Panel */}
+      {leftPanelOpen && leftPanelView === 'menu' && (
+        <TouchableWithoutFeedback onPress={() => setLeftPanelOpen(false)}>
+          <Animated.View style={[styles.leftPanelBackdrop, leftPanelBackdropAnimatedStyle]} />
+        </TouchableWithoutFeedback>
+      )}
+      <Animated.View style={[styles.leftPanel, leftPanelAnimatedStyle]} pointerEvents={leftPanelOpen ? 'auto' : 'none'}>
+        {leftPanelView === 'menu' ? (
+          <>
+            <View style={styles.leftPanelHeader}>
+              <Text style={styles.leftPanelTitle}>Menu</Text>
+            </View>
+            <View style={styles.leftPanelContent}>
+              <TouchableOpacity style={styles.leftPanelMenuItem} onPress={() => setLeftPanelOpen(false)} activeOpacity={0.7}>
+                <Ionicons name="calendar-outline" size={22} color={theme.text} />
+                <Text style={styles.leftPanelMenuItemText}>Calendar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.leftPanelMenuItem} onPress={openAllPhotos} activeOpacity={0.7}>
+                <Ionicons name="images-outline" size={22} color={theme.text} />
+                <Text style={styles.leftPanelMenuItemText}>All Photos</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.leftPanelMenuItem} activeOpacity={0.7}>
+                <Ionicons name="star-outline" size={22} color={theme.text} />
+                <Text style={styles.leftPanelMenuItemText}>Favorites</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.leftPanelMenuItem} activeOpacity={0.7}>
+                <Ionicons name="time-outline" size={22} color={theme.text} />
+                <Text style={styles.leftPanelMenuItemText}>Recent</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.leftPanelMenuItem} activeOpacity={0.7}>
+                <Ionicons name="settings-outline" size={22} color={theme.text} />
+                <Text style={styles.leftPanelMenuItemText}>Settings</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.allPhotosHeader}>
+              <TouchableOpacity style={styles.allPhotosBackButton} onPress={backToMenu} activeOpacity={0.7}>
+                <Ionicons name="arrow-back" size={24} color={theme.text} />
+              </TouchableOpacity>
+              <Text style={styles.allPhotosTitle}>All Photos</Text>
+              <Text style={styles.allPhotosCount}>{allPhotos.length} photos</Text>
+            </View>
+            {!allPhotosReady ? null : allPhotos.length === 0 ? (
+              <View style={styles.allPhotosEmpty}>
+                <Ionicons name="images-outline" size={48} color={theme.textMuted} />
+                <Text style={styles.allPhotosEmptyText}>No photos in calendar</Text>
+              </View>
+            ) : (
+              <ScrollView style={styles.allPhotosGrid} contentContainerStyle={styles.allPhotosGridContent}>
+                {allPhotos.map((photo, index) => (
+                  <TouchableOpacity key={photo.id} style={styles.allPhotosItem} activeOpacity={0.8}>
+                    <AllPhotosImage
+                      uri={photo.uri}
+                      style={styles.allPhotosImageWrapper}
+                      imageStyle={styles.allPhotosImage}
+                      animationIndex={index}
+                      shouldAnimate={allPhotosReady}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </>
+        )}
+      </Animated.View>
     </View>
   );
 };
