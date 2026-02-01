@@ -175,7 +175,7 @@ const makeStyles = (theme) =>
     calendarSwipeArea: {
       flex: 1,
       overflow: 'hidden',
-      paddingBottom: 10,
+      paddingBottom: 12,
     },
     grid: {
       flex: 1,
@@ -671,11 +671,8 @@ export const CalendarScreen = () => {
     setShowDifficultyModal(false);
     setSelectedImageUri(null);
     setImagesShouldAnimate(false);
-    // Only reset action mode if section is closing, not when switching dates in move mode
-    if (!selectedKey) {
-      setActionMode(null);
-      setMovingImage(null);
-    }
+    setActionMode(null);
+    setMovingImage(null);
   }, [selectedKey]);
 
   // Clamp page index when total pages changes
