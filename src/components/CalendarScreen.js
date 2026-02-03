@@ -351,6 +351,31 @@ const makeStyles = (theme) =>
       borderColor: '#9C27B0',
       backgroundColor: 'rgba(156, 39, 176, 0.1)',
     },
+    labelModeButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 12,
+      backgroundColor: theme.surface,
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    labelModeButtonActive: {
+      borderColor: '#9C27B0',
+      backgroundColor: 'rgba(156, 39, 176, 0.1)',
+    },
+    labelModeButtonText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.text,
+    },
+    labelModeButtonTextActive: {
+      color: '#9C27B0',
+    },
     actionModeButtonPlaceholder: {
       width: 44,
       height: 44,
@@ -465,6 +490,73 @@ const makeStyles = (theme) =>
     },
     pickerMonthChipTextActive: {
       color: theme.buttonText,
+    },
+    // Label Picker Modal
+    labelPickerBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    labelPickerCard: {
+      width: SCREEN_WIDTH * 0.85,
+      maxWidth: 340,
+      backgroundColor: theme.surface,
+      borderRadius: 20,
+      padding: 20,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 10,
+      elevation: 10,
+    },
+    labelPickerTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.text,
+      textAlign: 'center',
+      marginBottom: 16,
+    },
+    labelPickerOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      gap: 12,
+    },
+    labelPickerOptionSelected: {
+      backgroundColor: theme.surfaceAlt,
+    },
+    labelPickerColorDot: {
+      width: 20,
+      height: 20,
+      borderRadius: 6,
+    },
+    labelPickerOptionText: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: theme.text,
+      flex: 1,
+    },
+    labelPickerCheckmark: {
+      width: 24,
+      alignItems: 'center',
+    },
+    labelPickerRemove: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      marginTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      gap: 8,
+    },
+    labelPickerRemoveText: {
+      fontSize: 15,
+      fontWeight: '500',
+      color: theme.textMuted,
     },
     // Left Panel styles
     leftPanelBackdrop: {
@@ -644,10 +736,12 @@ function DaySectionImage({
   onPlayPress,
   onActionPress,
   onDeletePress,
+  onLabelPress,
   styles,
   animationIndex,
   shouldAnimate,
   actionMode,
+  labelColor,
 }) {
   // Adjust scale based on selection count: full scale for 1, smaller for multi-select
   const getSelectedScale = () => {
@@ -690,6 +784,8 @@ function DaySectionImage({
     if (actionMode === 'move') return styles.daySectionThumbMove;
     if (actionMode === 'label') return styles.daySectionThumbLabel;
     if (isSelected) return styles.daySectionThumbSelected;
+    // Show label color as border when image has a label assigned
+    if (labelColor) return { borderColor: labelColor };
     return null;
   };
 
@@ -737,9 +833,9 @@ function DaySectionImage({
                   <Ionicons name={overlayIcon.name} size={32} color={overlayIcon.color} />
                 </View>
               ) : actionMode === 'label' ? (
-                <View style={styles.playButton}>
+                <TouchableOpacity style={styles.playButton} onPress={onLabelPress} activeOpacity={0.8}>
                   <Ionicons name={overlayIcon.name} size={32} color={overlayIcon.color} />
-                </View>
+                </TouchableOpacity>
               ) : (
                 <TouchableOpacity style={styles.playButton} onPress={onPlayPress} activeOpacity={0.8}>
                   <Ionicons name={overlayIcon.name} size={32} color={overlayIcon.color} />
@@ -833,6 +929,9 @@ export const CalendarScreen = () => {
     { id: '3', color: '#1E88E5', name: 'Travel' },
     { id: '4', color: '#FF9800', name: 'Work' },
   ]);
+  const [imageLabels, setImageLabels] = useState({}); // { imageId: labelId }
+  const [labelPickerVisible, setLabelPickerVisible] = useState(false);
+  const [labelPickerImageId, setLabelPickerImageId] = useState(null);
   const dayScrollRef = useRef(null);
 
   // Left panel animation
@@ -1223,6 +1322,34 @@ export const CalendarScreen = () => {
     }
   }, [selectedKey, removeImageFromDate, selectedImageIds]);
 
+  const openLabelPicker = useCallback((imageId) => {
+    setLabelPickerImageId(imageId);
+    setLabelPickerVisible(true);
+  }, []);
+
+  const assignLabelToImage = useCallback((labelId) => {
+    if (labelPickerImageId) {
+      setImageLabels((prev) => ({
+        ...prev,
+        [labelPickerImageId]: labelId,
+      }));
+      setLabelPickerVisible(false);
+      setLabelPickerImageId(null);
+    }
+  }, [labelPickerImageId]);
+
+  const removeLabelFromImage = useCallback(() => {
+    if (labelPickerImageId) {
+      setImageLabels((prev) => {
+        const newLabels = { ...prev };
+        delete newLabels[labelPickerImageId];
+        return newLabels;
+      });
+      setLabelPickerVisible(false);
+      setLabelPickerImageId(null);
+    }
+  }, [labelPickerImageId]);
+
   const handleScroll = useCallback(
     (e) => {
       const y = e.nativeEvent.contentOffset.y;
@@ -1392,6 +1519,8 @@ export const CalendarScreen = () => {
                         {page.map(({ id, uri }, index) => {
                           const isImageSelected = selectedImageIds.has(id);
 
+                          const imageLabelId = imageLabels[id];
+                          const imageLabelColor = imageLabelId ? labels.find((l) => l.id === imageLabelId)?.color : null;
                           return (
                             <DaySectionImage
                               key={id}
@@ -1424,10 +1553,12 @@ export const CalendarScreen = () => {
                               onPlayPress={() => handlePlayPress(uri)}
                               onActionPress={() => handleImageAction(id, uri)}
                               onDeletePress={handleDeleteImage}
+                              onLabelPress={() => openLabelPicker(id)}
                               styles={styles}
                               animationIndex={pi * IMAGES_PER_PAGE + index}
                               shouldAnimate={imagesShouldAnimate}
                               actionMode={actionMode}
+                              labelColor={imageLabelColor}
                             />
                           );
                         })}
@@ -1466,32 +1597,6 @@ export const CalendarScreen = () => {
                     <View style={styles.actionModeButtonPlaceholder} />
                   )}
 
-                  {/* Label Button - show if images exist, placeholder otherwise */}
-                  {dayImages.length > 0 ? (
-                    <TouchableOpacity
-                      style={[
-                        styles.actionModeButton,
-                        actionMode === 'label' && styles.actionModeButtonLabel,
-                      ]}
-                      onPress={() => toggleActionMode('label')}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons
-                        name="pricetag-outline"
-                        size={20}
-                        color={actionMode === 'label' ? '#9C27B0' : theme.text}
-                      />
-                    </TouchableOpacity>
-                  ) : (
-                    <View style={styles.actionModeButtonPlaceholder} />
-                  )}
-
-                  {/* Add to Date Button */}
-                  <TouchableOpacity style={styles.addToDateButton} onPress={handleAddToDate} activeOpacity={0.7}>
-                    <Ionicons name="images-outline" size={20} color={theme.buttonText} />
-                    <Text style={styles.addToDateButtonText}>Add to date</Text>
-                  </TouchableOpacity>
-
                   {/* Move Button - show if images exist, placeholder otherwise */}
                   {dayImages.length > 0 ? (
                     <TouchableOpacity
@@ -1510,6 +1615,35 @@ export const CalendarScreen = () => {
                     </TouchableOpacity>
                   ) : (
                     <View style={styles.actionModeButtonPlaceholder} />
+                  )}
+
+                  {/* Add to Date Button */}
+                  <TouchableOpacity style={styles.addToDateButton} onPress={handleAddToDate} activeOpacity={0.7}>
+                    <Ionicons name="images-outline" size={20} color={theme.buttonText} />
+                    <Text style={styles.addToDateButtonText}>Add to date</Text>
+                  </TouchableOpacity>
+
+                  {/* Label Button - styled like Add to date */}
+                  {dayImages.length > 0 ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.labelModeButton,
+                        actionMode === 'label' && styles.labelModeButtonActive,
+                      ]}
+                      onPress={() => toggleActionMode('label')}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name="pricetag-outline"
+                        size={20}
+                        color={actionMode === 'label' ? '#9C27B0' : theme.text}
+                      />
+                      <Text style={[styles.labelModeButtonText, actionMode === 'label' && styles.labelModeButtonTextActive]}>
+                        Label
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={[styles.labelModeButton, { opacity: 0 }]} />
                   )}
                 </View>
               </Animated.View>
@@ -1680,6 +1814,42 @@ export const CalendarScreen = () => {
           </>
         )}
       </Animated.View>
+
+      {/* Label Picker Modal */}
+      <Modal visible={labelPickerVisible} transparent animationType="fade" onRequestClose={() => setLabelPickerVisible(false)}>
+        <TouchableWithoutFeedback onPress={() => setLabelPickerVisible(false)}>
+          <View style={styles.labelPickerBackdrop}>
+            <TouchableWithoutFeedback>
+              <View style={styles.labelPickerCard}>
+                <Text style={styles.labelPickerTitle}>Select a Label</Text>
+                {labels.map((label) => {
+                  const isCurrentLabel = labelPickerImageId && imageLabels[labelPickerImageId] === label.id;
+                  return (
+                    <TouchableOpacity
+                      key={label.id}
+                      style={[styles.labelPickerOption, isCurrentLabel && styles.labelPickerOptionSelected]}
+                      onPress={() => assignLabelToImage(label.id)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.labelPickerColorDot, { backgroundColor: label.color }]} />
+                      <Text style={styles.labelPickerOptionText}>{label.name}</Text>
+                      <View style={styles.labelPickerCheckmark}>
+                        {isCurrentLabel && <Ionicons name="checkmark" size={20} color={theme.accent} />}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+                {labelPickerImageId && imageLabels[labelPickerImageId] && (
+                  <TouchableOpacity style={styles.labelPickerRemove} onPress={removeLabelFromImage} activeOpacity={0.7}>
+                    <Ionicons name="close-circle-outline" size={20} color={theme.textMuted} />
+                    <Text style={styles.labelPickerRemoveText}>Remove label</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 };
