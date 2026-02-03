@@ -334,12 +334,15 @@ function AppContent() {
   const resetGameState = async () => {
     contentOpacity.value = 0;
     showLoadingScreenWithMessage('Returning to menu...');
-    await new Promise(resolve => setTimeout(resolve, 2000));
     
+    // Set up destination screen while loading screen is visible
     setShowGameScreen(false);
     setShowCompletionModal(false);
     clearGameState();
-    setCurrentRouteName('Home'); // Always navigate to Home screen
+    setCurrentRouteName('Home');
+    
+    // Wait for loading screen minimum time
+    await new Promise(resolve => setTimeout(resolve, 2000));
     setIsTransitioning(false);
   };
 
@@ -380,26 +383,36 @@ function AppContent() {
   const handleBackToMenu = resetGameState;
   const handleBackButton = resetGameState;
 
-  const handleSettings = () => {
-    // Close completion modal and navigate to settings
-    setShowCompletionModal(false);
+  const handleSettings = async () => {
+    // Show loading screen and navigate to settings
+    contentOpacity.value = 0;
+    showLoadingScreenWithMessage('Opening settings...');
+    
+    // Set up destination screen while loading screen is visible
     setShowGameScreen(false);
+    setShowCompletionModal(false);
     clearGameState();
-    // Small delay to ensure state updates before navigation
-    setTimeout(() => {
-      setCurrentRouteName('Settings');
-    }, 100);
+    setCurrentRouteName('Settings');
+    
+    // Wait for loading screen minimum time
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    setIsTransitioning(false);
   };
 
-  const handleCalendar = () => {
-    // Close completion modal and navigate to calendar
-    setShowCompletionModal(false);
+  const handleCalendar = async () => {
+    // Show loading screen and navigate to calendar
+    contentOpacity.value = 0;
+    showLoadingScreenWithMessage('Opening calendar...');
+    
+    // Set up destination screen while loading screen is visible
     setShowGameScreen(false);
+    setShowCompletionModal(false);
     clearGameState();
-    // Small delay to ensure state updates before navigation
-    setTimeout(() => {
-      setCurrentRouteName('Calendar');
-    }, 100);
+    setCurrentRouteName('Calendar');
+    
+    // Wait for loading screen minimum time
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    setIsTransitioning(false);
   };
 
   const getBoardDimensions = () => {
