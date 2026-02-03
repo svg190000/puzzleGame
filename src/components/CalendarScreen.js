@@ -10,6 +10,7 @@ import {
   TouchableWithoutFeedback,
   Image,
   Alert,
+  TextInput,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -527,16 +528,16 @@ const makeStyles = (theme) =>
     },
     allPhotosGrid: {
       flex: 1,
-      padding: 2,
+      padding: 4,
     },
     allPhotosGridContent: {
       flexDirection: 'row',
       flexWrap: 'wrap',
     },
     allPhotosItem: {
-      width: (SCREEN_WIDTH - 8) / 3,
-      height: (SCREEN_WIDTH - 8) / 3,
-      padding: 2,
+      width: (SCREEN_WIDTH - 16) / 3,
+      height: (SCREEN_WIDTH - 16) / 3,
+      padding: 4,
     },
     allPhotosImageWrapper: {
       width: '100%',
@@ -545,7 +546,10 @@ const makeStyles = (theme) =>
     allPhotosImage: {
       width: '100%',
       height: '100%',
-      borderRadius: 4,
+      borderRadius: 10,
+      borderWidth: 2,
+      borderColor: theme.border,
+      backgroundColor: theme.surfaceAlt,
     },
     allPhotosEmpty: {
       flex: 1,
@@ -557,6 +561,51 @@ const makeStyles = (theme) =>
       fontSize: 16,
       color: theme.textMuted,
       marginTop: 12,
+    },
+    // Labels menu item and dropdown styles
+    labelsMenuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 14,
+      paddingHorizontal: 20,
+    },
+    labelsMenuItemLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      flex: 1,
+    },
+    labelsMenuItemChevron: {
+      padding: 4,
+    },
+    labelsDropdown: {
+      paddingHorizontal: 20,
+      paddingLeft: 56,
+      paddingBottom: 8,
+    },
+    labelItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+      gap: 10,
+    },
+    labelColorIndicator: {
+      width: 16,
+      height: 16,
+      borderRadius: 4,
+    },
+    labelNameInput: {
+      flex: 1,
+      fontSize: 15,
+      color: theme.text,
+      paddingVertical: 4,
+      paddingHorizontal: 8,
+      borderRadius: 6,
+      backgroundColor: theme.background,
+    },
+    labelDeleteButton: {
+      padding: 4,
     },
   });
 
@@ -757,12 +806,23 @@ export const CalendarScreen = () => {
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const [leftPanelView, setLeftPanelView] = useState('menu'); // 'menu' | 'allPhotos'
   const [allPhotosReady, setAllPhotosReady] = useState(false);
+  const [labelsExpanded, setLabelsExpanded] = useState(false);
+  const [labels, setLabels] = useState([
+    { id: '1', color: '#E53935', name: 'Important' },
+    { id: '2', color: '#43A047', name: 'Family' },
+    { id: '3', color: '#1E88E5', name: 'Travel' },
+    { id: '4', color: '#FF9800', name: 'Work' },
+  ]);
   const dayScrollRef = useRef(null);
 
   // Left panel animation
   const leftPanelTranslateX = useSharedValue(-SCREEN_WIDTH);
   const leftPanelWidth = useSharedValue(SCREEN_WIDTH * 0.75);
   const leftPanelBackdropOpacity = useSharedValue(0);
+
+  // Labels section animation
+  const labelsOpacity = useSharedValue(0);
+  const labelsIconRotation = useSharedValue(0); // 0 = chevron-down, 1 = plus, 2 = chevron-up
 
   // Get all photos from calendar
   const allPhotos = useMemo(() => {
@@ -898,6 +958,54 @@ export const CalendarScreen = () => {
     setAllPhotosReady(false);
     setLeftPanelView('menu');
   }, []);
+
+  // Labels section animation effect
+  useEffect(() => {
+    if (labelsExpanded) {
+      labelsOpacity.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.ease) });
+      // Animate icon: if at max, go to chevron-up (2), otherwise plus (1)
+      labelsIconRotation.value = withTiming(labels.length >= 7 ? 2 : 1, { duration: 200 });
+    } else {
+      labelsOpacity.value = withTiming(0, { duration: 150, easing: Easing.in(Easing.ease) });
+      labelsIconRotation.value = withTiming(0, { duration: 200 }); // Back to chevron-down
+    }
+  }, [labelsExpanded, labels.length, labelsOpacity, labelsIconRotation]);
+
+  const labelsContentAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: labelsOpacity.value,
+  }));
+
+  const labelsIconAnimatedStyle = useAnimatedStyle(() => {
+    // Rotation: 0 -> 0deg (chevron-down), 1 -> 45deg (plus effect), 2 -> 180deg (chevron-up)
+    const rotation = interpolate(labelsIconRotation.value, [0, 1, 2], [0, 0, 180]);
+    return {
+      transform: [{ rotate: `${rotation}deg` }],
+    };
+  });
+
+  const toggleLabelsExpanded = useCallback(() => {
+    setLabelsExpanded((prev) => !prev);
+  }, []);
+
+  const updateLabelName = useCallback((labelId, newName) => {
+    setLabels((prev) =>
+      prev.map((label) =>
+        label.id === labelId ? { ...label, name: newName } : label
+      )
+    );
+  }, []);
+
+  const deleteLabel = useCallback((labelId) => {
+    setLabels((prev) => prev.filter((label) => label.id !== labelId));
+  }, []);
+
+  const addNewLabel = useCallback(() => {
+    if (labels.length >= 7) return; // Max 7 labels
+    const colors = ['#9C27B0', '#00BCD4', '#795548', '#607D8B', '#F44336', '#4CAF50'];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    const newId = Date.now().toString();
+    setLabels((prev) => [...prev, { id: newId, color: randomColor, name: 'New Label' }]);
+  }, [labels.length]);
 
   // Handlers
   const onDatePress = useCallback(
@@ -1436,10 +1544,48 @@ export const CalendarScreen = () => {
                 <Ionicons name="time-outline" size={22} color={theme.text} />
                 <Text style={styles.leftPanelMenuItemText}>Recent</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.leftPanelMenuItem} activeOpacity={0.7}>
-                <Ionicons name="settings-outline" size={22} color={theme.text} />
-                <Text style={styles.leftPanelMenuItemText}>Settings</Text>
-              </TouchableOpacity>
+
+              {/* Labels Menu Item */}
+              <View style={styles.labelsMenuItem}>
+                <TouchableOpacity style={styles.labelsMenuItemLeft} onPress={toggleLabelsExpanded} activeOpacity={0.7}>
+                  <Ionicons name="pricetag-outline" size={22} color={theme.text} />
+                  <Text style={styles.leftPanelMenuItemText}>Labels</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={labelsExpanded && labels.length < 7 ? addNewLabel : toggleLabelsExpanded}
+                  activeOpacity={0.7}
+                  style={styles.labelsMenuItemChevron}
+                >
+                  <Animated.View style={labelsIconAnimatedStyle}>
+                    <Ionicons
+                      name={labelsExpanded && labels.length < 7 ? 'add' : 'chevron-down'}
+                      size={labelsExpanded && labels.length < 7 ? 22 : 20}
+                      color={theme.textMuted}
+                    />
+                  </Animated.View>
+                </TouchableOpacity>
+              </View>
+
+              {/* Labels Dropdown Content */}
+              {labelsExpanded && (
+                <Animated.View style={[styles.labelsDropdown, labelsContentAnimatedStyle]}>
+                  {labels.map((label) => (
+                    <View key={label.id} style={styles.labelItem}>
+                      <View style={[styles.labelColorIndicator, { backgroundColor: label.color }]} />
+                      <TextInput
+                        style={styles.labelNameInput}
+                        value={label.name}
+                        onChangeText={(text) => updateLabelName(label.id, text)}
+                        placeholder="Label name"
+                        placeholderTextColor={theme.textMuted}
+                      />
+                      <TouchableOpacity style={styles.labelDeleteButton} onPress={() => deleteLabel(label.id)} activeOpacity={0.7}>
+                        <Ionicons name="close" size={18} color={theme.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </Animated.View>
+              )}
             </View>
           </>
         ) : (
