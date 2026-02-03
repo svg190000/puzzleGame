@@ -1030,8 +1030,6 @@ export const CalendarScreen = () => {
   const isCurrentYear = year === new Date().getFullYear();
   const selectedKey = selectedDate ? dateKey(selectedDate) : null;
   const dayImages = selectedKey ? (imagesByDate[selectedKey] ?? []) : [];
-  const pages = useMemo(() => chunk(dayImages, IMAGES_PER_PAGE), [dayImages]);
-  const totalPages = pages.length;
 
   // Local state
   const [listHeight, setListHeight] = useState(null);
@@ -1058,6 +1056,15 @@ export const CalendarScreen = () => {
   const [filterVisible, setFilterVisible] = useState(false);
   const [activeFilters, setActiveFilters] = useState(new Set()); // Set of label IDs
   const dayScrollRef = useRef(null);
+
+  // Filter day images based on active label filters
+  const filteredDayImages = useMemo(() => {
+    if (activeFilters.size === 0) return dayImages;
+    return dayImages.filter((img) => img.labelId && activeFilters.has(img.labelId));
+  }, [dayImages, activeFilters]);
+  
+  const pages = useMemo(() => chunk(filteredDayImages, IMAGES_PER_PAGE), [filteredDayImages]);
+  const totalPages = pages.length;
 
   // Left panel animation
   const leftPanelTranslateX = useSharedValue(-SCREEN_WIDTH);
@@ -1150,6 +1157,22 @@ export const CalendarScreen = () => {
       setPageIndex(Math.max(0, totalPages - 1));
     }
   }, [totalPages, pageIndex]);
+
+  // Clear selections that are no longer visible when filters change
+  useEffect(() => {
+    if (activeFilters.size > 0 && selectedImageIds.size > 0) {
+      const visibleIds = new Set(filteredDayImages.map((img) => img.id));
+      const newSelectedIds = new Set([...selectedImageIds].filter((id) => visibleIds.has(id)));
+      if (newSelectedIds.size !== selectedImageIds.size) {
+        setSelectedImageIds(newSelectedIds);
+        // Exit action mode if no images are selected anymore
+        if (newSelectedIds.size === 0 && actionMode) {
+          setActionMode(null);
+          setMovingImages([]);
+        }
+      }
+    }
+  }, [activeFilters, filteredDayImages, selectedImageIds, actionMode]);
 
   // Animated styles
   const daySectionAnimatedStyle = useAnimatedStyle(() => ({
@@ -1267,12 +1290,23 @@ export const CalendarScreen = () => {
       // If in move mode with images selected, move them to the tapped date
       if (actionMode === 'move' && movingImages.length > 0) {
         const toKey = dateKey(day.date);
+        const fromKey = movingImages[0]?.fromKey;
+        const movingCount = movingImages.length;
+        
         movingImages.forEach((img) => {
           moveImageToDate(img.fromKey, toKey, img.id);
         });
         setMovingImages([]);
         setSelectedImageIds(new Set());
-        setActionMode(null); // Reset to regular mode after move
+        
+        // Check if there are remaining images on the source date
+        const currentImages = fromKey ? (imagesByDate[fromKey] ?? []) : [];
+        const remainingCount = currentImages.length - movingCount;
+        
+        // Only exit move mode if no images remain on the source date
+        if (remainingCount <= 0) {
+          setActionMode(null);
+        }
         return;
       }
 
@@ -1285,7 +1319,7 @@ export const CalendarScreen = () => {
         setViewDate(new Date(day.date.getFullYear(), day.date.getMonth(), 1));
       }
     },
-    [selectedDate, setSelectedDate, setViewDate, actionMode, movingImages, moveImageToDate, dateKey]
+    [selectedDate, setSelectedDate, setViewDate, actionMode, movingImages, moveImageToDate, dateKey, imagesByDate]
   );
 
   const openPicker = useCallback(() => {
@@ -1711,7 +1745,7 @@ export const CalendarScreen = () => {
                 </TouchableOpacity>
               </View>
 
-              {dayImages.length === 0 ? (
+              {filteredDayImages.length === 0 ? (
                 <ScrollView
                   style={styles.daySectionList}
                   contentContainerStyle={styles.daySectionListContent}
@@ -1719,7 +1753,11 @@ export const CalendarScreen = () => {
                   showsHorizontalScrollIndicator={false}
                 >
                   <View style={styles.daySectionEmpty}>
-                    <Text style={styles.daySectionEmptyText}>No items for this day</Text>
+                    <Text style={styles.daySectionEmptyText}>
+                      {dayImages.length > 0 && activeFilters.size > 0
+                        ? 'No matching items'
+                        : 'No items for this day'}
+                    </Text>
                   </View>
                 </ScrollView>
               ) : (
@@ -1797,8 +1835,8 @@ export const CalendarScreen = () => {
               )}
 
               <Animated.View style={buttonAnimatedStyle}>
-                <View style={[styles.daySectionActions, dayImages.length === 0 && styles.daySectionActionsEmpty]}>
-                  {dayImages.length > 0 ? (
+                <View style={[styles.daySectionActions, filteredDayImages.length === 0 && styles.daySectionActionsEmpty]}>
+                  {filteredDayImages.length > 0 ? (
                     <>
                       {/* Edit Button */}
                       <TouchableOpacity
