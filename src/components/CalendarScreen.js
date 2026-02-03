@@ -138,6 +138,10 @@ const makeStyles = (theme) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
+    iconButtonActive: {
+      backgroundColor: `${theme.accent}20`,
+      borderRadius: 20,
+    },
     monthTitleTouchable: {
       alignSelf: 'center',
       alignItems: 'center',
@@ -212,12 +216,20 @@ const makeStyles = (theme) =>
       fontWeight: '700',
       textDecorationLine: 'underline',
     },
+    dateIndicatorContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: 4,
+      gap: 2,
+      maxWidth: 26, // 3 dots (6px each) + 2 gaps (2px each) = 22px, with a bit of padding
+    },
     dateImageIndicator: {
       width: 6,
       height: 6,
       borderRadius: 3,
       backgroundColor: theme.accent,
-      marginTop: 4,
     },
     // Day Section
     daySectionWrapper: {
@@ -539,6 +551,77 @@ const makeStyles = (theme) =>
     },
     labelPickerRemoveText: {
       fontSize: 15,
+      fontWeight: '500',
+      color: theme.textMuted,
+    },
+    // Filter Modal
+    filterModalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'flex-start',
+      alignItems: 'flex-end',
+      paddingTop: 100,
+      paddingRight: 16,
+    },
+    filterCard: {
+      width: 220,
+      backgroundColor: theme.surface,
+      borderRadius: 16,
+      padding: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 10,
+      elevation: 10,
+    },
+    filterTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.text,
+      marginBottom: 12,
+    },
+    filterOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      gap: 12,
+    },
+    filterColorDot: {
+      width: 18,
+      height: 18,
+      borderRadius: 5,
+    },
+    filterOptionText: {
+      fontSize: 15,
+      fontWeight: '500',
+      color: theme.text,
+      flex: 1,
+    },
+    filterCheckbox: {
+      width: 22,
+      height: 22,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: theme.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    filterCheckboxActive: {
+      backgroundColor: theme.accent,
+      borderColor: theme.accent,
+    },
+    filterClearButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+      marginTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      gap: 6,
+    },
+    filterClearText: {
+      fontSize: 14,
       fontWeight: '500',
       color: theme.textMuted,
     },
@@ -925,6 +1008,8 @@ export const CalendarScreen = () => {
   const [imageLabels, setImageLabels] = useState({}); // { imageId: labelId }
   const [labelPickerVisible, setLabelPickerVisible] = useState(false);
   const [labelPickerImageId, setLabelPickerImageId] = useState(null);
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [activeFilters, setActiveFilters] = useState(new Set()); // Set of label IDs
   const dayScrollRef = useRef(null);
 
   // Left panel animation
@@ -1403,8 +1488,12 @@ export const CalendarScreen = () => {
           </TouchableOpacity>
         </View>
         <View style={styles.topBarRight}>
-          <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
-            <Ionicons name="search" size={22} color={theme.text} />
+          <TouchableOpacity
+            style={[styles.iconButton, activeFilters.size > 0 && styles.iconButtonActive]}
+            onPress={() => setFilterVisible(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="filter" size={22} color={activeFilters.size > 0 ? theme.accent : theme.text} />
           </TouchableOpacity>
         </View>
       </View>
@@ -1435,7 +1524,33 @@ export const CalendarScreen = () => {
                 {week.map((day, di) => {
                   const isSelected = selectedDate && day.date.getTime() === selectedDate.getTime();
                   const dayKey = dateKey(day.date);
-                  const hasImages = imagesByDate[dayKey]?.length > 0;
+                  const dayImagesForCell = imagesByDate[dayKey] || [];
+                  const hasImages = dayImagesForCell.length > 0;
+                  
+                  // Get unique label IDs and colors for this date's images
+                  const uniqueLabelData = hasImages
+                    ? [...new Map(
+                        dayImagesForCell
+                          .map((img) => {
+                            const labelId = imageLabels[img.id];
+                            const label = labelId ? labels.find((l) => l.id === labelId) : null;
+                            return label ? [label.id, label.color] : null;
+                          })
+                          .filter(Boolean)
+                      ).entries()].map(([id, color]) => ({ id, color }))
+                    : [];
+                  
+                  // Filter by active filters if any are set
+                  const filteredLabelData = activeFilters.size > 0
+                    ? uniqueLabelData.filter((l) => activeFilters.has(l.id))
+                    : uniqueLabelData;
+                  
+                  // Check if there are unlabeled images (only show if no filters active)
+                  const hasUnlabeledImages = activeFilters.size === 0 && dayImagesForCell.some((img) => !imageLabels[img.id]);
+                  
+                  // Determine if we should show indicators
+                  const showIndicators = filteredLabelData.length > 0 || hasUnlabeledImages;
+                  
                   return (
                     <TouchableOpacity
                       key={di}
@@ -1455,7 +1570,19 @@ export const CalendarScreen = () => {
                         >
                           {day.day}
                         </Text>
-                        {hasImages && <View style={styles.dateImageIndicator} />}
+                        {showIndicators && (
+                          <View style={styles.dateIndicatorContainer}>
+                            {filteredLabelData.map((labelData) => (
+                              <View
+                                key={labelData.id}
+                                style={[styles.dateImageIndicator, { backgroundColor: labelData.color }]}
+                              />
+                            ))}
+                            {hasUnlabeledImages && (
+                              <View style={styles.dateImageIndicator} />
+                            )}
+                          </View>
+                        )}
                       </View>
                     </TouchableOpacity>
                   );
@@ -1876,6 +2003,56 @@ export const CalendarScreen = () => {
                   <TouchableOpacity style={styles.labelPickerRemove} onPress={removeLabelFromImage} activeOpacity={0.7}>
                     <Ionicons name="close-circle-outline" size={20} color={theme.textMuted} />
                     <Text style={styles.labelPickerRemoveText}>Remove label</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Filter Modal */}
+      <Modal visible={filterVisible} transparent animationType="fade" onRequestClose={() => setFilterVisible(false)}>
+        <TouchableWithoutFeedback onPress={() => setFilterVisible(false)}>
+          <View style={styles.filterModalBackdrop}>
+            <TouchableWithoutFeedback>
+              <View style={styles.filterCard}>
+                <Text style={styles.filterTitle}>Filter by Label</Text>
+                {labels.map((label) => {
+                  const isActive = activeFilters.has(label.id);
+                  return (
+                    <TouchableOpacity
+                      key={label.id}
+                      style={styles.filterOption}
+                      onPress={() => {
+                        setActiveFilters((prev) => {
+                          const newFilters = new Set(prev);
+                          if (newFilters.has(label.id)) {
+                            newFilters.delete(label.id);
+                          } else {
+                            newFilters.add(label.id);
+                          }
+                          return newFilters;
+                        });
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.filterColorDot, { backgroundColor: label.color }]} />
+                      <Text style={styles.filterOptionText}>{label.name}</Text>
+                      <View style={[styles.filterCheckbox, isActive && styles.filterCheckboxActive]}>
+                        {isActive && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+                {activeFilters.size > 0 && (
+                  <TouchableOpacity
+                    style={styles.filterClearButton}
+                    onPress={() => setActiveFilters(new Set())}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="close-circle-outline" size={18} color={theme.textMuted} />
+                    <Text style={styles.filterClearText}>Clear filters</Text>
                   </TouchableOpacity>
                 )}
               </View>
