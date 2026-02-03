@@ -212,6 +212,13 @@ const makeStyles = (theme) =>
       fontWeight: '700',
       textDecorationLine: 'underline',
     },
+    dateImageIndicator: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: theme.accent,
+      marginTop: 4,
+    },
     // Day Section
     daySectionWrapper: {
       position: 'absolute',
@@ -295,6 +302,9 @@ const makeStyles = (theme) =>
     daySectionThumbMove: {
       borderColor: '#FF9800',
     },
+    daySectionThumbLabel: {
+      borderColor: '#9C27B0',
+    },
     daySectionThumbOverlay: {
       ...StyleSheet.absoluteFillObject,
       borderRadius: 10,
@@ -336,6 +346,10 @@ const makeStyles = (theme) =>
     actionModeButtonMove: {
       borderColor: '#FF9800',
       backgroundColor: 'rgba(255, 152, 0, 0.1)',
+    },
+    actionModeButtonLabel: {
+      borderColor: '#9C27B0',
+      backgroundColor: 'rgba(156, 39, 176, 0.1)',
     },
     actionModeButtonPlaceholder: {
       width: 44,
@@ -674,6 +688,7 @@ function DaySectionImage({
   const getBorderStyle = () => {
     if (actionMode === 'edit') return styles.daySectionThumbEdit;
     if (actionMode === 'move') return styles.daySectionThumbMove;
+    if (actionMode === 'label') return styles.daySectionThumbLabel;
     if (isSelected) return styles.daySectionThumbSelected;
     return null;
   };
@@ -682,6 +697,7 @@ function DaySectionImage({
   const getOverlayIcon = () => {
     if (actionMode === 'edit') return { name: 'close', color: '#FFFFFF' };
     if (actionMode === 'move') return { name: 'move', color: '#FFFFFF' };
+    if (actionMode === 'label') return { name: 'pricetag', color: '#FFFFFF' };
     return { name: 'play', color: '#FFFFFF' };
   };
 
@@ -717,6 +733,10 @@ function DaySectionImage({
                   <Ionicons name={overlayIcon.name} size={32} color={overlayIcon.color} />
                 </TouchableOpacity>
               ) : actionMode === 'move' ? (
+                <View style={styles.playButton}>
+                  <Ionicons name={overlayIcon.name} size={32} color={overlayIcon.color} />
+                </View>
+              ) : actionMode === 'label' ? (
                 <View style={styles.playButton}>
                   <Ionicons name={overlayIcon.name} size={32} color={overlayIcon.color} />
                 </View>
@@ -801,7 +821,7 @@ export const CalendarScreen = () => {
   const [showDifficultyModal, setShowDifficultyModal] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState(null);
   const [imagesShouldAnimate, setImagesShouldAnimate] = useState(false);
-  const [actionMode, setActionMode] = useState(null); // 'edit' | 'move' | null
+  const [actionMode, setActionMode] = useState(null); // 'edit' | 'move' | 'label' | null
   const [movingImages, setMovingImages] = useState([]); // [{ id, uri, fromKey }, ...]
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const [leftPanelView, setLeftPanelView] = useState('menu'); // 'menu' | 'allPhotos'
@@ -1177,6 +1197,17 @@ export const CalendarScreen = () => {
             return [...current, { id: imageId, uri: imageUri, fromKey: selectedKey }];
           }
         });
+      } else if (actionMode === 'label') {
+        // Toggle selection for labeling
+        setSelectedImageIds((current) => {
+          const newSet = new Set(current);
+          if (newSet.has(imageId)) {
+            newSet.delete(imageId);
+          } else {
+            newSet.add(imageId);
+          }
+          return newSet;
+        });
       }
     },
     [actionMode, selectedKey]
@@ -1261,6 +1292,8 @@ export const CalendarScreen = () => {
               <View key={`${year}-${month}-${wi}`} style={styles.weekRow}>
                 {week.map((day, di) => {
                   const isSelected = selectedDate && day.date.getTime() === selectedDate.getTime();
+                  const dayKey = dateKey(day.date);
+                  const hasImages = imagesByDate[dayKey]?.length > 0;
                   return (
                     <TouchableOpacity
                       key={di}
@@ -1280,6 +1313,7 @@ export const CalendarScreen = () => {
                         >
                           {day.day}
                         </Text>
+                        {hasImages && <View style={styles.dateImageIndicator} />}
                       </View>
                     </TouchableOpacity>
                   );
@@ -1296,9 +1330,15 @@ export const CalendarScreen = () => {
           {selectedDate && (
             <>
               <View style={styles.daySectionHeader}>
-                <Text style={[styles.daySectionTitle, movingImages.length > 0 && { color: '#FF9800' }]}>
+                <Text style={[
+                  styles.daySectionTitle,
+                  movingImages.length > 0 && { color: '#FF9800' },
+                  actionMode === 'label' && selectedImageIds.size > 0 && { color: '#9C27B0' },
+                ]}>
                   {movingImages.length > 0
                     ? `Tap a date to move ${movingImages.length} image${movingImages.length > 1 ? 's' : ''}`
+                    : actionMode === 'label' && selectedImageIds.size > 0
+                    ? `${selectedImageIds.size} image${selectedImageIds.size > 1 ? 's' : ''} selected for labeling`
                     : formatDayHeader(selectedDate)}
                 </Text>
                 <TouchableOpacity
@@ -1307,7 +1347,7 @@ export const CalendarScreen = () => {
                     if (movingImages.length > 0) {
                       setMovingImages([]);
                       setSelectedImageIds(new Set());
-                    } else if (actionMode === 'edit' && selectedImageIds.size > 0) {
+                    } else if ((actionMode === 'edit' || actionMode === 'label') && selectedImageIds.size > 0) {
                       setSelectedImageIds(new Set());
                     } else {
                       setSelectedDate(null);
@@ -1316,7 +1356,7 @@ export const CalendarScreen = () => {
                   activeOpacity={0.7}
                 >
                   <Ionicons
-                    name={movingImages.length > 0 || (actionMode === 'edit' && selectedImageIds.size > 0) ? 'close' : 'chevron-down'}
+                    name={movingImages.length > 0 || ((actionMode === 'edit' || actionMode === 'label') && selectedImageIds.size > 0) ? 'close' : 'chevron-down'}
                     size={22}
                     color={theme.text}
                   />
@@ -1420,6 +1460,26 @@ export const CalendarScreen = () => {
                         name="trash-outline"
                         size={20}
                         color={actionMode === 'edit' ? '#E53935' : theme.text}
+                      />
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.actionModeButtonPlaceholder} />
+                  )}
+
+                  {/* Label Button - show if images exist, placeholder otherwise */}
+                  {dayImages.length > 0 ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.actionModeButton,
+                        actionMode === 'label' && styles.actionModeButtonLabel,
+                      ]}
+                      onPress={() => toggleActionMode('label')}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name="pricetag-outline"
+                        size={20}
+                        color={actionMode === 'label' ? '#9C27B0' : theme.text}
                       />
                     </TouchableOpacity>
                   ) : (
