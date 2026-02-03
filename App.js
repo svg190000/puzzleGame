@@ -199,7 +199,7 @@ function AppContent() {
 
   const pickImageFromGallery = async () => {
     const hasPermission = await requestPermissions();
-    if (!hasPermission) return;
+    if (!hasPermission) return null;
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -209,7 +209,12 @@ function AppContent() {
       });
 
       if (!result.canceled && result.assets[0]) {
-        return result.assets[0].uri;
+        const asset = result.assets[0];
+        return {
+          uri: asset.uri,
+          assetId: asset.assetId || null,
+          fileName: asset.fileName || null,
+        };
       }
       return null;
     } catch (error) {
@@ -244,7 +249,7 @@ function AppContent() {
     };
   };
 
-  const startPuzzleWithImage = async (imageUri, selectedDifficulty) => {
+  const startPuzzleWithImage = async (imageUri, selectedDifficulty, imageInfo = null) => {
     if (!imageUri) {
       return;
     }
@@ -276,6 +281,13 @@ function AppContent() {
         pixelBoardWidth,
         pixelBoardHeight
       );
+      
+      // Add image identifiers for calendar matching
+      if (imageInfo) {
+        puzzle.sourceAssetId = imageInfo.assetId;
+        puzzle.sourceFileName = imageInfo.fileName;
+      }
+      
       const shuffledPieces = shuffleArray(puzzle.pieces);
       setPuzzleData(puzzle);
       setHolderPieces(shuffledPieces);
@@ -310,13 +322,13 @@ function AppContent() {
   };
 
   const handleDifficultySelected = async (selectedDifficulty) => {
-    const imageUri = await pickImageFromGallery();
-    if (!imageUri) {
+    const imageInfo = await pickImageFromGallery();
+    if (!imageInfo) {
       return;
     }
     
     setShowDifficultyModal(false);
-    await startPuzzleWithImage(imageUri, selectedDifficulty);
+    await startPuzzleWithImage(imageInfo.uri, selectedDifficulty, imageInfo);
   };
 
   const resetGameState = async () => {
@@ -376,6 +388,17 @@ function AppContent() {
     // Small delay to ensure state updates before navigation
     setTimeout(() => {
       setCurrentRouteName('Settings');
+    }, 100);
+  };
+
+  const handleCalendar = () => {
+    // Close completion modal and navigate to calendar
+    setShowCompletionModal(false);
+    setShowGameScreen(false);
+    clearGameState();
+    // Small delay to ensure state updates before navigation
+    setTimeout(() => {
+      setCurrentRouteName('Calendar');
     }, 100);
   };
 
@@ -853,10 +876,14 @@ function AppContent() {
               moveCount={moveCount}
               difficulty={difficulty}
               originalImageUri={puzzleData?.originalImageUri}
+              sourceImageUri={puzzleData?.sourceImageUri}
+              sourceAssetId={puzzleData?.sourceAssetId}
+              sourceFileName={puzzleData?.sourceFileName}
               imageWidth={puzzleData ? pieceWidth * (puzzleData.cols ?? difficulty.cols) : 0}
               imageHeight={puzzleData ? pieceHeight * (puzzleData.rows ?? difficulty.rows) : 0}
               onPlayAgain={handlePlayAgain}
               onBackToMenu={handleBackToMenu}
+              onCalendar={handleCalendar}
               onSettings={handleSettings}
             />
           ) : null}

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useCalendar } from '../contexts/CalendarContext';
 import { Polaroid } from './Polaroid';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -38,11 +39,23 @@ const makeStyles = (theme) =>
       backgroundColor: theme.background,
     },
     polaroidSection: {
-      paddingTop: 50,
+      paddingTop: 80,
       paddingHorizontal: 24,
-      paddingBottom: 20,
+      paddingBottom: 12,
       alignItems: 'center',
       justifyContent: 'flex-start',
+    },
+    memoryStoredContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      marginTop: 12,
+    },
+    memoryStoredText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#43A047',
     },
     scrollContent: {
       flexGrow: 1,
@@ -167,15 +180,49 @@ export const CompletionScreen = ({
   moveCount, 
   difficulty, 
   originalImageUri,
+  sourceImageUri,
+  sourceAssetId,
+  sourceFileName,
   imageWidth,
   imageHeight,
   onPlayAgain, 
   onBackToMenu,
+  onCalendar,
   onSettings 
 }) => {
   const { theme } = useTheme();
+  const { imagesByDate } = useCalendar();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [message] = useState(() => getRandomMessage());
+
+  // Check if the current image is already in the calendar
+  // Priority: assetId (most reliable) > fileName > URI
+  const isImageInCalendar = useMemo(() => {
+    const allImages = Object.values(imagesByDate).flat();
+    
+    // Check by assetId first (most reliable identifier)
+    if (sourceAssetId) {
+      if (allImages.some(img => img.assetId && img.assetId === sourceAssetId)) {
+        return true;
+      }
+    }
+    
+    // Check by fileName as fallback
+    if (sourceFileName) {
+      if (allImages.some(img => img.fileName && img.fileName === sourceFileName)) {
+        return true;
+      }
+    }
+    
+    // Check by URI as last resort
+    if (sourceImageUri) {
+      if (allImages.some(img => img.uri === sourceImageUri)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }, [imagesByDate, sourceAssetId, sourceFileName, sourceImageUri]);
 
   return (
     <View style={styles.container}>
@@ -188,6 +235,12 @@ export const CompletionScreen = ({
           maxWidth={SCREEN_WIDTH - 48}
           animate
         />
+        {isImageInCalendar && (
+          <View style={styles.memoryStoredContainer}>
+            <Ionicons name="checkmark-circle" size={18} color="#43A047" />
+            <Text style={styles.memoryStoredText}>Memory already stored!</Text>
+          </View>
+        )}
       </View>
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
@@ -219,6 +272,13 @@ export const CompletionScreen = ({
             activeOpacity={0.8}
           >
             <Ionicons name="home" size={26} color={theme.text} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={typeof onCalendar === 'function' ? onCalendar : undefined}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="calendar" size={26} color={theme.text} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.primaryButton]}

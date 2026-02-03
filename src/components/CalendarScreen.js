@@ -1037,6 +1037,7 @@ export const CalendarScreen = () => {
   const [selectedImageIds, setSelectedImageIds] = useState(new Set());
   const [showDifficultyModal, setShowDifficultyModal] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState(null);
+  const [selectedImageInfo, setSelectedImageInfo] = useState(null);
   const [imagesShouldAnimate, setImagesShouldAnimate] = useState(false);
   const [actionMode, setActionMode] = useState(null); // 'edit' | 'move' | 'label' | null
   const [movingImages, setMovingImages] = useState([]); // [{ id, uri, fromKey }, ...]
@@ -1127,6 +1128,7 @@ export const CalendarScreen = () => {
     setSelectedImageIds(new Set());
     setShowDifficultyModal(false);
     setSelectedImageUri(null);
+    setSelectedImageInfo(null);
     setImagesShouldAnimate(false);
     setActionMode(null);
     setMovingImages([]);
@@ -1361,8 +1363,9 @@ export const CalendarScreen = () => {
     }
   }, [selectedDate, dateKey, addImagesToDate, imagesByDate]);
 
-  const handlePlayPress = useCallback((imageUri) => {
-    setSelectedImageUri(imageUri);
+  const handlePlayPress = useCallback((imageInfo) => {
+    setSelectedImageUri(imageInfo.uri);
+    setSelectedImageInfo(imageInfo);
     setShowDifficultyModal(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, []);
@@ -1371,13 +1374,14 @@ export const CalendarScreen = () => {
     async (difficulty) => {
       setShowDifficultyModal(false);
       if (selectedImageUri && startPuzzleWithImage) {
-        await startPuzzleWithImage(selectedImageUri, difficulty);
+        await startPuzzleWithImage(selectedImageUri, difficulty, selectedImageInfo);
         setSelectedImageUri(null);
+        setSelectedImageInfo(null);
         setSelectedImageIds(new Set());
       }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     },
-    [selectedImageUri, startPuzzleWithImage]
+    [selectedImageUri, selectedImageInfo, startPuzzleWithImage]
   );
 
   const toggleActionMode = useCallback((mode) => {
@@ -1739,7 +1743,8 @@ export const CalendarScreen = () => {
                   >
                     {pages.map((page, pi) => (
                       <View key={pi} style={[styles.daySectionPage, { height: pageHeight }]}>
-                        {page.map(({ id, uri }, index) => {
+                        {page.map((img, index) => {
+                          const { id, uri, assetId, fileName } = img;
                           const isImageSelected = selectedImageIds.has(id);
 
                           const imageLabelId = imageLabels[id];
@@ -1773,7 +1778,7 @@ export const CalendarScreen = () => {
                                   });
                                 }
                               }}
-                              onPlayPress={() => handlePlayPress(uri)}
+                              onPlayPress={() => handlePlayPress({ uri, assetId, fileName })}
                               onActionPress={() => handleImageAction(id, uri)}
                               onDeletePress={handleDeleteImage}
                               onLabelPress={() => openLabelPicker(id)}
@@ -1918,6 +1923,7 @@ export const CalendarScreen = () => {
         onClose={() => {
           setShowDifficultyModal(false);
           setSelectedImageUri(null);
+          setSelectedImageInfo(null);
         }}
       />
 

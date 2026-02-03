@@ -147,6 +147,7 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
       originalWidth: exactWidth,
       originalHeight: exactHeight,
       originalImageUri: processedImageUri,
+      sourceImageUri: imageUri, // Original source URI for calendar matching
       rows,
       cols,
     };
