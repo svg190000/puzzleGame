@@ -302,9 +302,6 @@ const makeStyles = (theme) =>
     daySectionThumbMove: {
       borderColor: '#FF9800',
     },
-    daySectionThumbLabel: {
-      borderColor: '#9C27B0',
-    },
     daySectionThumbOverlay: {
       ...StyleSheet.absoluteFillObject,
       borderRadius: 10,
@@ -346,10 +343,6 @@ const makeStyles = (theme) =>
     actionModeButtonMove: {
       borderColor: '#FF9800',
       backgroundColor: 'rgba(255, 152, 0, 0.1)',
-    },
-    actionModeButtonLabel: {
-      borderColor: '#9C27B0',
-      backgroundColor: 'rgba(156, 39, 176, 0.1)',
     },
     labelModeButton: {
       flex: 1,
@@ -773,7 +766,12 @@ function DaySectionImage({
   const getBorderStyle = () => {
     if (actionMode === 'edit') return styles.daySectionThumbEdit;
     if (actionMode === 'move') return styles.daySectionThumbMove;
-    if (actionMode === 'label') return styles.daySectionThumbLabel;
+    if (actionMode === 'label') {
+      // In label mode, show label color if assigned, otherwise show selected style if selected
+      if (labelColor) return { borderColor: labelColor };
+      if (isSelected) return styles.daySectionThumbSelected;
+      return null;
+    }
     if (isSelected) return styles.daySectionThumbSelected;
     // Show label color as border when image has a label assigned
     if (labelColor) return { borderColor: labelColor };
@@ -840,7 +838,7 @@ function DaySectionImage({
   );
 }
 
-function AllPhotosImage({ uri, style, imageStyle, animationIndex, shouldAnimate }) {
+function AllPhotosImage({ uri, style, imageStyle, animationIndex, shouldAnimate, labelColor }) {
   const imageOpacity = useSharedValue(0);
 
   useEffect(() => {
@@ -858,7 +856,11 @@ function AllPhotosImage({ uri, style, imageStyle, animationIndex, shouldAnimate 
 
   return (
     <Animated.View style={[style, animatedStyle]}>
-      <Image source={{ uri }} style={imageStyle} resizeMode="cover" />
+      <Image
+        source={{ uri }}
+        style={[imageStyle, labelColor && { borderColor: labelColor }]}
+        resizeMode="cover"
+      />
     </Animated.View>
   );
 }
@@ -1314,32 +1316,54 @@ export const CalendarScreen = () => {
   }, [selectedKey, removeImageFromDate, selectedImageIds]);
 
   const openLabelPicker = useCallback((imageId) => {
+    // If multiple images are selected, we'll apply the label to all of them
+    // Store the clicked image id for reference (to show current label if single selection)
     setLabelPickerImageId(imageId);
     setLabelPickerVisible(true);
   }, []);
 
   const assignLabelToImage = useCallback((labelId) => {
-    if (labelPickerImageId) {
+    // Apply label to all selected images
+    if (selectedImageIds.size > 0) {
+      setImageLabels((prev) => {
+        const newLabels = { ...prev };
+        selectedImageIds.forEach((imageId) => {
+          newLabels[imageId] = labelId;
+        });
+        return newLabels;
+      });
+    } else if (labelPickerImageId) {
+      // Fallback to single image if no selection
       setImageLabels((prev) => ({
         ...prev,
         [labelPickerImageId]: labelId,
       }));
-      setLabelPickerVisible(false);
-      setLabelPickerImageId(null);
     }
-  }, [labelPickerImageId]);
+    setLabelPickerVisible(false);
+    setLabelPickerImageId(null);
+  }, [labelPickerImageId, selectedImageIds]);
 
   const removeLabelFromImage = useCallback(() => {
-    if (labelPickerImageId) {
+    // Remove label from all selected images
+    if (selectedImageIds.size > 0) {
+      setImageLabels((prev) => {
+        const newLabels = { ...prev };
+        selectedImageIds.forEach((imageId) => {
+          delete newLabels[imageId];
+        });
+        return newLabels;
+      });
+    } else if (labelPickerImageId) {
+      // Fallback to single image if no selection
       setImageLabels((prev) => {
         const newLabels = { ...prev };
         delete newLabels[labelPickerImageId];
         return newLabels;
       });
-      setLabelPickerVisible(false);
-      setLabelPickerImageId(null);
     }
-  }, [labelPickerImageId]);
+    setLabelPickerVisible(false);
+    setLabelPickerImageId(null);
+  }, [labelPickerImageId, selectedImageIds]);
 
   const handleScroll = useCallback(
     (e) => {
@@ -1450,13 +1474,24 @@ export const CalendarScreen = () => {
               <View style={styles.daySectionHeader}>
                 <Text style={[
                   styles.daySectionTitle,
-                  movingImages.length > 0 && { color: '#FF9800' },
-                  actionMode === 'label' && selectedImageIds.size > 0 && { color: '#9C27B0' },
+                  actionMode === 'edit' && { color: '#E53935' },
+                  actionMode === 'move' && { color: '#FF9800' },
+                  actionMode === 'label' && { color: '#9C27B0' },
                 ]}>
                   {movingImages.length > 0
                     ? `Tap a date to move ${movingImages.length} image${movingImages.length > 1 ? 's' : ''}`
+                    : actionMode === 'edit' && selectedImageIds.size > 0
+                    ? `${selectedImageIds.size} image${selectedImageIds.size > 1 ? 's' : ''} selected for deletion`
+                    : actionMode === 'edit'
+                    ? 'Edit Mode'
+                    : actionMode === 'move' && selectedImageIds.size > 0
+                    ? `${selectedImageIds.size} image${selectedImageIds.size > 1 ? 's' : ''} selected to move`
+                    : actionMode === 'move'
+                    ? 'Move Mode'
                     : actionMode === 'label' && selectedImageIds.size > 0
                     ? `${selectedImageIds.size} image${selectedImageIds.size > 1 ? 's' : ''} selected for labeling`
+                    : actionMode === 'label'
+                    ? 'Label Mode'
                     : formatDayHeader(selectedDate)}
                 </Text>
                 <TouchableOpacity
@@ -1780,17 +1815,22 @@ export const CalendarScreen = () => {
               </View>
             ) : (
               <ScrollView style={styles.allPhotosGrid} contentContainerStyle={styles.allPhotosGridContent}>
-                {allPhotos.map((photo, index) => (
-                  <TouchableOpacity key={photo.id} style={styles.allPhotosItem} activeOpacity={0.8}>
-                    <AllPhotosImage
-                      uri={photo.uri}
-                      style={styles.allPhotosImageWrapper}
-                      imageStyle={styles.allPhotosImage}
-                      animationIndex={index}
-                      shouldAnimate={allPhotosReady}
-                    />
-                  </TouchableOpacity>
-                ))}
+                {allPhotos.map((photo, index) => {
+                  const photoLabelId = imageLabels[photo.id];
+                  const photoLabelColor = photoLabelId ? labels.find((l) => l.id === photoLabelId)?.color : null;
+                  return (
+                    <TouchableOpacity key={photo.id} style={styles.allPhotosItem} activeOpacity={0.8}>
+                      <AllPhotosImage
+                        uri={photo.uri}
+                        style={styles.allPhotosImageWrapper}
+                        imageStyle={styles.allPhotosImage}
+                        animationIndex={index}
+                        shouldAnimate={allPhotosReady}
+                        labelColor={photoLabelColor}
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
               </ScrollView>
             )}
           </>
@@ -1803,25 +1843,36 @@ export const CalendarScreen = () => {
           <View style={styles.labelPickerBackdrop}>
             <TouchableWithoutFeedback>
               <View style={styles.labelPickerCard}>
-                <Text style={styles.labelPickerTitle}>Select a Label</Text>
+                <Text style={styles.labelPickerTitle}>
+                  {selectedImageIds.size > 1
+                    ? `Label ${selectedImageIds.size} images`
+                    : 'Select a Label'}
+                </Text>
                 {labels.map((label) => {
-                  const isCurrentLabel = labelPickerImageId && imageLabels[labelPickerImageId] === label.id;
+                  // Check if all selected images have this label
+                  const allHaveThisLabel = selectedImageIds.size > 0
+                    ? Array.from(selectedImageIds).every((id) => imageLabels[id] === label.id)
+                    : labelPickerImageId && imageLabels[labelPickerImageId] === label.id;
                   return (
                     <TouchableOpacity
                       key={label.id}
-                      style={[styles.labelPickerOption, isCurrentLabel && styles.labelPickerOptionSelected]}
+                      style={[styles.labelPickerOption, allHaveThisLabel && styles.labelPickerOptionSelected]}
                       onPress={() => assignLabelToImage(label.id)}
                       activeOpacity={0.7}
                     >
                       <View style={[styles.labelPickerColorDot, { backgroundColor: label.color }]} />
                       <Text style={styles.labelPickerOptionText}>{label.name}</Text>
                       <View style={styles.labelPickerCheckmark}>
-                        {isCurrentLabel && <Ionicons name="checkmark" size={20} color={theme.accent} />}
+                        {allHaveThisLabel && <Ionicons name="checkmark" size={20} color={theme.accent} />}
                       </View>
                     </TouchableOpacity>
                   );
                 })}
-                {labelPickerImageId && imageLabels[labelPickerImageId] && (
+                {/* Show remove option if any selected image has a label */}
+                {(selectedImageIds.size > 0
+                  ? Array.from(selectedImageIds).some((id) => imageLabels[id])
+                  : labelPickerImageId && imageLabels[labelPickerImageId]
+                ) && (
                   <TouchableOpacity style={styles.labelPickerRemove} onPress={removeLabelFromImage} activeOpacity={0.7}>
                     <Ionicons name="close-circle-outline" size={20} color={theme.textMuted} />
                     <Text style={styles.labelPickerRemoveText}>Remove label</Text>
