@@ -9,7 +9,7 @@ import {
   Alert,
   PixelRatio,
 } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -785,13 +785,18 @@ function AppContent() {
     if (currentRouteName === 'Calendar') {
       // Calendar slides in from left
       calendarTranslateX.value = withTiming(0, { duration });
-      // Settings slides out to right (if coming from Settings)
+      // Settings slides out to right (if coming from Settings) - delayed
       if (prevRoute === 'Settings') {
-        settingsTranslateX.value = withTiming(SCREEN_WIDTH, { duration });
+        // Calendar on top, slides in first
+        setCalendarZIndex(2);
+        setSettingsZIndex(1);
+        // Settings slides out after Calendar slides in
+        settingsTranslateX.value = withDelay(duration, withTiming(SCREEN_WIDTH, { duration }));
+      } else {
+        // Coming from Home
+        setCalendarZIndex(2);
+        setSettingsZIndex(1);
       }
-      // Calendar on top when sliding in
-      setCalendarZIndex(2);
-      setSettingsZIndex(1);
     } else if (currentRouteName === 'Home') {
       // Both Calendar and Settings slide out
       calendarTranslateX.value = withTiming(-SCREEN_WIDTH, { duration });
@@ -799,13 +804,18 @@ function AppContent() {
     } else if (currentRouteName === 'Settings') {
       // Settings slides in from right
       settingsTranslateX.value = withTiming(0, { duration });
-      // Calendar slides out to left (if coming from Calendar)
+      // Calendar slides out to left (if coming from Calendar) - delayed
       if (prevRoute === 'Calendar') {
-        calendarTranslateX.value = withTiming(-SCREEN_WIDTH, { duration });
+        // Settings on top, slides in first
+        setSettingsZIndex(2);
+        setCalendarZIndex(1);
+        // Calendar slides out after Settings slides in
+        calendarTranslateX.value = withDelay(duration, withTiming(-SCREEN_WIDTH, { duration }));
+      } else {
+        // Coming from Home
+        setSettingsZIndex(2);
+        setCalendarZIndex(1);
       }
-      // Settings on top when sliding in
-      setSettingsZIndex(2);
-      setCalendarZIndex(1);
     }
     
     prevRouteRef.current = currentRouteName;
