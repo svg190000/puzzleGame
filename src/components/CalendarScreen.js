@@ -139,8 +139,33 @@ const makeStyles = (theme) =>
       justifyContent: 'center',
     },
     iconButtonActive: {
-      backgroundColor: `${theme.accent}20`,
-      borderRadius: 20,
+      backgroundColor: `${theme.accent}15`,
+      borderRadius: 8,
+    },
+    filterButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: 40,
+      paddingHorizontal: 8,
+    },
+    filterButtonActive: {
+      backgroundColor: `${theme.accent}15`,
+      borderRadius: 8,
+    },
+    filterIndicatorContainer: {
+      flexDirection: 'column',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 6,
+      gap: 2,
+      maxHeight: 22,
+    },
+    filterIndicatorDot: {
+      width: 5,
+      height: 5,
+      borderRadius: 2.5,
     },
     monthTitleTouchable: {
       alignSelf: 'center',
@@ -560,14 +585,14 @@ const makeStyles = (theme) =>
       backgroundColor: 'rgba(0, 0, 0, 0.5)',
       justifyContent: 'flex-start',
       alignItems: 'flex-end',
-      paddingTop: 100,
-      paddingRight: 16,
+      paddingTop: 56,
+      paddingRight: 12,
     },
     filterCard: {
-      width: 220,
+      width: SCREEN_WIDTH * 0.6,
       backgroundColor: theme.surface,
       borderRadius: 16,
-      padding: 16,
+      padding: 14,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.3,
@@ -575,32 +600,32 @@ const makeStyles = (theme) =>
       elevation: 10,
     },
     filterTitle: {
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: '700',
       color: theme.text,
-      marginBottom: 12,
+      marginBottom: 10,
     },
     filterOption: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 10,
-      gap: 12,
+      paddingVertical: 8,
+      gap: 10,
     },
     filterColorDot: {
-      width: 18,
-      height: 18,
-      borderRadius: 5,
+      width: 14,
+      height: 14,
+      borderRadius: 4,
     },
     filterOptionText: {
-      fontSize: 15,
+      fontSize: 13,
       fontWeight: '500',
       color: theme.text,
       flex: 1,
     },
     filterCheckbox: {
-      width: 22,
-      height: 22,
-      borderRadius: 6,
+      width: 18,
+      height: 18,
+      borderRadius: 5,
       borderWidth: 2,
       borderColor: theme.border,
       alignItems: 'center',
@@ -614,14 +639,14 @@ const makeStyles = (theme) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 10,
-      marginTop: 8,
+      paddingVertical: 8,
+      marginTop: 6,
       borderTopWidth: 1,
       borderTopColor: theme.border,
       gap: 6,
     },
     filterClearText: {
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: '500',
       color: theme.textMuted,
     },
@@ -1489,10 +1514,26 @@ export const CalendarScreen = () => {
         </View>
         <View style={styles.topBarRight}>
           <TouchableOpacity
-            style={[styles.iconButton, activeFilters.size > 0 && styles.iconButtonActive]}
+            style={[
+              activeFilters.size > 0 ? styles.filterButton : styles.iconButton,
+              activeFilters.size > 0 && styles.filterButtonActive,
+            ]}
             onPress={() => setFilterVisible(true)}
             activeOpacity={0.7}
           >
+            {activeFilters.size > 0 && (
+              <View style={styles.filterIndicatorContainer}>
+                {Array.from(activeFilters).map((filterId) => {
+                  const filterLabel = labels.find((l) => l.id === filterId);
+                  return filterLabel ? (
+                    <View
+                      key={filterId}
+                      style={[styles.filterIndicatorDot, { backgroundColor: filterLabel.color }]}
+                    />
+                  ) : null;
+                })}
+              </View>
+            )}
             <Ionicons name="filter" size={22} color={activeFilters.size > 0 ? theme.accent : theme.text} />
           </TouchableOpacity>
         </View>
