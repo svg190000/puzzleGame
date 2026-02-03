@@ -1442,6 +1442,7 @@ export const CalendarScreen = () => {
         });
         return newLabels;
       });
+      setSelectedImageIds(new Set()); // Clear selection after action
     } else if (labelPickerImageId) {
       // Fallback to single image if no selection
       setImageLabels((prev) => ({
@@ -1463,6 +1464,7 @@ export const CalendarScreen = () => {
         });
         return newLabels;
       });
+      setSelectedImageIds(new Set()); // Clear selection after action
     } else if (labelPickerImageId) {
       // Fallback to single image if no selection
       setImageLabels((prev) => {
