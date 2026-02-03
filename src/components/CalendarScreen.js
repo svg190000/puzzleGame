@@ -360,21 +360,12 @@ const makeStyles = (theme) =>
       paddingVertical: 12,
       paddingHorizontal: 20,
       borderRadius: 12,
-      backgroundColor: theme.surface,
-      borderWidth: 2,
-      borderColor: 'transparent',
-    },
-    labelModeButtonActive: {
-      borderColor: '#9C27B0',
-      backgroundColor: 'rgba(156, 39, 176, 0.1)',
+      backgroundColor: theme.accent,
     },
     labelModeButtonText: {
       fontSize: 15,
       fontWeight: '600',
-      color: theme.text,
-    },
-    labelModeButtonTextActive: {
-      color: '#9C27B0',
+      color: theme.buttonText,
     },
     actionModeButtonPlaceholder: {
       width: 44,
@@ -1597,6 +1588,26 @@ export const CalendarScreen = () => {
                     <View style={styles.actionModeButtonPlaceholder} />
                   )}
 
+                  {/* Label Button - styled like Add to date */}
+                  {dayImages.length > 0 ? (
+                    <TouchableOpacity
+                      style={styles.labelModeButton}
+                      onPress={() => toggleActionMode('label')}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="pricetag-outline" size={20} color={theme.buttonText} />
+                      <Text style={styles.labelModeButtonText}>Label</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={[styles.labelModeButton, { opacity: 0 }]} />
+                  )}
+
+                  {/* Add to Date Button */}
+                  <TouchableOpacity style={styles.addToDateButton} onPress={handleAddToDate} activeOpacity={0.7}>
+                    <Ionicons name="images-outline" size={20} color={theme.buttonText} />
+                    <Text style={styles.addToDateButtonText}>Add to date</Text>
+                  </TouchableOpacity>
+
                   {/* Move Button - show if images exist, placeholder otherwise */}
                   {dayImages.length > 0 ? (
                     <TouchableOpacity
@@ -1615,35 +1626,6 @@ export const CalendarScreen = () => {
                     </TouchableOpacity>
                   ) : (
                     <View style={styles.actionModeButtonPlaceholder} />
-                  )}
-
-                  {/* Add to Date Button */}
-                  <TouchableOpacity style={styles.addToDateButton} onPress={handleAddToDate} activeOpacity={0.7}>
-                    <Ionicons name="images-outline" size={20} color={theme.buttonText} />
-                    <Text style={styles.addToDateButtonText}>Add to date</Text>
-                  </TouchableOpacity>
-
-                  {/* Label Button - styled like Add to date */}
-                  {dayImages.length > 0 ? (
-                    <TouchableOpacity
-                      style={[
-                        styles.labelModeButton,
-                        actionMode === 'label' && styles.labelModeButtonActive,
-                      ]}
-                      onPress={() => toggleActionMode('label')}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons
-                        name="pricetag-outline"
-                        size={20}
-                        color={actionMode === 'label' ? '#9C27B0' : theme.text}
-                      />
-                      <Text style={[styles.labelModeButtonText, actionMode === 'label' && styles.labelModeButtonTextActive]}>
-                        Label
-                      </Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <View style={[styles.labelModeButton, { opacity: 0 }]} />
                   )}
                 </View>
               </Animated.View>
