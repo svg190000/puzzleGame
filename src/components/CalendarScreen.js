@@ -1131,7 +1131,7 @@ export const CalendarScreen = () => {
       if (selectedImageUri && startPuzzleWithImage) {
         await startPuzzleWithImage(selectedImageUri, difficulty);
         setSelectedImageUri(null);
-        setSelectedImageId(null);
+        setSelectedImageIds(new Set());
       }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     },
