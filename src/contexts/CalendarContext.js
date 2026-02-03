@@ -22,7 +22,7 @@ export function CalendarProvider({ children }) {
   const [imagesByDate, setImagesByDate] = useState({});
 
   const addImagesToDate = useCallback((key, images) => {
-    // images is array of { uri, assetId, fileName } objects
+    // images is array of { uri, assetId, fileName, labelId? } objects
     if (!images.length) return;
     const ddmmyyyy = keyToDDMMYYYY(key);
     const timestamp = Date.now();
@@ -33,6 +33,7 @@ export function CalendarProvider({ children }) {
         uri: img.uri,
         assetId: img.assetId,
         fileName: img.fileName,
+        labelId: img.labelId || null,
       }));
       return { ...prev, [key]: [...list, ...next] };
     });
@@ -69,6 +70,7 @@ export function CalendarProvider({ children }) {
         uri: imageToMove.uri,
         assetId: imageToMove.assetId,
         fileName: imageToMove.fileName,
+        labelId: imageToMove.labelId, // Preserve label when moving
       };
 
       const result = { ...prev, [toKey]: [...toList, newImage] };
@@ -84,6 +86,26 @@ export function CalendarProvider({ children }) {
     });
   }, []);
 
+  const setImageLabel = useCallback((imageId, labelId) => {
+    setImagesByDate((prev) => {
+      const newState = { ...prev };
+      for (const key of Object.keys(newState)) {
+        const list = newState[key];
+        const index = list.findIndex((img) => img.id === imageId);
+        if (index !== -1) {
+          newState[key] = [...list];
+          newState[key][index] = { ...list[index], labelId };
+          break;
+        }
+      }
+      return newState;
+    });
+  }, []);
+
+  const removeImageLabel = useCallback((imageId) => {
+    setImageLabel(imageId, null);
+  }, [setImageLabel]);
+
   const value = useMemo(
     () => ({
       viewDate,
@@ -98,6 +120,8 @@ export function CalendarProvider({ children }) {
       addImagesToDate,
       removeImageFromDate,
       moveImageToDate,
+      setImageLabel,
+      removeImageLabel,
       dateKey,
     }),
     [
@@ -109,6 +133,8 @@ export function CalendarProvider({ children }) {
       addImagesToDate,
       removeImageFromDate,
       moveImageToDate,
+      setImageLabel,
+      removeImageLabel,
     ]
   );
 

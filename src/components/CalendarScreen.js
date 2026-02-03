@@ -1009,6 +1009,8 @@ export const CalendarScreen = () => {
     addImagesToDate,
     removeImageFromDate,
     moveImageToDate,
+    setImageLabel,
+    removeImageLabel,
     dateKey,
   } = useCalendar();
   const { startPuzzleWithImage } = useGame();
@@ -1051,7 +1053,6 @@ export const CalendarScreen = () => {
     { id: '3', color: '#1E88E5', name: 'Travel' },
     { id: '4', color: '#FF9800', name: 'Work' },
   ]);
-  const [imageLabels, setImageLabels] = useState({}); // { imageId: labelId }
   const [labelPickerVisible, setLabelPickerVisible] = useState(false);
   const [labelPickerImageId, setLabelPickerImageId] = useState(null);
   const [filterVisible, setFilterVisible] = useState(false);
@@ -1079,6 +1080,15 @@ export const CalendarScreen = () => {
     photos.sort((a, b) => b.dateKey.localeCompare(a.dateKey));
     return photos;
   }, [imagesByDate]);
+
+  // Create a lookup map for image labels by ID
+  const imageLabelById = useMemo(() => {
+    const map = {};
+    allPhotos.forEach((img) => {
+      map[img.id] = img.labelId;
+    });
+    return map;
+  }, [allPhotos]);
 
   const pageHeight = listHeight ?? Math.max(1, DAY_SECTION_HEIGHT - 100);
 
@@ -1466,47 +1476,32 @@ export const CalendarScreen = () => {
   const assignLabelToImage = useCallback((labelId) => {
     // Apply label to all selected images
     if (selectedImageIds.size > 0) {
-      setImageLabels((prev) => {
-        const newLabels = { ...prev };
-        selectedImageIds.forEach((imageId) => {
-          newLabels[imageId] = labelId;
-        });
-        return newLabels;
+      selectedImageIds.forEach((imageId) => {
+        setImageLabel(imageId, labelId);
       });
       setSelectedImageIds(new Set()); // Clear selection after action
     } else if (labelPickerImageId) {
       // Fallback to single image if no selection
-      setImageLabels((prev) => ({
-        ...prev,
-        [labelPickerImageId]: labelId,
-      }));
+      setImageLabel(labelPickerImageId, labelId);
     }
     setLabelPickerVisible(false);
     setLabelPickerImageId(null);
-  }, [labelPickerImageId, selectedImageIds]);
+  }, [labelPickerImageId, selectedImageIds, setImageLabel]);
 
   const removeLabelFromImage = useCallback(() => {
     // Remove label from all selected images
     if (selectedImageIds.size > 0) {
-      setImageLabels((prev) => {
-        const newLabels = { ...prev };
-        selectedImageIds.forEach((imageId) => {
-          delete newLabels[imageId];
-        });
-        return newLabels;
+      selectedImageIds.forEach((imageId) => {
+        removeImageLabel(imageId);
       });
       setSelectedImageIds(new Set()); // Clear selection after action
     } else if (labelPickerImageId) {
       // Fallback to single image if no selection
-      setImageLabels((prev) => {
-        const newLabels = { ...prev };
-        delete newLabels[labelPickerImageId];
-        return newLabels;
-      });
+      removeImageLabel(labelPickerImageId);
     }
     setLabelPickerVisible(false);
     setLabelPickerImageId(null);
-  }, [labelPickerImageId, selectedImageIds]);
+  }, [labelPickerImageId, selectedImageIds, removeImageLabel]);
 
   const handleScroll = useCallback(
     (e) => {
@@ -1606,8 +1601,7 @@ export const CalendarScreen = () => {
                     ? [...new Map(
                         dayImagesForCell
                           .map((img) => {
-                            const labelId = imageLabels[img.id];
-                            const label = labelId ? labels.find((l) => l.id === labelId) : null;
+                            const label = img.labelId ? labels.find((l) => l.id === img.labelId) : null;
                             return label ? [label.id, label.color] : null;
                           })
                           .filter(Boolean)
@@ -1620,7 +1614,7 @@ export const CalendarScreen = () => {
                     : uniqueLabelData;
                   
                   // Check if there are unlabeled images (only show if no filters active)
-                  const hasUnlabeledImages = activeFilters.size === 0 && dayImagesForCell.some((img) => !imageLabels[img.id]);
+                  const hasUnlabeledImages = activeFilters.size === 0 && dayImagesForCell.some((img) => !img.labelId);
                   
                   // Determine if we should show indicators
                   const showIndicators = filteredLabelData.length > 0 || hasUnlabeledImages;
@@ -1744,10 +1738,9 @@ export const CalendarScreen = () => {
                     {pages.map((page, pi) => (
                       <View key={pi} style={[styles.daySectionPage, { height: pageHeight }]}>
                         {page.map((img, index) => {
-                          const { id, uri, assetId, fileName } = img;
+                          const { id, uri, assetId, fileName, labelId: imageLabelId } = img;
                           const isImageSelected = selectedImageIds.has(id);
 
-                          const imageLabelId = imageLabels[id];
                           const imageLabelColor = imageLabelId ? labels.find((l) => l.id === imageLabelId)?.color : null;
                           return (
                             <DaySectionImage
@@ -2004,8 +1997,7 @@ export const CalendarScreen = () => {
             ) : (
               <ScrollView style={styles.allPhotosGrid} contentContainerStyle={styles.allPhotosGridContent}>
                 {allPhotos.map((photo, index) => {
-                  const photoLabelId = imageLabels[photo.id];
-                  const photoLabelColor = photoLabelId ? labels.find((l) => l.id === photoLabelId)?.color : null;
+                  const photoLabelColor = photo.labelId ? labels.find((l) => l.id === photo.labelId)?.color : null;
                   return (
                     <TouchableOpacity key={photo.id} style={styles.allPhotosItem} activeOpacity={0.8}>
                       <AllPhotosImage
@@ -2039,8 +2031,8 @@ export const CalendarScreen = () => {
                 {labels.map((label) => {
                   // Check if all selected images have this label
                   const allHaveThisLabel = selectedImageIds.size > 0
-                    ? Array.from(selectedImageIds).every((id) => imageLabels[id] === label.id)
-                    : labelPickerImageId && imageLabels[labelPickerImageId] === label.id;
+                    ? Array.from(selectedImageIds).every((id) => imageLabelById[id] === label.id)
+                    : labelPickerImageId && imageLabelById[labelPickerImageId] === label.id;
                   return (
                     <TouchableOpacity
                       key={label.id}
@@ -2058,8 +2050,8 @@ export const CalendarScreen = () => {
                 })}
                 {/* Show remove option if any selected image has a label */}
                 {(selectedImageIds.size > 0
-                  ? Array.from(selectedImageIds).some((id) => imageLabels[id])
-                  : labelPickerImageId && imageLabels[labelPickerImageId]
+                  ? Array.from(selectedImageIds).some((id) => imageLabelById[id])
+                  : labelPickerImageId && imageLabelById[labelPickerImageId]
                 ) && (
                   <TouchableOpacity style={styles.labelPickerRemove} onPress={removeLabelFromImage} activeOpacity={0.7}>
                     <Ionicons name="close-circle-outline" size={20} color={theme.textMuted} />
