@@ -697,6 +697,12 @@ const makeStyles = (theme) =>
       fontWeight: '500',
       color: theme.text,
     },
+    leftPanelDivider: {
+      height: 1,
+      backgroundColor: theme.border,
+      marginHorizontal: 20,
+      marginVertical: 8,
+    },
     // All Photos view styles
     allPhotosHeader: {
       flexDirection: 'row',
@@ -781,6 +787,7 @@ const makeStyles = (theme) =>
       paddingHorizontal: 20,
       paddingLeft: 56,
       paddingBottom: 8,
+      minHeight: 280, // Height for 7 labels (7 * ~40px)
     },
     labelItem: {
       flexDirection: 'row',
@@ -1915,58 +1922,45 @@ export const CalendarScreen = () => {
               </TouchableOpacity>
               <TouchableOpacity style={styles.leftPanelMenuItem} onPress={openAllPhotos} activeOpacity={0.7}>
                 <Ionicons name="images-outline" size={22} color={theme.text} />
-                <Text style={styles.leftPanelMenuItemText}>All Photos</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.leftPanelMenuItem} activeOpacity={0.7}>
-                <Ionicons name="star-outline" size={22} color={theme.text} />
-                <Text style={styles.leftPanelMenuItemText}>Favorites</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.leftPanelMenuItem} activeOpacity={0.7}>
-                <Ionicons name="time-outline" size={22} color={theme.text} />
-                <Text style={styles.leftPanelMenuItemText}>Recent</Text>
+                <Text style={styles.leftPanelMenuItemText}>Gallery</Text>
               </TouchableOpacity>
 
-              {/* Labels Menu Item */}
+              <View style={styles.leftPanelDivider} />
+
+              {/* Labels Section */}
               <View style={styles.labelsMenuItem}>
-                <TouchableOpacity style={styles.labelsMenuItemLeft} onPress={toggleLabelsExpanded} activeOpacity={0.7}>
+                <View style={styles.labelsMenuItemLeft}>
                   <Ionicons name="pricetag-outline" size={22} color={theme.text} />
                   <Text style={styles.leftPanelMenuItemText}>Labels</Text>
-                </TouchableOpacity>
+                </View>
                 <TouchableOpacity
-                  onPress={labelsExpanded && labels.length < 7 ? addNewLabel : toggleLabelsExpanded}
-                  activeOpacity={0.7}
-                  style={styles.labelsMenuItemChevron}
+                  onPress={labels.length < 7 ? addNewLabel : undefined}
+                  activeOpacity={labels.length < 7 ? 0.7 : 1}
+                  style={[styles.labelsMenuItemChevron, labels.length >= 7 && { opacity: 0 }]}
+                  disabled={labels.length >= 7}
                 >
-                  <Animated.View style={labelsIconAnimatedStyle}>
-                    <Ionicons
-                      name={labelsExpanded && labels.length < 7 ? 'add' : 'chevron-down'}
-                      size={labelsExpanded && labels.length < 7 ? 22 : 20}
-                      color={theme.textMuted}
-                    />
-                  </Animated.View>
+                  <Ionicons name="add" size={22} color={theme.textMuted} />
                 </TouchableOpacity>
               </View>
 
-              {/* Labels Dropdown Content */}
-              {labelsExpanded && (
-                <Animated.View style={[styles.labelsDropdown, labelsContentAnimatedStyle]}>
-                  {labels.map((label) => (
-                    <View key={label.id} style={styles.labelItem}>
-                      <View style={[styles.labelColorIndicator, { backgroundColor: label.color }]} />
-                      <TextInput
-                        style={styles.labelNameInput}
-                        value={label.name}
-                        onChangeText={(text) => updateLabelName(label.id, text)}
-                        placeholder="Label name"
-                        placeholderTextColor={theme.textMuted}
-                      />
-                      <TouchableOpacity style={styles.labelDeleteButton} onPress={() => deleteLabel(label.id)} activeOpacity={0.7}>
-                        <Ionicons name="close" size={18} color={theme.textMuted} />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </Animated.View>
-              )}
+              {/* Labels List */}
+              <View style={styles.labelsDropdown}>
+                {labels.map((label) => (
+                  <View key={label.id} style={styles.labelItem}>
+                    <View style={[styles.labelColorIndicator, { backgroundColor: label.color }]} />
+                    <TextInput
+                      style={styles.labelNameInput}
+                      value={label.name}
+                      onChangeText={(text) => updateLabelName(label.id, text)}
+                      placeholder="Label name"
+                      placeholderTextColor={theme.textMuted}
+                    />
+                    <TouchableOpacity style={styles.labelDeleteButton} onPress={() => deleteLabel(label.id)} activeOpacity={0.7}>
+                      <Ionicons name="close" size={18} color={theme.textMuted} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
             </View>
           </>
         ) : (
@@ -1975,7 +1969,7 @@ export const CalendarScreen = () => {
               <TouchableOpacity style={styles.allPhotosBackButton} onPress={backToMenu} activeOpacity={0.7}>
                 <Ionicons name="arrow-back" size={24} color={theme.text} />
               </TouchableOpacity>
-              <Text style={styles.allPhotosTitle}>All Photos</Text>
+              <Text style={styles.allPhotosTitle}>Gallery</Text>
               <Text style={styles.allPhotosCount}>{allPhotos.length} photos</Text>
             </View>
             {!allPhotosReady ? null : allPhotos.length === 0 ? (
