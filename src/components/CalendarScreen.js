@@ -412,10 +412,23 @@ const makeStyles = (theme) =>
       borderRadius: 12,
       backgroundColor: theme.accent,
     },
+    addToDateButtonCentered: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 14,
+      paddingHorizontal: 40,
+      borderRadius: 12,
+      backgroundColor: theme.accent,
+    },
     addToDateButtonText: {
       fontSize: 15,
       fontWeight: '600',
       color: theme.buttonText,
+    },
+    daySectionActionsEmpty: {
+      justifyContent: 'center',
     },
     pageIndicators: {
       flexDirection: 'row',
@@ -1424,13 +1437,20 @@ export const CalendarScreen = () => {
 
   const handleDeleteImage = useCallback(() => {
     if (selectedKey && selectedImageIds.size > 0) {
+      const currentImages = imagesByDate[selectedKey] || [];
+      const remainingCount = currentImages.length - selectedImageIds.size;
+      
       selectedImageIds.forEach((imageId) => {
         removeImageFromDate(selectedKey, imageId);
       });
       setSelectedImageIds(new Set());
-      setActionMode(null); // Reset to regular mode after delete
+      
+      // Exit edit mode if no images remain
+      if (remainingCount <= 0) {
+        setActionMode(null);
+      }
     }
-  }, [selectedKey, removeImageFromDate, selectedImageIds]);
+  }, [selectedKey, removeImageFromDate, selectedImageIds, imagesByDate]);
 
   const openLabelPicker = useCallback((imageId) => {
     // If multiple images are selected, we'll apply the label to all of them
@@ -1779,65 +1799,63 @@ export const CalendarScreen = () => {
               )}
 
               <Animated.View style={buttonAnimatedStyle}>
-                <View style={styles.daySectionActions}>
-                  {/* Edit Button - show if images exist, placeholder otherwise */}
+                <View style={[styles.daySectionActions, dayImages.length === 0 && styles.daySectionActionsEmpty]}>
                   {dayImages.length > 0 ? (
-                    <TouchableOpacity
-                      style={[
-                        styles.actionModeButton,
-                        actionMode === 'edit' && styles.actionModeButtonEdit,
-                      ]}
-                      onPress={() => toggleActionMode('edit')}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons
-                        name="trash-outline"
-                        size={20}
-                        color={actionMode === 'edit' ? '#E53935' : theme.text}
-                      />
-                    </TouchableOpacity>
-                  ) : (
-                    <View style={styles.actionModeButtonPlaceholder} />
-                  )}
+                    <>
+                      {/* Edit Button */}
+                      <TouchableOpacity
+                        style={[
+                          styles.actionModeButton,
+                          actionMode === 'edit' && styles.actionModeButtonEdit,
+                        ]}
+                        onPress={() => toggleActionMode('edit')}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name="trash-outline"
+                          size={20}
+                          color={actionMode === 'edit' ? '#E53935' : theme.text}
+                        />
+                      </TouchableOpacity>
 
-                  {/* Label Button - styled like Add to date */}
-                  {dayImages.length > 0 ? (
-                    <TouchableOpacity
-                      style={styles.labelModeButton}
-                      onPress={() => toggleActionMode('label')}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="pricetag-outline" size={20} color={theme.buttonText} />
-                      <Text style={styles.labelModeButtonText}>Label</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <View style={[styles.labelModeButton, { opacity: 0 }]} />
-                  )}
+                      {/* Label Button */}
+                      <TouchableOpacity
+                        style={styles.labelModeButton}
+                        onPress={() => toggleActionMode('label')}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="pricetag-outline" size={20} color={theme.buttonText} />
+                        <Text style={styles.labelModeButtonText}>Label</Text>
+                      </TouchableOpacity>
 
-                  {/* Add to Date Button */}
-                  <TouchableOpacity style={styles.addToDateButton} onPress={handleAddToDate} activeOpacity={0.7}>
-                    <Ionicons name="images-outline" size={20} color={theme.buttonText} />
-                    <Text style={styles.addToDateButtonText}>Add to date</Text>
-                  </TouchableOpacity>
+                      {/* Add to Date Button */}
+                      <TouchableOpacity style={styles.addToDateButton} onPress={handleAddToDate} activeOpacity={0.7}>
+                        <Ionicons name="images-outline" size={20} color={theme.buttonText} />
+                        <Text style={styles.addToDateButtonText}>Add to date</Text>
+                      </TouchableOpacity>
 
-                  {/* Move Button - show if images exist, placeholder otherwise */}
-                  {dayImages.length > 0 ? (
-                    <TouchableOpacity
-                      style={[
-                        styles.actionModeButton,
-                        actionMode === 'move' && styles.actionModeButtonMove,
-                      ]}
-                      onPress={() => toggleActionMode('move')}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons
-                        name="swap-horizontal-outline"
-                        size={20}
-                        color={actionMode === 'move' ? '#FF9800' : theme.text}
-                      />
-                    </TouchableOpacity>
+                      {/* Move Button */}
+                      <TouchableOpacity
+                        style={[
+                          styles.actionModeButton,
+                          actionMode === 'move' && styles.actionModeButtonMove,
+                        ]}
+                        onPress={() => toggleActionMode('move')}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name="swap-horizontal-outline"
+                          size={20}
+                          color={actionMode === 'move' ? '#FF9800' : theme.text}
+                        />
+                      </TouchableOpacity>
+                    </>
                   ) : (
-                    <View style={styles.actionModeButtonPlaceholder} />
+                    /* Centered Add to Date Button when no images */
+                    <TouchableOpacity style={styles.addToDateButtonCentered} onPress={handleAddToDate} activeOpacity={0.7}>
+                      <Ionicons name="images-outline" size={20} color={theme.buttonText} />
+                      <Text style={styles.addToDateButtonText}>Add to date</Text>
+                    </TouchableOpacity>
                   )}
                 </View>
               </Animated.View>
