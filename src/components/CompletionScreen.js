@@ -228,34 +228,42 @@ export const CompletionScreen = ({
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [message] = useState(() => getRandomMessage());
 
-  // Check if the current image is already in the calendar
-  // Priority: assetId (most reliable) > fileName > URI
-  const isImageInCalendar = useMemo(() => {
-    const allImages = Object.values(imagesByDate).flat();
-    
-    // Check by assetId first (most reliable identifier)
-    if (sourceAssetId) {
-      if (allImages.some(img => img.assetId && img.assetId === sourceAssetId)) {
-        return true;
+  // Check if the current image is already in the calendar and find its date
+  const calendarImageInfo = useMemo(() => {
+    for (const [dateKey, images] of Object.entries(imagesByDate)) {
+      for (const img of images) {
+        // Check by assetId first (most reliable identifier)
+        if (sourceAssetId && img.assetId && img.assetId === sourceAssetId) {
+          return { exists: true, dateKey };
+        }
+        // Check by fileName as fallback
+        if (sourceFileName && img.fileName && img.fileName === sourceFileName) {
+          return { exists: true, dateKey };
+        }
+        // Check by URI as last resort
+        if (sourceImageUri && img.uri === sourceImageUri) {
+          return { exists: true, dateKey };
+        }
       }
     }
-    
-    // Check by fileName as fallback
-    if (sourceFileName) {
-      if (allImages.some(img => img.fileName && img.fileName === sourceFileName)) {
-        return true;
-      }
-    }
-    
-    // Check by URI as last resort
-    if (sourceImageUri) {
-      if (allImages.some(img => img.uri === sourceImageUri)) {
-        return true;
-      }
-    }
-    
-    return false;
+    return { exists: false, dateKey: null };
   }, [imagesByDate, sourceAssetId, sourceFileName, sourceImageUri]);
+
+  const isImageInCalendar = calendarImageInfo.exists;
+
+  const handleCalendarPress = () => {
+    if (typeof onCalendar === 'function') {
+      onCalendar({
+        exists: calendarImageInfo.exists,
+        dateKey: calendarImageInfo.dateKey,
+        imageInfo: {
+          uri: sourceImageUri,
+          assetId: sourceAssetId,
+          fileName: sourceFileName,
+        },
+      });
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -309,7 +317,7 @@ export const CompletionScreen = ({
             </View>
             <TouchableOpacity
               style={[styles.iconButton, isImageInCalendar && styles.iconButtonHighlight]}
-              onPress={typeof onCalendar === 'function' ? onCalendar : undefined}
+              onPress={handleCalendarPress}
               activeOpacity={0.8}
             >
               <Ionicons name="calendar" size={26} color={isImageInCalendar ? '#43A047' : theme.text} />

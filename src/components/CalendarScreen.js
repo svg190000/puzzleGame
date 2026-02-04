@@ -663,6 +663,69 @@ const makeStyles = (theme) =>
       fontWeight: '500',
       color: theme.textMuted,
     },
+    // Add Confirmation Modal
+    addConfirmBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    addConfirmCard: {
+      backgroundColor: theme.surface,
+      borderRadius: 16,
+      padding: 24,
+      width: '80%',
+      maxWidth: 320,
+      alignItems: 'center',
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    addConfirmTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.text,
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    addConfirmMessage: {
+      fontSize: 14,
+      color: theme.textMuted,
+      marginBottom: 20,
+      textAlign: 'center',
+    },
+    addConfirmButtons: {
+      flexDirection: 'row',
+      gap: 12,
+      width: '100%',
+    },
+    addConfirmButton: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addConfirmButtonCancel: {
+      backgroundColor: theme.surfaceAlt,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    addConfirmButtonConfirm: {
+      backgroundColor: theme.accent,
+    },
+    addConfirmButtonTextCancel: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.text,
+    },
+    addConfirmButtonTextConfirm: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.buttonText,
+    },
     // Left Panel styles
     leftPanelBackdrop: {
       ...StyleSheet.absoluteFillObject,
@@ -1011,6 +1074,8 @@ export const CalendarScreen = () => {
     moveImageToDate,
     setImageLabel,
     removeImageLabel,
+    pendingNavigation,
+    setPendingNavigation,
     dateKey,
   } = useCalendar();
   const { startPuzzleWithImage } = useGame();
@@ -1055,6 +1120,8 @@ export const CalendarScreen = () => {
   const [labelPickerImageId, setLabelPickerImageId] = useState(null);
   const [filterVisible, setFilterVisible] = useState(false);
   const [activeFilters, setActiveFilters] = useState(new Set()); // Set of label IDs
+  const [addConfirmVisible, setAddConfirmVisible] = useState(false);
+  const [pendingAddImage, setPendingAddImage] = useState(null); // { uri, assetId, fileName }
   const dayScrollRef = useRef(null);
 
   // Filter day images based on active label filters
@@ -1173,6 +1240,37 @@ export const CalendarScreen = () => {
       }
     }
   }, [activeFilters, filteredDayImages, selectedImageIds, actionMode]);
+
+  // Handle pending navigation from completion screen
+  useEffect(() => {
+    if (pendingNavigation) {
+      const { dateKey: targetDateKey, imageInfo, showAddPrompt } = pendingNavigation;
+      
+      if (targetDateKey) {
+        // Parse the date key and navigate to that date
+        const [year, month, day] = targetDateKey.split('-').map(Number);
+        const targetDate = new Date(year, month - 1, day);
+        
+        // Set view date to show the correct month
+        setViewDate(new Date(year, month - 1, 1));
+        
+        // Select the date to open day section
+        setSelectedDate(targetDate);
+        
+        // If we need to show add prompt
+        if (showAddPrompt && imageInfo) {
+          setPendingAddImage(imageInfo);
+          // Small delay to ensure day section is visible before showing prompt
+          setTimeout(() => {
+            setAddConfirmVisible(true);
+          }, 500);
+        }
+      }
+      
+      // Clear pending navigation
+      setPendingNavigation(null);
+    }
+  }, [pendingNavigation, setPendingNavigation, setViewDate, setSelectedDate]);
 
   // Animated styles
   const daySectionAnimatedStyle = useAnimatedStyle(() => ({
@@ -1432,6 +1530,21 @@ export const CalendarScreen = () => {
     setActionMode((current) => (current === mode ? null : mode));
     setSelectedImageIds(new Set());
     setMovingImages([]);
+  }, []);
+
+  const handleAddConfirm = useCallback(() => {
+    if (pendingAddImage && selectedDate) {
+      const key = dateKey(selectedDate);
+      addImagesToDate(key, [pendingAddImage]);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    setAddConfirmVisible(false);
+    setPendingAddImage(null);
+  }, [pendingAddImage, selectedDate, addImagesToDate, dateKey]);
+
+  const handleAddCancel = useCallback(() => {
+    setAddConfirmVisible(false);
+    setPendingAddImage(null);
   }, []);
 
   const handleImageAction = useCallback(
@@ -2150,6 +2263,34 @@ export const CalendarScreen = () => {
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Add Confirmation Modal */}
+      <Modal visible={addConfirmVisible} transparent animationType="fade" onRequestClose={handleAddCancel}>
+        <View style={styles.addConfirmBackdrop}>
+          <View style={styles.addConfirmCard}>
+            <Text style={styles.addConfirmTitle}>Save Memory?</Text>
+            <Text style={styles.addConfirmMessage}>
+              Add this image to {selectedDate ? selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'today'}?
+            </Text>
+            <View style={styles.addConfirmButtons}>
+              <TouchableOpacity
+                style={[styles.addConfirmButton, styles.addConfirmButtonCancel]}
+                onPress={handleAddCancel}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.addConfirmButtonTextCancel}>No</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.addConfirmButton, styles.addConfirmButtonConfirm]}
+                onPress={handleAddConfirm}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.addConfirmButtonTextConfirm}>Yes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );

@@ -24,7 +24,7 @@ import { LoadingScreen } from './src/components/LoadingScreen';
 import { HomeScreen } from './src/components/HomeScreen';
 import { SettingsScreen } from './src/components/SettingsScreen';
 import { CalendarScreen } from './src/components/CalendarScreen';
-import { CalendarProvider } from './src/contexts/CalendarContext';
+import { CalendarProvider, useCalendar } from './src/contexts/CalendarContext';
 import { GameProvider } from './src/contexts/GameContext';
 import { NavigationBar } from './src/components/NavigationBar';
 import { generatePuzzle, shuffleArray } from './src/utils/puzzleUtils';
@@ -117,6 +117,7 @@ const makeStyles = (theme) =>
 
 function AppContent() {
   const { theme } = useTheme();
+  const { setPendingNavigation } = useCalendar();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const HEADER_HEIGHT = 100;
@@ -399,7 +400,7 @@ function AppContent() {
     setIsTransitioning(false);
   };
 
-  const handleCalendar = async () => {
+  const handleCalendar = async (calendarInfo = null) => {
     // Show loading screen and navigate to calendar
     contentOpacity.value = 0;
     showLoadingScreenWithMessage('Opening calendar...');
@@ -408,6 +409,27 @@ function AppContent() {
     setShowGameScreen(false);
     setShowCompletionModal(false);
     clearGameState();
+    
+    // Set pending navigation if we have calendar info from completion screen
+    if (calendarInfo) {
+      if (calendarInfo.exists && calendarInfo.dateKey) {
+        // Image exists - navigate to its date
+        setPendingNavigation({
+          dateKey: calendarInfo.dateKey,
+          showAddPrompt: false,
+        });
+      } else if (calendarInfo.imageInfo) {
+        // Image doesn't exist - navigate to today and show add prompt
+        const today = new Date();
+        const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        setPendingNavigation({
+          dateKey: todayKey,
+          imageInfo: calendarInfo.imageInfo,
+          showAddPrompt: true,
+        });
+      }
+    }
+    
     setCurrentRouteName('Calendar');
     
     // Wait for loading screen minimum time

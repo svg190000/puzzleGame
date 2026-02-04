@@ -20,6 +20,7 @@ export function CalendarProvider({ children }) {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
   const [imagesByDate, setImagesByDate] = useState({});
+  const [pendingNavigation, setPendingNavigation] = useState(null); // { dateKey, imageInfo?, showAddPrompt? }
 
   const addImagesToDate = useCallback((key, images) => {
     // images is array of { uri, assetId, fileName, labelId? } objects
@@ -122,6 +123,8 @@ export function CalendarProvider({ children }) {
       moveImageToDate,
       setImageLabel,
       removeImageLabel,
+      pendingNavigation,
+      setPendingNavigation,
       dateKey,
     }),
     [
@@ -135,6 +138,7 @@ export function CalendarProvider({ children }) {
       moveImageToDate,
       setImageLabel,
       removeImageLabel,
+      pendingNavigation,
     ]
   );
 
