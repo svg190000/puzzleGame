@@ -207,14 +207,31 @@ function AppContent() {
         mediaTypes: ['images'],
         allowsEditing: false,
         quality: 1,
+        exif: true,
       });
 
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
+        
+        // Try to get creation date from EXIF data
+        let creationDate = null;
+        if (asset.exif) {
+          // Try common EXIF date fields
+          const exifDate = asset.exif.DateTimeOriginal || asset.exif.DateTime || asset.exif.DateTimeDigitized;
+          if (exifDate) {
+            // EXIF date format is typically "YYYY:MM:DD HH:MM:SS"
+            const parts = exifDate.split(' ')[0].split(':');
+            if (parts.length === 3) {
+              creationDate = `${parts[0]}-${parts[1]}-${parts[2]}`;
+            }
+          }
+        }
+        
         return {
           uri: asset.uri,
           assetId: asset.assetId || null,
           fileName: asset.fileName || null,
+          creationDate, // YYYY-MM-DD format or null
         };
       }
       return null;
@@ -287,6 +304,7 @@ function AppContent() {
       if (imageInfo) {
         puzzle.sourceAssetId = imageInfo.assetId;
         puzzle.sourceFileName = imageInfo.fileName;
+        puzzle.sourceCreationDate = imageInfo.creationDate; // YYYY-MM-DD or null
       }
       
       const shuffledPieces = shuffleArray(puzzle.pieces);
@@ -419,11 +437,18 @@ function AppContent() {
           showAddPrompt: false,
         });
       } else if (calendarInfo.imageInfo) {
-        // Image doesn't exist - navigate to today and show add prompt
-        const today = new Date();
-        const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        // Image doesn't exist - navigate to creation date (or today if not available) and show add prompt
+        let targetDateKey;
+        if (calendarInfo.creationDate) {
+          // Use the image's creation date (already in YYYY-MM-DD format)
+          targetDateKey = calendarInfo.creationDate;
+        } else {
+          // Fallback to today's date
+          const today = new Date();
+          targetDateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        }
         setPendingNavigation({
-          dateKey: todayKey,
+          dateKey: targetDateKey,
           imageInfo: calendarInfo.imageInfo,
           showAddPrompt: true,
         });
@@ -914,6 +939,7 @@ function AppContent() {
               sourceImageUri={puzzleData?.sourceImageUri}
               sourceAssetId={puzzleData?.sourceAssetId}
               sourceFileName={puzzleData?.sourceFileName}
+              sourceCreationDate={puzzleData?.sourceCreationDate}
               imageWidth={puzzleData ? pieceWidth * (puzzleData.cols ?? difficulty.cols) : 0}
               imageHeight={puzzleData ? pieceHeight * (puzzleData.rows ?? difficulty.rows) : 0}
               onPlayAgain={handlePlayAgain}

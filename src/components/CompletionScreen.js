@@ -216,6 +216,7 @@ export const CompletionScreen = ({
   sourceImageUri,
   sourceAssetId,
   sourceFileName,
+  sourceCreationDate,
   imageWidth,
   imageHeight,
   onPlayAgain, 
@@ -256,6 +257,7 @@ export const CompletionScreen = ({
       onCalendar({
         exists: calendarImageInfo.exists,
         dateKey: calendarImageInfo.dateKey,
+        creationDate: sourceCreationDate, // YYYY-MM-DD format or null
         imageInfo: {
           uri: sourceImageUri,
           assetId: sourceAssetId,
