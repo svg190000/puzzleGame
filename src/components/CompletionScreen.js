@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -6,23 +6,6 @@ import { useCalendar } from '../contexts/CalendarContext';
 import { Polaroid } from './Polaroid';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-const COMPLETION_MESSAGES = [
-  "Amazing work!",
-  "You're a puzzle master!",
-  "Incredible!",
-  "Well done!",
-  "Perfect!",
-  "Outstanding!",
-  "Brilliant!",
-  "Fantastic!",
-  "Excellent!",
-  "You nailed it!",
-];
-
-const getRandomMessage = () => {
-  return COMPLETION_MESSAGES[Math.floor(Math.random() * COMPLETION_MESSAGES.length)];
-};
 
 const formatTime = (seconds) => {
   const mins = Math.floor(seconds / 60);
@@ -227,7 +210,26 @@ export const CompletionScreen = ({
   const { theme } = useTheme();
   const { imagesByDate } = useCalendar();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const [message] = useState(() => getRandomMessage());
+
+  // Format creation date for Polaroid caption
+  const polaroidCaption = useMemo(() => {
+    if (sourceCreationDate) {
+      // sourceCreationDate is in YYYY-MM-DD format
+      const [year, month, day] = sourceCreationDate.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      return date.toLocaleDateString('en-US', { 
+        month: 'long', 
+        day: 'numeric', 
+        year: 'numeric' 
+      });
+    }
+    // Fallback to today's date if no creation date
+    return new Date().toLocaleDateString('en-US', { 
+      month: 'long', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  }, [sourceCreationDate]);
 
   // Check if the current image is already in the calendar and find its date
   const calendarImageInfo = useMemo(() => {
@@ -274,7 +276,7 @@ export const CompletionScreen = ({
           imageUri={originalImageUri}
           imageWidth={imageWidth}
           imageHeight={imageHeight}
-          caption={message}
+          caption={polaroidCaption}
           maxWidth={SCREEN_WIDTH - 48}
           animate
         />
