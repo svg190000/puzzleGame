@@ -45,17 +45,50 @@ const makeStyles = (theme) =>
       alignItems: 'center',
       justifyContent: 'flex-start',
     },
-    memoryStoredContainer: {
-      flexDirection: 'row',
+    calendarButtonWrapper: {
       alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      marginTop: 12,
     },
-    memoryStoredText: {
-      fontSize: 14,
+    calendarDialog: {
+      position: 'absolute',
+      bottom: '100%',
+      marginBottom: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      backgroundColor: theme.surface,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 3,
+      minWidth: 110,
+    },
+    calendarDialogArrow: {
+      position: 'absolute',
+      bottom: -6,
+      left: '50%',
+      marginLeft: -6,
+      width: 0,
+      height: 0,
+      borderLeftWidth: 6,
+      borderRightWidth: 6,
+      borderTopWidth: 6,
+      borderLeftColor: 'transparent',
+      borderRightColor: 'transparent',
+      borderTopColor: theme.surface,
+    },
+    calendarDialogText: {
+      fontSize: 11,
       fontWeight: '600',
+      color: theme.text,
+      textAlign: 'center',
+    },
+    calendarDialogTextStored: {
       color: '#43A047',
+    },
+    iconButtonHighlight: {
+      borderColor: '#43A047',
+      borderWidth: 2,
     },
     scrollContent: {
       flexGrow: 1,
@@ -235,12 +268,6 @@ export const CompletionScreen = ({
           maxWidth={SCREEN_WIDTH - 48}
           animate
         />
-        {isImageInCalendar && (
-          <View style={styles.memoryStoredContainer}>
-            <Ionicons name="checkmark-circle" size={18} color="#43A047" />
-            <Text style={styles.memoryStoredText}>Memory already stored!</Text>
-          </View>
-        )}
       </View>
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
@@ -273,13 +300,21 @@ export const CompletionScreen = ({
           >
             <Ionicons name="home" size={26} color={theme.text} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={typeof onCalendar === 'function' ? onCalendar : undefined}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="calendar" size={26} color={theme.text} />
-          </TouchableOpacity>
+          <View style={styles.calendarButtonWrapper}>
+            <View style={styles.calendarDialog}>
+              <Text style={[styles.calendarDialogText, isImageInCalendar && styles.calendarDialogTextStored]}>
+                {isImageInCalendar ? 'Memory saved!' : 'Save memory?'}
+              </Text>
+              <View style={styles.calendarDialogArrow} />
+            </View>
+            <TouchableOpacity
+              style={[styles.iconButton, isImageInCalendar && styles.iconButtonHighlight]}
+              onPress={typeof onCalendar === 'function' ? onCalendar : undefined}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="calendar" size={26} color={isImageInCalendar ? '#43A047' : theme.text} />
+            </TouchableOpacity>
+          </View>
           <TouchableOpacity
             style={[styles.button, styles.primaryButton]}
             onPress={onPlayAgain}
