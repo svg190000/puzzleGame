@@ -1,12 +1,18 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, Dimensions, TouchableWithoutFeedback } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, Dimensions, TouchableWithoutFeedback, Platform } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../contexts/ThemeContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const ANIMATION_DURATION = 300;
+
+// Spring config for smooth, natural animation
+const SPRING_CONFIG = {
+  damping: 20,
+  stiffness: 150,
+  mass: 0.8,
+};
 
 const DIFFICULTIES = [
   { label: 'Easy', rows: 3, cols: 3 },
@@ -98,8 +104,8 @@ export const DifficultyModal = ({ visible, onSelect, onClose }) => {
   const backdropOpacity = useSharedValue(0);
 
   const closeModal = () => {
-    backdropOpacity.value = withTiming(0, { duration: ANIMATION_DURATION });
-    translateY.value = withTiming(SCREEN_HEIGHT, { duration: ANIMATION_DURATION }, () => {
+    backdropOpacity.value = withTiming(0, { duration: 250 });
+    translateY.value = withSpring(SCREEN_HEIGHT, { ...SPRING_CONFIG, damping: 25 }, () => {
       runOnJS(setModalVisible)(false);
     });
   };
@@ -107,8 +113,8 @@ export const DifficultyModal = ({ visible, onSelect, onClose }) => {
   useEffect(() => {
     if (visible) {
       setModalVisible(true);
-      backdropOpacity.value = withTiming(1, { duration: ANIMATION_DURATION });
-      translateY.value = withTiming(0, { duration: ANIMATION_DURATION });
+      backdropOpacity.value = withTiming(1, { duration: 200 });
+      translateY.value = withSpring(0, SPRING_CONFIG);
     } else if (modalVisible) {
       closeModal();
     }
@@ -134,7 +140,10 @@ export const DifficultyModal = ({ visible, onSelect, onClose }) => {
       <TouchableWithoutFeedback onPress={onClose}>
         <Animated.View style={[styles.backdrop, backdropStyle]} />
       </TouchableWithoutFeedback>
-      <Animated.View style={[styles.modal, contentStyle]}>
+      <Animated.View 
+        style={[styles.modal, contentStyle]}
+        renderToHardwareTextureAndroid={Platform.OS === 'android'}
+      >
         <View style={styles.handle} />
         <Text style={styles.title}>Select Difficulty</Text>
         <View style={styles.buttonContainer}>

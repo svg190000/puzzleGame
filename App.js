@@ -8,8 +8,16 @@ import {
   Dimensions,
   Alert,
   PixelRatio,
+  Platform,
 } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, withDelay, Easing } from 'react-native-reanimated';
+
+// Spring config for smooth screen transitions on Android
+const SCREEN_SPRING_CONFIG = {
+  damping: 22,
+  stiffness: 200,
+  mass: 0.8,
+};
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -957,42 +965,36 @@ function AppContent() {
   const [settingsZIndex, setSettingsZIndex] = useState(1);
   const prevRouteRef = useRef('Home');
   
-  // Handle screen transitions
+  // Handle screen transitions - using spring for smoother Android performance
   useEffect(() => {
-    const duration = 300;
     const prevRoute = prevRouteRef.current;
+    const timingConfig = { duration: 280, easing: Easing.out(Easing.cubic) };
     
     if (currentRouteName === 'Calendar') {
       // Calendar slides in from left
-      calendarTranslateX.value = withTiming(0, { duration });
+      calendarTranslateX.value = withSpring(0, SCREEN_SPRING_CONFIG);
       // Settings slides out to right (if coming from Settings) - delayed
       if (prevRoute === 'Settings') {
-        // Calendar on top, slides in first
         setCalendarZIndex(2);
         setSettingsZIndex(1);
-        // Settings slides out after Calendar slides in
-        settingsTranslateX.value = withDelay(duration, withTiming(SCREEN_WIDTH, { duration }));
+        settingsTranslateX.value = withDelay(200, withTiming(SCREEN_WIDTH, timingConfig));
       } else {
-        // Coming from Home
         setCalendarZIndex(2);
         setSettingsZIndex(1);
       }
     } else if (currentRouteName === 'Home') {
       // Both Calendar and Settings slide out
-      calendarTranslateX.value = withTiming(-SCREEN_WIDTH, { duration });
-      settingsTranslateX.value = withTiming(SCREEN_WIDTH, { duration });
+      calendarTranslateX.value = withTiming(-SCREEN_WIDTH, timingConfig);
+      settingsTranslateX.value = withTiming(SCREEN_WIDTH, timingConfig);
     } else if (currentRouteName === 'Settings') {
       // Settings slides in from right
-      settingsTranslateX.value = withTiming(0, { duration });
+      settingsTranslateX.value = withSpring(0, SCREEN_SPRING_CONFIG);
       // Calendar slides out to left (if coming from Calendar) - delayed
       if (prevRoute === 'Calendar') {
-        // Settings on top, slides in first
         setSettingsZIndex(2);
         setCalendarZIndex(1);
-        // Calendar slides out after Settings slides in
-        calendarTranslateX.value = withDelay(duration, withTiming(-SCREEN_WIDTH, { duration }));
+        calendarTranslateX.value = withDelay(200, withTiming(-SCREEN_WIDTH, timingConfig));
       } else {
-        // Coming from Home
         setSettingsZIndex(2);
         setCalendarZIndex(1);
       }
@@ -1056,7 +1058,10 @@ function AppContent() {
                 </View>
                 
                 {/* Calendar Screen - slides from left over Home */}
-                <Animated.View style={[styles.screenLayer, calendarAnimatedStyle, { zIndex: calendarZIndex }]}>
+                <Animated.View 
+                  style={[styles.screenLayer, calendarAnimatedStyle, { zIndex: calendarZIndex }]}
+                  renderToHardwareTextureAndroid={Platform.OS === 'android'}
+                >
                   <View style={styles.screenContainer}>
                     <GameProvider startPuzzleWithImage={startPuzzleWithImage}>
                       <CalendarScreen />
@@ -1065,7 +1070,10 @@ function AppContent() {
                 </Animated.View>
                 
                 {/* Settings Screen - slides from right over Home */}
-                <Animated.View style={[styles.screenLayer, settingsAnimatedStyle, { zIndex: settingsZIndex }]}>
+                <Animated.View 
+                  style={[styles.screenLayer, settingsAnimatedStyle, { zIndex: settingsZIndex }]}
+                  renderToHardwareTextureAndroid={Platform.OS === 'android'}
+                >
                   <View style={styles.screenContainer}>
                     <SettingsScreen />
                   </View>

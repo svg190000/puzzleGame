@@ -11,11 +11,13 @@ import {
   Image,
   Alert,
   TextInput,
+  Platform,
 } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withSpring,
   withDelay,
   Easing,
   runOnJS,
@@ -35,6 +37,13 @@ import { DifficultyModal } from './DifficultyModal';
 const DAY_SECTION_HEIGHT = 300;
 const SWIPE_THRESHOLD = 60;
 const IMAGES_PER_PAGE = 3;
+
+// Spring config for smooth animations on Android
+const SPRING_CONFIG = {
+  damping: 20,
+  stiffness: 180,
+  mass: 0.8,
+};
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CELL_SIZE = (SCREEN_WIDTH - 32) / 7;
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -1084,6 +1093,7 @@ export const CalendarScreen = () => {
 
   // Animation values
   const daySectionTranslateY = useSharedValue(DAY_SECTION_HEIGHT);
+  const calendarFlex = useSharedValue(1); // Separate value for calendar flex animation
   const indicatorsOpacity = useSharedValue(0);
   const buttonOpacity = useSharedValue(0);
 
@@ -1193,18 +1203,21 @@ export const CalendarScreen = () => {
         buttonOpacity.value = 0;
       }
 
-      daySectionTranslateY.value = withTiming(0, { duration: 300 }, (finished) => {
+      // Animate both day section slide and calendar shrink together
+      daySectionTranslateY.value = withSpring(0, SPRING_CONFIG, (finished) => {
         if (finished) {
           runOnJS(triggerImageAnimation)(shouldAnimateControls);
         }
       });
+      calendarFlex.value = withSpring(0.5, SPRING_CONFIG);
     } else {
       setImagesShouldAnimate(false);
       indicatorsOpacity.value = 0;
       buttonOpacity.value = 0;
-      daySectionTranslateY.value = withTiming(DAY_SECTION_HEIGHT, { duration: 300 });
+      daySectionTranslateY.value = withSpring(DAY_SECTION_HEIGHT, { ...SPRING_CONFIG, damping: 25 });
+      calendarFlex.value = withSpring(1, { ...SPRING_CONFIG, damping: 25 });
     }
-  }, [selectedDate, daySectionTranslateY, triggerImageAnimation, indicatorsOpacity, buttonOpacity]);
+  }, [selectedDate, daySectionTranslateY, calendarFlex, triggerImageAnimation, indicatorsOpacity, buttonOpacity]);
 
   // Reset state when selected date changes
   useEffect(() => {
@@ -1272,13 +1285,14 @@ export const CalendarScreen = () => {
     }
   }, [pendingNavigation, setPendingNavigation, setViewDate, setSelectedDate]);
 
-  // Animated styles
+  // Animated styles - using transform only (no flex/layout changes for performance)
   const daySectionAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: daySectionTranslateY.value }],
   }));
 
+  // Calendar flex animation - using separate spring value (more performant than interpolate)
   const calendarAnimatedStyle = useAnimatedStyle(() => ({
-    flex: interpolate(daySectionTranslateY.value, [DAY_SECTION_HEIGHT, 0], [1, 0.5]),
+    flex: calendarFlex.value,
   }));
 
   const indicatorsAnimatedStyle = useAnimatedStyle(() => ({
@@ -1725,7 +1739,10 @@ export const CalendarScreen = () => {
 
       {/* Calendar Grid */}
       <GestureDetector gesture={panGesture}>
-        <Animated.View style={[styles.calendarSwipeArea, calendarAnimatedStyle]}>
+        <Animated.View 
+          style={[styles.calendarSwipeArea, calendarAnimatedStyle]}
+          renderToHardwareTextureAndroid={Platform.OS === 'android'}
+        >
           <View style={styles.weekdayRow}>
             {WEEKDAYS.map((d, i) => (
               <Text key={i} style={styles.weekday}>
@@ -1810,7 +1827,10 @@ export const CalendarScreen = () => {
 
       {/* Day Section */}
       <View style={styles.daySectionWrapper} pointerEvents={selectedDate ? 'auto' : 'none'}>
-        <Animated.View style={[styles.daySection, daySectionAnimatedStyle]}>
+        <Animated.View 
+          style={[styles.daySection, daySectionAnimatedStyle]}
+          renderToHardwareTextureAndroid={Platform.OS === 'android'}
+        >
           {selectedDate && (
             <>
               <View style={styles.daySectionHeader}>
