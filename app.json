@@ -3,6 +3,7 @@
     "name": "Puzzle",
     "slug": "jigsaw-puzzle-game",
     "version": "1.0.0",
+    "scheme": "puzzle",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
@@ -36,7 +37,8 @@
           "photosPermission": "The app accesses your photos to create puzzles.",
           "cameraPermission": "The app accesses your camera to take photos for puzzles."
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

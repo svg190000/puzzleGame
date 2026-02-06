@@ -1086,6 +1086,10 @@ export const CalendarScreen = () => {
     pendingNavigation,
     setPendingNavigation,
     dateKey,
+    labels,
+    updateLabelName,
+    deleteLabel,
+    addNewLabel,
   } = useCalendar();
   const { startPuzzleWithImage } = useGame();
 
@@ -1120,12 +1124,6 @@ export const CalendarScreen = () => {
   const [leftPanelView, setLeftPanelView] = useState('menu'); // 'menu' | 'allPhotos'
   const [allPhotosReady, setAllPhotosReady] = useState(false);
   const [labelsExpanded, setLabelsExpanded] = useState(false);
-  const [labels, setLabels] = useState([
-    { id: '1', color: '#E53935', name: 'Important' },
-    { id: '2', color: '#43A047', name: 'Family' },
-    { id: '3', color: '#1E88E5', name: 'Travel' },
-    { id: '4', color: '#FF9800', name: 'Work' },
-  ]);
   const [labelPickerVisible, setLabelPickerVisible] = useState(false);
   const [labelPickerImageId, setLabelPickerImageId] = useState(null);
   const [filterVisible, setFilterVisible] = useState(false);
@@ -1375,26 +1373,6 @@ export const CalendarScreen = () => {
   const toggleLabelsExpanded = useCallback(() => {
     setLabelsExpanded((prev) => !prev);
   }, []);
-
-  const updateLabelName = useCallback((labelId, newName) => {
-    setLabels((prev) =>
-      prev.map((label) =>
-        label.id === labelId ? { ...label, name: newName } : label
-      )
-    );
-  }, []);
-
-  const deleteLabel = useCallback((labelId) => {
-    setLabels((prev) => prev.filter((label) => label.id !== labelId));
-  }, []);
-
-  const addNewLabel = useCallback(() => {
-    if (labels.length >= 7) return; // Max 7 labels
-    const colors = ['#9C27B0', '#00BCD4', '#795548', '#607D8B', '#F44336', '#4CAF50'];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
-    const newId = Date.now().toString();
-    setLabels((prev) => [...prev, { id: newId, color: randomColor, name: 'New Label' }]);
-  }, [labels.length]);
 
   // Handlers
   const onDatePress = useCallback(
