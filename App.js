@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import { DifficultyModal } from './src/components/DifficultyModal';
 import { PaperBackground } from './src/components/PaperBackground';
 import { GameBoard } from './src/components/GameBoard';
@@ -198,6 +199,33 @@ function AppContent() {
     return true;
   };
 
+  // Helper to parse date from filename (e.g., IMG-20240115-WA0001.jpg, IMG_20240115_123456.jpg)
+  const parseDateFromFilename = (filename) => {
+    if (!filename) return null;
+    
+    // Match patterns like: 20240115, 2024-01-15, 2024_01_15
+    const patterns = [
+      /(\d{4})(\d{2})(\d{2})/, // 20240115
+      /(\d{4})-(\d{2})-(\d{2})/, // 2024-01-15
+      /(\d{4})_(\d{2})_(\d{2})/, // 2024_01_15
+    ];
+    
+    for (const pattern of patterns) {
+      const match = filename.match(pattern);
+      if (match) {
+        const [, year, month, day] = match;
+        const y = parseInt(year, 10);
+        const m = parseInt(month, 10);
+        const d = parseInt(day, 10);
+        // Validate the date is reasonable
+        if (y >= 2000 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+          return `${year}-${month}-${day}`;
+        }
+      }
+    }
+    return null;
+  };
+
   const pickImageFromGallery = async () => {
     const hasPermission = await requestPermissions();
     if (!hasPermission) return null;
@@ -213,19 +241,84 @@ function AppContent() {
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
         
-        // Try to get creation date from EXIF data
-        let creationDate = null;
+        // Debug: Log all available asset info
+        console.log('=== Image Picker Asset Debug ===');
+        console.log('fileName:', asset.fileName);
+        console.log('assetId:', asset.assetId);
+        console.log('uri:', asset.uri);
+        console.log('exif:', asset.exif ? Object.keys(asset.exif) : 'no exif');
         if (asset.exif) {
-          // Try common EXIF date fields
+          console.log('EXIF DateTimeOriginal:', asset.exif.DateTimeOriginal);
+          console.log('EXIF DateTime:', asset.exif.DateTime);
+          console.log('EXIF DateTimeDigitized:', asset.exif.DateTimeDigitized);
+        }
+        
+        // Try to get creation date from multiple sources
+        let creationDate = null;
+        let dateSource = 'none';
+        
+        // 1. First try EXIF data (most accurate for original photos)
+        if (asset.exif) {
           const exifDate = asset.exif.DateTimeOriginal || asset.exif.DateTime || asset.exif.DateTimeDigitized;
           if (exifDate) {
             // EXIF date format is typically "YYYY:MM:DD HH:MM:SS"
             const parts = exifDate.split(' ')[0].split(':');
             if (parts.length === 3) {
               creationDate = `${parts[0]}-${parts[1]}-${parts[2]}`;
+              dateSource = 'EXIF';
             }
           }
         }
+        console.log('After EXIF check - creationDate:', creationDate);
+        
+        // 2. If no EXIF date, try MediaLibrary for asset metadata
+        if (!creationDate && asset.assetId) {
+          try {
+            const mediaAsset = await MediaLibrary.getAssetInfoAsync(asset.assetId);
+            console.log('MediaLibrary asset:', mediaAsset ? {
+              creationTime: mediaAsset.creationTime,
+              modificationTime: mediaAsset.modificationTime,
+            } : 'null');
+            if (mediaAsset) {
+              // Prefer creationTime, fall back to modificationTime
+              const timestamp = mediaAsset.creationTime || mediaAsset.modificationTime;
+              if (timestamp) {
+                const date = new Date(timestamp);
+                creationDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                dateSource = 'MediaLibrary';
+              }
+            }
+          } catch (mediaError) {
+            console.log('Could not get MediaLibrary asset info:', mediaError);
+          }
+        }
+        console.log('After MediaLibrary check - creationDate:', creationDate);
+        
+        // 3. If still no date, try parsing from filename (works for WhatsApp, screenshots, etc.)
+        if (!creationDate) {
+          const filenameParsed = parseDateFromFilename(asset.fileName);
+          console.log('Filename parse attempt:', asset.fileName, '->', filenameParsed);
+          if (filenameParsed) {
+            creationDate = filenameParsed;
+            dateSource = 'filename';
+          }
+        }
+        
+        // 4. Also try parsing from URI if filename didn't work
+        if (!creationDate) {
+          const uriFilename = asset.uri.split('/').pop();
+          const uriParsed = parseDateFromFilename(uriFilename);
+          console.log('URI parse attempt:', uriFilename, '->', uriParsed);
+          if (uriParsed) {
+            creationDate = uriParsed;
+            dateSource = 'URI';
+          }
+        }
+        
+        console.log('=== Final Result ===');
+        console.log('creationDate:', creationDate);
+        console.log('dateSource:', dateSource);
+        console.log('====================');
         
         return {
           uri: asset.uri,
