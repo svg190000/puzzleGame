@@ -272,20 +272,107 @@ function AppContent() {
         console.log('After EXIF check - creationDate:', creationDate);
         
         // 2. If no EXIF date, try MediaLibrary for asset metadata
-        if (!creationDate && asset.assetId) {
+        if (!creationDate) {
           try {
-            const mediaAsset = await MediaLibrary.getAssetInfoAsync(asset.assetId);
-            console.log('MediaLibrary asset:', mediaAsset ? {
-              creationTime: mediaAsset.creationTime,
-              modificationTime: mediaAsset.modificationTime,
-            } : 'null');
-            if (mediaAsset) {
-              // Prefer creationTime, fall back to modificationTime
-              const timestamp = mediaAsset.creationTime || mediaAsset.modificationTime;
-              if (timestamp) {
-                const date = new Date(timestamp);
-                creationDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-                dateSource = 'MediaLibrary';
+            // Request MediaLibrary permissions
+            const { status } = await MediaLibrary.requestPermissionsAsync();
+            console.log('MediaLibrary permission status:', status);
+            
+            if (status === 'granted') {
+              let mediaAsset = null;
+              
+              // If we have assetId, use it directly
+              if (asset.assetId) {
+                mediaAsset = await MediaLibrary.getAssetInfoAsync(asset.assetId);
+                console.log('MediaLibrary asset (by assetId):', mediaAsset ? {
+                  creationTime: mediaAsset.creationTime,
+                  modificationTime: mediaAsset.modificationTime,
+                } : 'null');
+              }
+              
+              // The fileName from ImagePicker might be the Android Media Store ID (numeric)
+              // Try to use it as an asset ID directly
+              if (!mediaAsset && asset.fileName) {
+                const baseFileName = asset.fileName.replace(/\.[^/.]+$/, '');
+                const isNumericId = /^\d+$/.test(baseFileName);
+                
+                if (isNumericId) {
+                  console.log('Filename appears to be Android Media Store ID:', baseFileName);
+                  
+                  // Try different content URI formats
+                  const possibleIds = [
+                    baseFileName,
+                    `${baseFileName}`,
+                  ];
+                  
+                  for (const id of possibleIds) {
+                    try {
+                      console.log('Trying to get asset with ID:', id);
+                      mediaAsset = await MediaLibrary.getAssetInfoAsync(id);
+                      if (mediaAsset) {
+                        console.log('Found asset with numeric ID! creationTime:', mediaAsset.creationTime);
+                        break;
+                      }
+                    } catch (e) {
+                      console.log('ID', id, 'failed:', e.message);
+                    }
+                  }
+                }
+                
+                // If still no result, search by filename in library
+                if (!mediaAsset) {
+                  console.log('Searching MediaLibrary for recent assets...');
+                  
+                  // Get recent assets
+                  const { assets } = await MediaLibrary.getAssetsAsync({
+                    first: 500,
+                    mediaType: 'photo',
+                    sortBy: [[MediaLibrary.SortBy.modificationTime, false]],
+                  });
+                  
+                  // Log sample to see format
+                  console.log('Sample assets:', assets.slice(0, 3).map(a => ({ id: a.id, filename: a.filename })));
+                  
+                  // Try to find by ID embedded in the asset.id
+                  const matchById = assets.find(a => a.id === baseFileName || a.id.includes(baseFileName));
+                  if (matchById) {
+                    console.log('Found by ID match:', matchById.filename);
+                    
+                    // First try to get full asset info (may fail without ACCESS_MEDIA_LOCATION)
+                    try {
+                      mediaAsset = await MediaLibrary.getAssetInfoAsync(matchById.id);
+                    } catch (permError) {
+                      console.log('getAssetInfoAsync failed, using basic asset info');
+                      // Use basic asset properties - modificationTime is available without extra permission
+                      if (matchById.modificationTime) {
+                        const date = new Date(matchById.modificationTime);
+                        creationDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                        dateSource = 'MediaLibrary-basic';
+                        console.log('Got date from basic asset modificationTime:', creationDate);
+                      }
+                      
+                      // Also try parsing the real filename for the date
+                      if (!creationDate && matchById.filename) {
+                        const parsedFromRealFilename = parseDateFromFilename(matchById.filename);
+                        if (parsedFromRealFilename) {
+                          creationDate = parsedFromRealFilename;
+                          dateSource = 'MediaLibrary-filename';
+                          console.log('Got date from real filename:', matchById.filename, '->', creationDate);
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              
+              if (mediaAsset) {
+                // Prefer creationTime, fall back to modificationTime
+                const timestamp = mediaAsset.creationTime || mediaAsset.modificationTime;
+                if (timestamp) {
+                  const date = new Date(timestamp);
+                  creationDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                  dateSource = 'MediaLibrary';
+                }
               }
             }
           } catch (mediaError) {

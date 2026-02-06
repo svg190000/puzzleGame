@@ -21,14 +21,14 @@
         "backgroundColor": "#F8FAFC"
       },
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
       ],
       "package": "com.jigsawpuzzle.game"
     },
-    "web": {
-    },
+    "web": {},
     "plugins": [
       [
         "expo-image-picker",
@@ -37,6 +37,12 @@
           "cameraPermission": "The app accesses your camera to take photos for puzzles."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ec97e2a5-f89b-408e-b3f5-f494ef5e81cd"
+      }
+    },
+    "owner": "ashke"
   }
 }
