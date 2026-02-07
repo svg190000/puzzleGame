@@ -1108,9 +1108,6 @@ export const CalendarScreen = () => {
   // Animation values
   const daySectionTranslateY = useSharedValue(DAY_SECTION_HEIGHT);
   const calendarFlex = useSharedValue(1); // Separate value for calendar flex animation
-  const indicatorsOpacity = useSharedValue(0);
-  const buttonOpacity = useSharedValue(0);
-
   // Derived values
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
@@ -1191,48 +1188,25 @@ export const CalendarScreen = () => {
 
   const pageHeight = listHeight ?? Math.max(1, DAY_SECTION_HEIGHT - 100);
 
-  // Animation callback
-  const triggerImageAnimation = useCallback(
-    (shouldAnimateControls) => {
-      const delay = shouldAnimateControls ? 150 : 0;
-      setTimeout(() => {
-        setImagesShouldAnimate(true);
-        if (shouldAnimateControls) {
-          indicatorsOpacity.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.ease) });
-          buttonOpacity.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.ease) });
-        }
-      }, delay);
-    },
-    [indicatorsOpacity, buttonOpacity]
-  );
+  // Animation callback – trigger image stagger when day section opens
+  const triggerImageAnimation = useCallback(() => {
+    setTimeout(() => setImagesShouldAnimate(true), 150);
+  }, []);
 
   // Day section animation
   useEffect(() => {
     if (selectedDate) {
-      const wasSectionOpen = daySectionTranslateY.value < DAY_SECTION_HEIGHT;
-      const shouldAnimateControls = !wasSectionOpen;
       setImagesShouldAnimate(false);
-
-      if (shouldAnimateControls) {
-        indicatorsOpacity.value = 0;
-        buttonOpacity.value = 0;
-      }
-
-      // Animate both day section slide and calendar shrink together
       daySectionTranslateY.value = withSpring(0, SPRING_CONFIG, (finished) => {
-        if (finished) {
-          runOnJS(triggerImageAnimation)(shouldAnimateControls);
-        }
+        if (finished) runOnJS(triggerImageAnimation)();
       });
       calendarFlex.value = withSpring(0.5, SPRING_CONFIG);
     } else {
       setImagesShouldAnimate(false);
-      indicatorsOpacity.value = 0;
-      buttonOpacity.value = 0;
       daySectionTranslateY.value = withSpring(DAY_SECTION_HEIGHT, { ...SPRING_CONFIG, damping: 25 });
       calendarFlex.value = withSpring(1, { ...SPRING_CONFIG, damping: 25 });
     }
-  }, [selectedDate, daySectionTranslateY, calendarFlex, triggerImageAnimation, indicatorsOpacity, buttonOpacity]);
+  }, [selectedDate, daySectionTranslateY, calendarFlex, triggerImageAnimation]);
 
   // Reset state when selected date changes
   useEffect(() => {
@@ -1308,14 +1282,6 @@ export const CalendarScreen = () => {
   // Calendar flex animation - using separate spring value (more performant than interpolate)
   const calendarAnimatedStyle = useAnimatedStyle(() => ({
     flex: calendarFlex.value,
-  }));
-
-  const indicatorsAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: indicatorsOpacity.value,
-  }));
-
-  const buttonAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: buttonOpacity.value,
   }));
 
   // Left panel animation
@@ -1959,18 +1925,15 @@ export const CalendarScreen = () => {
                       </View>
                     ))}
                   </ScrollView>
-                  <Animated.View style={indicatorsAnimatedStyle}>
-                    <View style={styles.pageIndicators}>
-                      {Array.from({ length: totalPages }, (_, i) => (
-                        <PageIndicatorDot key={i} active={i === pageIndex} baseStyle={styles.pageIndicatorDot} />
-                      ))}
-                    </View>
-                  </Animated.View>
+                  <View style={styles.pageIndicators}>
+                    {Array.from({ length: totalPages }, (_, i) => (
+                      <PageIndicatorDot key={i} active={i === pageIndex} baseStyle={styles.pageIndicatorDot} />
+                    ))}
+                  </View>
                 </>
               )}
 
-              <Animated.View style={buttonAnimatedStyle}>
-                <View style={[styles.daySectionActions, filteredDayImages.length === 0 && styles.daySectionActionsEmpty]}>
+              <View style={[styles.daySectionActions, filteredDayImages.length === 0 && styles.daySectionActionsEmpty]}>
                   {filteredDayImages.length > 0 ? (
                     <>
                       {/* Edit Button */}
@@ -2029,7 +1992,6 @@ export const CalendarScreen = () => {
                     </TouchableOpacity>
                   )}
                 </View>
-              </Animated.View>
             </>
           )}
         </Animated.View>
