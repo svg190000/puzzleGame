@@ -813,7 +813,17 @@ const makeStyles = (theme) =>
     allPhotosCount: {
       fontSize: 14,
       color: theme.textMuted,
-      marginLeft: 'auto',
+      marginTop: 2,
+    },
+    allPhotosHeaderCenter: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'flex-start',
+    },
+    allPhotosHeaderRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
     },
     allPhotosGrid: {
       flex: 1,
@@ -1145,6 +1155,7 @@ export const CalendarScreen = () => {
   const leftPanelTranslateX = useSharedValue(-SCREEN_WIDTH);
   const leftPanelWidth = useSharedValue(SCREEN_WIDTH * 0.75);
   const leftPanelBackdropOpacity = useSharedValue(0);
+  const galleryFilterOpacity = useSharedValue(0);
 
   // Labels section animation
   const labelsOpacity = useSharedValue(0);
@@ -1162,6 +1173,12 @@ export const CalendarScreen = () => {
     photos.sort((a, b) => b.dateKey.localeCompare(a.dateKey));
     return photos;
   }, [imagesByDate]);
+
+  // Gallery: apply same label filters as day view
+  const filteredAllPhotos = useMemo(() => {
+    if (activeFilters.size === 0) return allPhotos;
+    return allPhotos.filter((img) => img.labelId && activeFilters.has(img.labelId));
+  }, [allPhotos, activeFilters]);
 
   // Create a lookup map for image labels by ID
   const imageLabelById = useMemo(() => {
@@ -1308,11 +1325,14 @@ export const CalendarScreen = () => {
       leftPanelTranslateX.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.ease) });
       leftPanelWidth.value = withTiming(targetWidth, { duration: 300, easing: Easing.out(Easing.ease) });
       leftPanelBackdropOpacity.value = withTiming(leftPanelView === 'allPhotos' ? 0 : 0.5, { duration: 300 });
-      // Set allPhotosReady after transition completes
       if (leftPanelView === 'allPhotos') {
+        galleryFilterOpacity.value = withDelay(300, withTiming(1, { duration: 250, easing: Easing.out(Easing.ease) }));
         setTimeout(() => setAllPhotosReady(true), 320);
+      } else {
+        galleryFilterOpacity.value = withTiming(0, { duration: 120 });
       }
     } else {
+      galleryFilterOpacity.value = withTiming(0, { duration: 120 });
       leftPanelTranslateX.value = withTiming(-SCREEN_WIDTH, { duration: 300, easing: Easing.in(Easing.ease) });
       leftPanelBackdropOpacity.value = withTiming(0, { duration: 300 });
       // Reset to menu view when closing
@@ -1321,7 +1341,7 @@ export const CalendarScreen = () => {
         setAllPhotosReady(false);
       }, 300);
     }
-  }, [leftPanelOpen, leftPanelView, leftPanelTranslateX, leftPanelWidth, leftPanelBackdropOpacity]);
+  }, [leftPanelOpen, leftPanelView, leftPanelTranslateX, leftPanelWidth, leftPanelBackdropOpacity, galleryFilterOpacity]);
 
   const leftPanelAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: leftPanelTranslateX.value }],
@@ -1330,6 +1350,10 @@ export const CalendarScreen = () => {
 
   const leftPanelBackdropAnimatedStyle = useAnimatedStyle(() => ({
     opacity: leftPanelBackdropOpacity.value,
+  }));
+
+  const galleryFilterAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: galleryFilterOpacity.value,
   }));
 
   const toggleLeftPanel = useCallback(() => {
@@ -2135,17 +2159,46 @@ export const CalendarScreen = () => {
               <TouchableOpacity style={styles.allPhotosBackButton} onPress={backToMenu} activeOpacity={0.7}>
                 <Ionicons name="arrow-back" size={24} color={theme.text} />
               </TouchableOpacity>
-              <Text style={styles.allPhotosTitle}>Gallery</Text>
-              <Text style={styles.allPhotosCount}>{allPhotos.length} photos</Text>
+              <View style={styles.allPhotosHeaderCenter}>
+                <Text style={styles.allPhotosTitle}>Gallery</Text>
+                <Text style={styles.allPhotosCount}>{filteredAllPhotos.length} photos</Text>
+              </View>
+              <Animated.View style={[styles.allPhotosHeaderRight, galleryFilterAnimatedStyle]}>
+                <TouchableOpacity
+                  style={[
+                    activeFilters.size > 0 ? styles.filterButton : styles.iconButton,
+                    activeFilters.size > 0 && styles.filterButtonActive,
+                  ]}
+                  onPress={() => setFilterVisible(true)}
+                  activeOpacity={0.7}
+                >
+                  {activeFilters.size > 0 && (
+                    <View style={styles.filterIndicatorContainer}>
+                      {Array.from(activeFilters).map((filterId) => {
+                        const filterLabel = labels.find((l) => l.id === filterId);
+                        return filterLabel ? (
+                          <View
+                            key={filterId}
+                            style={[styles.filterIndicatorDot, { backgroundColor: filterLabel.color }]}
+                          />
+                        ) : null;
+                      })}
+                    </View>
+                  )}
+                  <Ionicons name="filter" size={22} color={activeFilters.size > 0 ? theme.accent : theme.text} />
+                </TouchableOpacity>
+              </Animated.View>
             </View>
-            {!allPhotosReady ? null : allPhotos.length === 0 ? (
+            {!allPhotosReady ? null : filteredAllPhotos.length === 0 ? (
               <View style={styles.allPhotosEmpty}>
                 <Ionicons name="images-outline" size={48} color={theme.textMuted} />
-                <Text style={styles.allPhotosEmptyText}>No photos in calendar</Text>
+                <Text style={styles.allPhotosEmptyText}>
+                  {allPhotos.length > 0 && activeFilters.size > 0 ? 'No photos match filters' : 'No photos in calendar'}
+                </Text>
               </View>
             ) : (
               <ScrollView style={styles.allPhotosGrid} contentContainerStyle={styles.allPhotosGridContent}>
-                {allPhotos.map((photo, index) => {
+                {filteredAllPhotos.map((photo, index) => {
                   const photoLabelColor = photo.labelId ? labels.find((l) => l.id === photo.labelId)?.color : null;
                   return (
                     <TouchableOpacity key={photo.id} style={styles.allPhotosItem} activeOpacity={0.8}>

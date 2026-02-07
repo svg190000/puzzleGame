@@ -164,7 +164,6 @@ class SyncService {
   // ==================== LABELS SYNC ====================
 
   async syncLabels(localLabels, userId) {
-    // Fetch remote labels
     const { data: remoteLabels, error } = await supabase
       .from('labels')
       .select('*')
@@ -172,16 +171,29 @@ class SyncService {
 
     if (error) throw error;
 
-    const merged = [...localLabels];
+    const merged = [];
     const toInsert = [];
     const toUpdate = [];
+    const remoteMatched = new Set();
 
-    // Process local labels - push to remote if not exists
+    // 1) For each local label: find remote by id or by (name, color). Adopt remote id; keep local name/color. If edited, queue update. If not on remote, queue insert.
     for (const local of localLabels) {
-      const remote = remoteLabels?.find((r) => r.name === local.name && r.color === local.color);
-      
+      let remote = remoteLabels?.find((r) => r.id === local.id);
       if (!remote) {
-        // Local label doesn't exist remotely - push it
+        remote = remoteLabels?.find((r) => r.name === local.name && r.color === local.color);
+      }
+      if (remote) {
+        remoteMatched.add(remote.id);
+        merged.push({
+          id: remote.id,
+          name: local.name,
+          color: local.color,
+        });
+        if (remote.name !== local.name || remote.color !== local.color) {
+          toUpdate.push({ id: remote.id, name: local.name, color: local.color });
+        }
+      } else {
+        merged.push({ ...local });
         toInsert.push({
           user_id: userId,
           name: local.name,
@@ -191,29 +203,7 @@ class SyncService {
       }
     }
 
-    // Process remote labels - pull if not exists locally or updated more recently
-    for (const remote of remoteLabels || []) {
-      const localIndex = merged.findIndex(
-        (l) => l.name === remote.name && l.color === remote.color
-      );
-
-      if (localIndex === -1) {
-        // Remote label doesn't exist locally - add it
-        merged.push({
-          id: remote.id,
-          name: remote.name,
-          color: remote.color,
-        });
-      } else {
-        // Update local with remote ID for consistency
-        merged[localIndex] = {
-          ...merged[localIndex],
-          id: remote.id,
-        };
-      }
-    }
-
-    // Insert new labels to remote
+    // 2) Insert new labels and update merged with new UUIDs
     if (toInsert.length > 0) {
       const { data: inserted, error: insertError } = await supabase
         .from('labels')
@@ -222,14 +212,28 @@ class SyncService {
 
       if (insertError) throw insertError;
 
-      // Update merged with new IDs
       inserted?.forEach((newLabel) => {
         const idx = merged.findIndex(
-          (m) => m.name === newLabel.name && m.color === newLabel.color
+          (m) => m.name === newLabel.name && m.color === newLabel.color && (typeof m.id !== 'string' || m.id.length < 36)
         );
-        if (idx !== -1) {
-          merged[idx].id = newLabel.id;
-        }
+        if (idx !== -1) merged[idx].id = newLabel.id;
+      });
+    }
+
+    for (const row of toUpdate) {
+      await supabase.from('labels').update({ name: row.name, color: row.color, updated_at: new Date().toISOString() }).eq('id', row.id);
+    }
+
+    // 3) Add remote-only labels (from other device) that we didn't match. Skip remote rows that match default starter (name, color) so we don't re-add old "Important"/"Family"/"Travel"/"Work" after user edited them.
+    const isDefaultStarter = (name, color) =>
+      DEFAULT_LABELS.some((d) => d.name === name && d.color === color);
+    for (const remote of remoteLabels || []) {
+      if (remoteMatched.has(remote.id)) continue;
+      if (isDefaultStarter(remote.name, remote.color)) continue;
+      merged.push({
+        id: remote.id,
+        name: remote.name,
+        color: remote.color,
       });
     }
 

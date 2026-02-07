@@ -43,6 +43,8 @@ export function CalendarProvider({ children }) {
   
   // Ref to track if initial load is done
   const initialLoadDone = useRef(false);
+  // Ref to trigger sync after next imagesByDate update (e.g. after delete)
+  const syncAfterNextUpdateRef = useRef(false);
 
   // Load local data on mount
   useEffect(() => {
@@ -73,8 +75,12 @@ export function CalendarProvider({ children }) {
   useEffect(() => {
     if (initialLoadDone.current) {
       syncService.saveLocalImages(imagesByDate);
+      if (syncAfterNextUpdateRef.current) {
+        syncAfterNextUpdateRef.current = false;
+        if (isAuthenticated && user?.id) syncWithRemote();
+      }
     }
-  }, [imagesByDate]);
+  }, [imagesByDate, isAuthenticated, user?.id, syncWithRemote]);
 
   useEffect(() => {
     if (initialLoadDone.current) {
@@ -127,6 +133,7 @@ export function CalendarProvider({ children }) {
   }, [user?.id]);
 
   const removeImageFromDate = useCallback((key, imageId) => {
+    syncAfterNextUpdateRef.current = true;
     setImagesByDate((prev) => {
       const list = prev[key] ?? [];
       const filtered = list.filter((img) => img.id !== imageId);
