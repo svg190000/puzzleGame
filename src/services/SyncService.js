@@ -140,8 +140,9 @@ class SyncService {
       this.notifySyncStatus('synced');
       return { imagesByDate: mergedImages, labels: mergedLabels, success: true };
     } catch (error) {
-      console.error('Sync error:', error);
-      this.notifySyncStatus('error');
+      // Treat sync failure as offline: keep local data, no error state; will retry when connection is back
+      console.warn('Sync skipped (offline or unreachable):', error?.message || error);
+      this.notifySyncStatus('offline');
       return { imagesByDate: localImagesByDate, labels: localLabels, success: false };
     } finally {
       this.isSyncing = false;
@@ -266,12 +267,11 @@ class SyncService {
         const mappedLabelId = labelIdMap[img.labelId] || img.labelId;
 
         if (!remote) {
-          // Local image doesn't exist remotely - push it
           toInsert.push({
             user_id: userId,
             local_id: img.id,
             date_key: dateKey,
-            uri: img.uri,
+            uri: img.uri ?? '',
             asset_id: img.assetId || null,
             file_name: img.fileName || null,
             label_id: mappedLabelId || null,
@@ -299,7 +299,7 @@ class SyncService {
             const idx = targetList.findIndex((i) => i.id === img.id);
             const updatedImg = {
               id: img.id,
-              uri: remote.uri,
+              uri: remote.uri ?? '',
               assetId: remote.asset_id,
               fileName: remote.file_name,
               labelId: remote.label_id,
@@ -318,7 +318,7 @@ class SyncService {
               .from('calendar_images')
               .update({
                 date_key: dateKey,
-                uri: img.uri,
+                uri: img.uri ?? '',
                 asset_id: img.assetId || null,
                 file_name: img.fileName || null,
                 label_id: mappedLabelId || null,
@@ -338,7 +338,7 @@ class SyncService {
         }
         merged[remote.date_key].push({
           id: remote.local_id,
-          uri: remote.uri,
+          uri: remote.uri ?? '',
           assetId: remote.asset_id,
           fileName: remote.file_name,
           labelId: remote.label_id,
@@ -380,7 +380,7 @@ class SyncService {
             user_id: userId,
             local_id: imageData.id,
             date_key: imageData.dateKey,
-            uri: imageData.uri,
+            uri: imageData.uri ?? '',
             asset_id: imageData.assetId || null,
             file_name: imageData.fileName || null,
             label_id: imageData.labelId || null,

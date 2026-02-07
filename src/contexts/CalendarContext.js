@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import NetInfo from '@react-native-community/netinfo';
 import syncService from '../services/SyncService';
 import { useAuth } from './AuthContext';
 
@@ -37,7 +38,7 @@ export function CalendarProvider({ children }) {
   // Labels state (moved from CalendarScreen)
   const [labels, setLabels] = useState(DEFAULT_LABELS);
   
-  // Sync status: 'idle' | 'syncing' | 'synced' | 'error'
+  // Sync status: 'idle' | 'syncing' | 'synced' | 'offline' | 'error'
   const [syncStatus, setSyncStatus] = useState('idle');
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   
@@ -70,6 +71,17 @@ export function CalendarProvider({ children }) {
       syncWithRemote();
     }
   }, [isAuthenticated, isDataLoaded, user?.id]);
+
+  // Re-sync when connection is restored (offline -> online)
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id || !isDataLoaded) return;
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      if (state.isConnected && state.isInternetReachable !== false) {
+        syncWithRemote();
+      }
+    });
+    return unsubscribe;
+  }, [isAuthenticated, user?.id, isDataLoaded, syncWithRemote]);
 
   // Save to local storage whenever data changes (after initial load)
   useEffect(() => {
@@ -114,9 +126,9 @@ export function CalendarProvider({ children }) {
       const next = images.map((img, i) => {
         const newImage = {
           id: `${ddmmyyyy}#${timestamp}_${i}`,
-          uri: img.uri,
-          assetId: img.assetId,
-          fileName: img.fileName,
+          uri: img.uri ?? '',
+          assetId: img.assetId ?? null,
+          fileName: img.fileName ?? null,
           labelId: img.labelId || null,
           updatedAt: new Date().toISOString(),
         };

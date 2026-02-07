@@ -1,4 +1,5 @@
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system';
 
 // Performance constants
 const MAX_DIMENSION = 2048; // Cap image processing at 2048px to prevent slowdowns
@@ -32,11 +33,42 @@ const createScaleAndCropActions = (originalWidth, originalHeight, targetWidth, t
   }
 };
 
+const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+function bytesToBase64(bytes) {
+  let result = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i];
+    const b = bytes[i + 1];
+    const c = bytes[i + 2];
+    result += BASE64_CHARS[a >> 2];
+    result += BASE64_CHARS[((a & 3) << 4) | (b >> 4)];
+    result += b !== undefined ? BASE64_CHARS[((b & 15) << 2) | (c >> 6)] : '=';
+    result += c !== undefined ? BASE64_CHARS[c & 63] : '=';
+  }
+  return result;
+}
+
+/** If uri is a remote URL, download to a local file and return its URI (ImageManipulator needs local). */
+async function ensureLocalUri(uri) {
+  if (!uri || typeof uri !== 'string') return uri;
+  if (!uri.startsWith('http://') && !uri.startsWith('https://')) return uri;
+  const localPath = `${FileSystem.cacheDirectory}puzzle_source_${Date.now()}.jpg`;
+  const response = await fetch(uri);
+  const blob = await response.blob();
+  const arrayBuffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+  const base64 = bytesToBase64(bytes);
+  await FileSystem.writeAsStringAsync(localPath, base64, { encoding: FileSystem.EncodingType.Base64 });
+  return localPath;
+}
+
 export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, targetBoardHeight) => {
   try {
     if (!imageUri || !rows || !cols || rows <= 0 || cols <= 0) {
       throw new Error('Invalid parameters for puzzle generation');
     }
+
+    const localUri = await ensureLocalUri(imageUri);
 
     // Cap target dimensions to prevent processing oversized images
     const maxDimension = Math.max(targetBoardWidth, targetBoardHeight);
@@ -48,7 +80,7 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
 
     // Get image dimensions (use JPEG for faster processing)
     const imageInfo = await ImageManipulator.manipulateAsync(
-      imageUri,
+      localUri,
       [],
       { format: ImageManipulator.SaveFormat.JPEG }
     );
@@ -79,7 +111,7 @@ export const generatePuzzle = async (imageUri, rows, cols, targetBoardWidth, tar
       const preScaledWidth = Math.round(originalWidth * preScale);
       const preScaledHeight = Math.round(originalHeight * preScale);
       const preScaled = await ImageManipulator.manipulateAsync(
-        imageUri,
+        localUri,
         [{ resize: { width: preScaledWidth, height: preScaledHeight } }],
         { format: ImageManipulator.SaveFormat.JPEG, compress: JPEG_QUALITY }
       );

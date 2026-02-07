@@ -28,9 +28,11 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useTheme } from '../contexts/ThemeContext';
 import { useCalendar } from '../contexts/CalendarContext';
 import { useGame } from '../contexts/GameContext';
+import { useAuth } from '../contexts/AuthContext';
 import { DifficultyModal } from './DifficultyModal';
 
 // Constants
@@ -44,7 +46,7 @@ const SPRING_CONFIG = {
   stiffness: 180,
   mass: 0.8,
 };
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CELL_SIZE = (SCREEN_WIDTH - 32) / 7;
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -672,6 +674,38 @@ const makeStyles = (theme) =>
       fontWeight: '500',
       color: theme.textMuted,
     },
+    // Gallery full-screen preview
+    galleryPreviewBackdrop: {
+      flex: 1,
+      overflow: 'hidden',
+    },
+    galleryPreviewBlur: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    galleryPreviewScroll: {
+      flex: 1,
+    },
+    galleryPreviewPage: {
+      width: SCREEN_WIDTH,
+      height: SCREEN_HEIGHT,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    galleryPreviewImage: {
+      width: SCREEN_WIDTH,
+      height: SCREEN_HEIGHT,
+    },
+    galleryPreviewCloseButton: {
+      position: 'absolute',
+      top: 48,
+      right: 20,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
     // Add Confirmation Modal
     addConfirmBackdrop: {
       flex: 1,
@@ -1010,11 +1044,17 @@ function DaySectionImage({
     <TouchableOpacity onPress={handlePress} activeOpacity={0.8}>
       <Animated.View style={animatedStyle}>
         <View style={{ position: 'relative' }}>
-          <Image
-            source={{ uri }}
-            style={[styles.daySectionThumb, getBorderStyle()]}
-            resizeMode="cover"
-          />
+          {uri ? (
+            <Image
+              source={{ uri }}
+              style={[styles.daySectionThumb, getBorderStyle()]}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[styles.daySectionThumb, getBorderStyle(), { backgroundColor: 'rgba(128,128,128,0.3)', justifyContent: 'center', alignItems: 'center' }]}>
+              <Ionicons name="image-outline" size={32} color="rgba(128,128,128,0.6)" />
+            </View>
+          )}
           {isSelected && (
             <Animated.View style={[styles.daySectionThumbOverlay, overlayAnimatedStyle]}>
               <LinearGradient
@@ -1066,11 +1106,17 @@ function AllPhotosImage({ uri, style, imageStyle, animationIndex, shouldAnimate,
 
   return (
     <Animated.View style={[style, animatedStyle]}>
-      <Image
-        source={{ uri }}
-        style={[imageStyle, labelColor && { borderColor: labelColor }]}
-        resizeMode="cover"
-      />
+      {uri ? (
+        <Image
+          source={{ uri }}
+          style={[imageStyle, labelColor && { borderColor: labelColor }]}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={[imageStyle, labelColor && { borderColor: labelColor }, { backgroundColor: 'rgba(128,128,128,0.3)', justifyContent: 'center', alignItems: 'center' }]}>
+          <Ionicons name="image-outline" size={28} color="rgba(128,128,128,0.6)" />
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -1102,6 +1148,7 @@ export const CalendarScreen = () => {
     addNewLabel,
   } = useCalendar();
   const { startPuzzleWithImage } = useGame();
+  const { user, isAuthenticated } = useAuth();
 
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
@@ -1137,7 +1184,9 @@ export const CalendarScreen = () => {
   const [activeFilters, setActiveFilters] = useState(new Set()); // Set of label IDs
   const [addConfirmVisible, setAddConfirmVisible] = useState(false);
   const [pendingAddImage, setPendingAddImage] = useState(null); // { uri, assetId, fileName }
+  const [galleryPreviewIndex, setGalleryPreviewIndex] = useState(null); // index into filteredAllPhotos, null = closed
   const dayScrollRef = useRef(null);
+  const galleryPreviewScrollRef = useRef(null);
 
   // Filter day images based on active label filters
   const filteredDayImages = useMemo(() => {
@@ -1457,7 +1506,7 @@ export const CalendarScreen = () => {
       );
 
       // Extract identifiers and filter duplicates
-      const newImages = result.assets
+      let newImages = result.assets
         .map((asset) => ({
           uri: asset.uri,
           assetId: asset.assetId || null,
@@ -1530,47 +1579,32 @@ export const CalendarScreen = () => {
   }, []);
 
   const handleImageAction = useCallback(
-    (imageId, imageUri) => {
+    (imageId, imageUri, sourceKey) => {
+      const fromKey = sourceKey ?? selectedKey;
       if (actionMode === 'edit') {
-        // Toggle selection - delete happens when X icon is tapped on any selected image
         setSelectedImageIds((current) => {
           const newSet = new Set(current);
-          if (newSet.has(imageId)) {
-            newSet.delete(imageId);
-          } else {
-            newSet.add(imageId);
-          }
+          if (newSet.has(imageId)) newSet.delete(imageId);
+          else newSet.add(imageId);
           return newSet;
         });
       } else if (actionMode === 'move') {
-        // Toggle selection for moving
         setSelectedImageIds((current) => {
           const newSet = new Set(current);
-          if (newSet.has(imageId)) {
-            newSet.delete(imageId);
-          } else {
-            newSet.add(imageId);
-          }
+          if (newSet.has(imageId)) newSet.delete(imageId);
+          else newSet.add(imageId);
           return newSet;
         });
-        // Update movingImages based on selection
         setMovingImages((current) => {
           const exists = current.some((img) => img.id === imageId);
-          if (exists) {
-            return current.filter((img) => img.id !== imageId);
-          } else {
-            return [...current, { id: imageId, uri: imageUri, fromKey: selectedKey }];
-          }
+          if (exists) return current.filter((img) => img.id !== imageId);
+          return [...current, { id: imageId, uri: imageUri, fromKey }];
         });
       } else if (actionMode === 'label') {
-        // Toggle selection for labeling
         setSelectedImageIds((current) => {
           const newSet = new Set(current);
-          if (newSet.has(imageId)) {
-            newSet.delete(imageId);
-          } else {
-            newSet.add(imageId);
-          }
+          if (newSet.has(imageId)) newSet.delete(imageId);
+          else newSet.add(imageId);
           return newSet;
         });
       }
@@ -1659,6 +1693,20 @@ export const CalendarScreen = () => {
         }),
     [goToPrevMonth, goToNextMonth]
   );
+
+  // Scroll gallery full-screen to opened index when modal opens
+  useEffect(() => {
+    if (galleryPreviewIndex === null) return;
+    const t = setTimeout(() => {
+      if (galleryPreviewScrollRef.current) {
+        galleryPreviewScrollRef.current.scrollTo({
+          x: galleryPreviewIndex * SCREEN_WIDTH,
+          animated: false,
+        });
+      }
+    }, 50);
+    return () => clearTimeout(t);
+  }, [galleryPreviewIndex]);
 
   return (
     <View style={styles.container}>
@@ -2159,23 +2207,30 @@ export const CalendarScreen = () => {
                 </Text>
               </View>
             ) : (
-              <ScrollView style={styles.allPhotosGrid} contentContainerStyle={styles.allPhotosGridContent}>
-                {filteredAllPhotos.map((photo, index) => {
-                  const photoLabelColor = photo.labelId ? labels.find((l) => l.id === photo.labelId)?.color : null;
-                  return (
-                    <TouchableOpacity key={photo.id} style={styles.allPhotosItem} activeOpacity={0.8}>
-                      <AllPhotosImage
-                        uri={photo.uri}
-                        style={styles.allPhotosImageWrapper}
-                        imageStyle={styles.allPhotosImage}
-                        animationIndex={index}
-                        shouldAnimate={allPhotosReady}
-                        labelColor={photoLabelColor}
-                      />
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+              <>
+                <ScrollView style={styles.allPhotosGrid} contentContainerStyle={styles.allPhotosGridContent}>
+                  {filteredAllPhotos.map((photo, index) => {
+                    const photoLabelColor = photo.labelId ? labels.find((l) => l.id === photo.labelId)?.color : null;
+                    return (
+                      <TouchableOpacity
+                        key={photo.id}
+                        style={styles.allPhotosItem}
+                        activeOpacity={0.8}
+                        onPress={() => setGalleryPreviewIndex(index)}
+                      >
+                        <AllPhotosImage
+                          uri={photo.uri}
+                          style={styles.allPhotosImageWrapper}
+                          imageStyle={styles.allPhotosImage}
+                          animationIndex={index}
+                          shouldAnimate={allPhotosReady}
+                          labelColor={photoLabelColor}
+                        />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </>
             )}
           </>
         )}
@@ -2276,6 +2331,53 @@ export const CalendarScreen = () => {
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Gallery full-screen image preview: swipe between photos, tap image or X to close */}
+      <Modal
+        visible={galleryPreviewIndex !== null}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setGalleryPreviewIndex(null)}
+      >
+        <View style={styles.galleryPreviewBackdrop}>
+          <BlurView intensity={80} tint="dark" style={styles.galleryPreviewBlur} />
+          {filteredAllPhotos.length > 0 && galleryPreviewIndex !== null ? (
+            <ScrollView
+              ref={galleryPreviewScrollRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              style={styles.galleryPreviewScroll}
+              contentContainerStyle={{ width: SCREEN_WIDTH * filteredAllPhotos.length }}
+              onMomentumScrollEnd={(e) => {
+                const i = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+                if (i >= 0 && i < filteredAllPhotos.length) setGalleryPreviewIndex(i);
+              }}
+            >
+              {filteredAllPhotos.map((photo, i) => (
+                <View key={photo.id} style={[styles.galleryPreviewPage, { width: SCREEN_WIDTH }]}>
+                  <TouchableWithoutFeedback onPress={() => setGalleryPreviewIndex(null)}>
+                    <Image
+                      source={{ uri: photo.uri }}
+                      style={styles.galleryPreviewImage}
+                      resizeMode="contain"
+                    />
+                  </TouchableWithoutFeedback>
+                </View>
+              ))}
+            </ScrollView>
+          ) : null}
+          <TouchableOpacity
+            style={styles.galleryPreviewCloseButton}
+            onPress={() => setGalleryPreviewIndex(null)}
+            hitSlop={12}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="close" size={28} color="#FFF" />
+          </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Add Confirmation Modal */}

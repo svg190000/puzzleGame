@@ -21,14 +21,12 @@ export function AuthProvider({ children }) {
       return;
     }
 
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
@@ -105,7 +103,6 @@ export function AuthProvider({ children }) {
         path: 'auth/callback',
       });
 
-      // Start OAuth flow with Supabase
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -123,28 +120,23 @@ export function AuthProvider({ children }) {
       );
       
       if (result.type === 'success') {
-        // Extract the URL and get the session
         const url = result.url;
-        
-        // Parse the URL to get tokens
-        // The URL format is: puzzle://auth/callback#access_token=...&refresh_token=...
-        const params = new URLSearchParams(url.split('#')[1]);
+        const hash = url.split('#')[1];
+        if (!hash) throw new Error('Failed to get authentication tokens');
+
+        const params = new URLSearchParams(hash);
         const accessToken = params.get('access_token');
         const refreshToken = params.get('refresh_token');
-        
+
         if (accessToken && refreshToken) {
-          // Set the session in Supabase
           const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
-          
           if (sessionError) throw sessionError;
-          
           return { data: sessionData, error: null };
-        } else {
-          throw new Error('Failed to get authentication tokens');
         }
+        throw new Error('Failed to get authentication tokens');
       } else if (result.type === 'cancel') {
         // User cancelled
         return { data: null, error: null };
@@ -160,19 +152,13 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    if (!isSupabaseConfigured()) {
-      return { error: null };
-    }
-    
+    if (!isSupabaseConfigured()) return { error: null };
     setError(null);
-    
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      
       setUser(null);
       setSession(null);
-      
       return { error: null };
     } catch (err) {
       setError(err.message);

@@ -168,6 +168,29 @@ npm start
 - [ ] Development server starts without errors
 - [ ] App loads on your chosen platform
 
+## Supabase (optional sync)
+
+The app can sync calendar metadata (dates, labels, image references) with Supabase when the user is signed in. **Images are stored locally only** (local file URIs); they are not uploaded to Supabase Storage. Images will be lost on uninstall (see the Data notice in Settings).
+
+- Create a Supabase project and add the **Authentication** and **Database** setup (tables `calendar_images` and `labels`).
+- See **`docs/SUPABASE_SCHEMA.md`** for the original table definitions and for reverting the DB if you previously added Google Photos columns.
+
+## EAS local build (Android)
+
+To run **`eas build --local`** for Android you must have the Android SDK installed and **ANDROID_HOME** set in the same shell where you run the command. Otherwise Gradle fails with: *"SDK location not found"*.
+
+1. Install Android Studio (or the standalone Android SDK) and install SDK packages (e.g. via Android Studio → SDK Manager).
+2. Set the environment variable **before** running the build (Linux example; adjust path if your SDK is elsewhere):
+   ```bash
+   export ANDROID_HOME=$HOME/Android/Sdk
+   # Optional: add SDK tools to PATH
+   export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin
+   eas build --local
+   ```
+3. To make it permanent, add the `export ANDROID_HOME=...` line to your `~/.bashrc` or `~/.profile`, then open a new terminal or run `source ~/.bashrc`.
+
+**About npm "deprecated" warnings:** The messages (e.g. `inflight`, `rimraf`, `glob`, `lodash.get`) come from transitive dependencies of Expo/React Native. They do **not** cause the build to fail. The only fix that makes the build succeed is setting **ANDROID_HOME**. To reduce noise you can run with `npm ci --omit=optional` or ignore those warnings.
+
 ## Additional Notes
 
 - The project uses Expo SDK 54, which is compatible with React Native 0.81.5

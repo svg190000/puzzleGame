@@ -16,6 +16,7 @@ const SYNC_STATUS_CONFIG = {
   idle: { icon: 'cloud-outline', label: 'Not synced', color: 'textMuted' },
   syncing: { icon: 'sync', label: 'Syncing...', color: 'accent' },
   synced: { icon: 'cloud-done', label: 'Synced', color: 'success' },
+  offline: { icon: 'cloud-offline', label: 'Offline – will sync when connected', color: 'textMuted' },
   error: { icon: 'cloud-offline', label: 'Sync error', color: 'error' },
 };
 
@@ -196,6 +197,22 @@ const makeStyles = (theme) =>
       textAlign: 'center',
       opacity: 0.8,
     },
+    dataNoticeCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: theme.surfaceAlt,
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    dataNoticeText: {
+      flex: 1,
+      fontSize: 14,
+      color: theme.textMuted,
+      lineHeight: 20,
+    },
   });
 
 export const SettingsScreen = ({ onNavigateToAuth }) => {
@@ -319,6 +336,17 @@ export const SettingsScreen = ({ onNavigateToAuth }) => {
               </Text>
             </View>
           )}
+        </View>
+
+        {/* Data notice */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Data</Text>
+          <View style={styles.dataNoticeCard}>
+            <Ionicons name="information-circle-outline" size={20} color={theme.textMuted} />
+            <Text style={styles.dataNoticeText}>
+              Images are stored locally and will be lost if you uninstall the app.
+            </Text>
+          </View>
         </View>
 
         {/* Theme Section */}
