@@ -181,6 +181,21 @@ const makeStyles = (theme) =>
       height: 5,
       borderRadius: 2.5,
     },
+    calendarTransitionContainer: {
+      flex: 1,
+      position: 'relative',
+    },
+    calendarTransitionLayer: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      flex: 1,
+    },
+    monthlyViewWrapper: {
+      flex: 1,
+    },
     monthTitleTouchable: {
       alignSelf: 'center',
       alignItems: 'center',
@@ -1362,6 +1377,8 @@ export const CalendarScreen = () => {
   const [leftPanelView, setLeftPanelView] = useState('menu'); // 'menu' | 'allPhotos' | 'albums' | 'albumAssets'
   const [calendarViewMode, setCalendarViewMode] = useState('monthly'); // 'monthly' | 'yearly'
   const [yearlyViewYear, setYearlyViewYear] = useState(() => new Date().getFullYear());
+  const monthlyOpacity = useSharedValue(1);
+  const yearlyOpacity = useSharedValue(0);
   const [allPhotosReady, setAllPhotosReady] = useState(false);
   const [albumsList, setAlbumsList] = useState([]);
   const [selectedAlbum, setSelectedAlbum] = useState(null);
@@ -1921,6 +1938,33 @@ export const CalendarScreen = () => {
     [pageHeight, totalPages, pageIndex]
   );
 
+  const TRANSITION_DURATION = 220;
+
+  const switchToYearlyView = useCallback(() => {
+    setCalendarViewMode('yearly');
+    setYearlyViewYear(viewDate.getFullYear());
+    setSelectedDate(null);
+    monthlyOpacity.value = withTiming(0, { duration: TRANSITION_DURATION });
+    yearlyOpacity.value = withTiming(1, { duration: TRANSITION_DURATION });
+  }, [viewDate, monthlyOpacity, yearlyOpacity]);
+
+  const switchToMonthlyView = useCallback(
+    (monthIdx) => {
+      setViewDate(new Date(yearlyViewYear, monthIdx, 1));
+      setCalendarViewMode('monthly');
+      yearlyOpacity.value = withTiming(0, { duration: TRANSITION_DURATION });
+      monthlyOpacity.value = withTiming(1, { duration: TRANSITION_DURATION });
+    },
+    [yearlyViewYear, monthlyOpacity, yearlyOpacity]
+  );
+
+  const monthlyLayerStyle = useAnimatedStyle(() => ({
+    opacity: monthlyOpacity.value,
+  }));
+  const yearlyLayerStyle = useAnimatedStyle(() => ({
+    opacity: yearlyOpacity.value,
+  }));
+
   // Gesture
   const panGesture = useMemo(
     () =>
@@ -1937,6 +1981,18 @@ export const CalendarScreen = () => {
           }
         }),
     [goToPrevMonth, goToNextMonth]
+  );
+
+  const pinchGesture = useMemo(
+    () =>
+      Gesture.Pinch()
+        .onEnd((e) => {
+          'worklet';
+          if (e.scale < 1) {
+            runOnJS(switchToYearlyView)();
+          }
+        }),
+    [switchToYearlyView]
   );
 
   // Scroll gallery full-screen to opened index when modal opens
@@ -1997,8 +2053,17 @@ export const CalendarScreen = () => {
         </View>
       </View>
 
-      {calendarViewMode === 'monthly' ? (
-        <>
+      <View style={styles.calendarTransitionContainer}>
+        <Animated.View
+          style={[
+            styles.calendarTransitionLayer,
+            monthlyLayerStyle,
+            { zIndex: calendarViewMode === 'monthly' ? 2 : 1 },
+          ]}
+          pointerEvents={calendarViewMode === 'monthly' ? 'auto' : 'none'}
+        >
+        <GestureDetector gesture={pinchGesture}>
+          <View style={styles.monthlyViewWrapper}>
       {/* Month Title */}
       <TouchableOpacity style={styles.monthTitleTouchable} onPress={openPicker} activeOpacity={0.7}>
         <Text style={styles.monthTitle}>
@@ -2094,213 +2159,17 @@ export const CalendarScreen = () => {
         </Animated.View>
       </GestureDetector>
 
-      {/* Day Section */}
-      <View style={styles.daySectionWrapper} pointerEvents={selectedDate ? 'auto' : 'none'}>
-        <Animated.View 
-          style={[styles.daySection, daySectionAnimatedStyle]}
-          renderToHardwareTextureAndroid={Platform.OS === 'android'}
-        >
-          {selectedDate && (
-            <>
-              <View style={styles.daySectionHeader}>
-                <Text style={[
-                  styles.daySectionTitle,
-                  actionMode === 'edit' && { color: '#E53935' },
-                  actionMode === 'move' && { color: '#FF9800' },
-                  actionMode === 'label' && { color: '#9C27B0' },
-                ]}>
-                  {movingImages.length > 0
-                    ? `Tap a date to move ${movingImages.length} image${movingImages.length > 1 ? 's' : ''}`
-                    : actionMode === 'edit' && selectedImageIds.size > 0
-                    ? `${selectedImageIds.size} image${selectedImageIds.size > 1 ? 's' : ''} selected for deletion`
-                    : actionMode === 'edit'
-                    ? 'Edit Mode'
-                    : actionMode === 'move' && selectedImageIds.size > 0
-                    ? `${selectedImageIds.size} image${selectedImageIds.size > 1 ? 's' : ''} selected to move`
-                    : actionMode === 'move'
-                    ? 'Move Mode'
-                    : actionMode === 'label' && selectedImageIds.size > 0
-                    ? `${selectedImageIds.size} image${selectedImageIds.size > 1 ? 's' : ''} selected for labeling`
-                    : actionMode === 'label'
-                    ? 'Label Mode'
-                    : formatDayHeader(selectedDate)}
-                </Text>
-                <TouchableOpacity
-                  style={styles.daySectionClose}
-                  onPress={() => {
-                    if (movingImages.length > 0) {
-                      setMovingImages([]);
-                      setSelectedImageIds(new Set());
-                    } else if ((actionMode === 'edit' || actionMode === 'label') && selectedImageIds.size > 0) {
-                      setSelectedImageIds(new Set());
-                    } else {
-                      setSelectedDate(null);
-                    }
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name={movingImages.length > 0 || ((actionMode === 'edit' || actionMode === 'label') && selectedImageIds.size > 0) ? 'close' : 'chevron-down'}
-                    size={22}
-                    color={theme.text}
-                  />
-                </TouchableOpacity>
-              </View>
-
-              {filteredDayImages.length === 0 ? (
-                <ScrollView
-                  style={styles.daySectionList}
-                  contentContainerStyle={styles.daySectionListContent}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                >
-                  <View style={styles.daySectionEmpty}>
-                    <Text style={styles.daySectionEmptyText}>
-                      {dayImages.length > 0 && activeFilters.size > 0
-                        ? 'No matching items'
-                        : 'No items for this day'}
-                    </Text>
-                  </View>
-                </ScrollView>
-              ) : (
-                <>
-                  <ScrollView
-                    ref={dayScrollRef}
-                    style={styles.daySectionList}
-                    pagingEnabled
-                    showsVerticalScrollIndicator={false}
-                    scrollEventThrottle={16}
-                    onLayout={(e) => setListHeight(e.nativeEvent.layout.height)}
-                    onScroll={handleScroll}
-                    onMomentumScrollEnd={handleScroll}
-                    onScrollEndDrag={handleScroll}
-                  >
-                    {pages.map((page, pi) => (
-                      <View key={pi} style={[styles.daySectionPage, { height: pageHeight }]}>
-                        {page.map((img, index) => {
-                          const { id, assetId, labelId: imageLabelId } = img;
-                          const isImageSelected = selectedImageIds.has(id);
-
-                          const imageLabelColor = imageLabelId ? labels.find((l) => l.id === imageLabelId)?.color : null;
-                          return (
-                            <DaySectionImage
-                              key={id}
-                              assetId={assetId}
-                              uri={img.uri}
-                              isSelected={isImageSelected}
-                              selectedCount={selectedImageIds.size}
-                              onPress={() => {
-                                if (actionMode) {
-                                  // Multi-select in edit/move mode
-                                  setSelectedImageIds((current) => {
-                                    const newSet = new Set(current);
-                                    if (newSet.has(id)) {
-                                      newSet.delete(id);
-                                    } else {
-                                      newSet.add(id);
-                                    }
-                                    return newSet;
-                                  });
-                                } else {
-                                  // Single select in regular mode
-                                  setSelectedImageIds((current) => {
-                                    if (current.has(id)) {
-                                      return new Set();
-                                    } else {
-                                      return new Set([id]);
-                                    }
-                                  });
-                                }
-                              }}
-                              onPlayPress={(imageInfo) => handlePlayPress(imageInfo)}
-                              onActionPress={() => handleImageAction(id, null)}
-                              onDeletePress={handleDeleteImage}
-                              onLabelPress={() => openLabelPicker(id)}
-                              styles={styles}
-                              animationIndex={pi * IMAGES_PER_PAGE + index}
-                              shouldAnimate={imagesShouldAnimate}
-                              actionMode={actionMode}
-                              labelColor={imageLabelColor}
-                            />
-                          );
-                        })}
-                      </View>
-                    ))}
-                  </ScrollView>
-                  <View style={styles.pageIndicators}>
-                    {Array.from({ length: totalPages }, (_, i) => (
-                      <PageIndicatorDot key={i} active={i === pageIndex} baseStyle={styles.pageIndicatorDot} />
-                    ))}
-                  </View>
-                </>
-              )}
-
-              <View style={[styles.daySectionActions, filteredDayImages.length === 0 && styles.daySectionActionsEmpty]}>
-                  {filteredDayImages.length > 0 ? (
-                    <>
-                      {/* Edit Button */}
-                      <TouchableOpacity
-                        style={[
-                          styles.actionModeButton,
-                          actionMode === 'edit' && styles.actionModeButtonEdit,
-                        ]}
-                        onPress={() => toggleActionMode('edit')}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons
-                          name="trash-outline"
-                          size={20}
-                          color={actionMode === 'edit' ? '#E53935' : theme.text}
-                        />
-                      </TouchableOpacity>
-
-                      {/* Label Button */}
-                      <TouchableOpacity
-                        style={styles.labelModeButton}
-                        onPress={() => toggleActionMode('label')}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="pricetag-outline" size={20} color={theme.buttonText} />
-                        <Text style={styles.labelModeButtonText}>Label</Text>
-                      </TouchableOpacity>
-
-                      {/* Add to Date Button */}
-                      <TouchableOpacity style={styles.addToDateButton} onPress={handleAddToDate} activeOpacity={0.7}>
-                        <Ionicons name="images-outline" size={20} color={theme.buttonText} />
-                        <Text style={styles.addToDateButtonText}>Add to date</Text>
-                      </TouchableOpacity>
-
-                      {/* Move Button */}
-                      <TouchableOpacity
-                        style={[
-                          styles.actionModeButton,
-                          actionMode === 'move' && styles.actionModeButtonMove,
-                        ]}
-                        onPress={() => toggleActionMode('move')}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons
-                          name="swap-horizontal-outline"
-                          size={20}
-                          color={actionMode === 'move' ? '#FF9800' : theme.text}
-                        />
-                      </TouchableOpacity>
-                    </>
-                  ) : (
-                    /* Centered Add to Date Button when no images */
-                    <TouchableOpacity style={styles.addToDateButtonCentered} onPress={handleAddToDate} activeOpacity={0.7}>
-                      <Ionicons name="images-outline" size={20} color={theme.buttonText} />
-                      <Text style={styles.addToDateButtonText}>Add to date</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-            </>
-          )}
+          </View>
+        </GestureDetector>
         </Animated.View>
-      </View>
-        </>
-      ) : (
-        <>
+        <Animated.View
+          style={[
+            styles.calendarTransitionLayer,
+            yearlyLayerStyle,
+            { zIndex: calendarViewMode === 'yearly' ? 2 : 1 },
+          ]}
+          pointerEvents={calendarViewMode === 'yearly' ? 'auto' : 'none'}
+        >
       {/* Yearly view: year selector + 3×4 month grid */}
       <View style={styles.yearlyYearRow}>
         <TouchableOpacity
@@ -2346,10 +2215,7 @@ export const CalendarScreen = () => {
                 <TouchableOpacity
                   key={label}
                   style={styles.yearlyMonthCell}
-                  onPress={() => {
-                    setViewDate(new Date(yearlyViewYear, idx, 1));
-                    setCalendarViewMode('monthly');
-                  }}
+                  onPress={() => switchToMonthlyView(idx)}
                   activeOpacity={0.7}
                 >
                   <Text style={styles.yearlyMonthCellLabel}>{label}</Text>
@@ -2423,7 +2289,177 @@ export const CalendarScreen = () => {
         })}
       </View>
       </ScrollView>
-        </>
+        </Animated.View>
+      </View>
+
+      {calendarViewMode === 'monthly' && (
+        <View style={styles.daySectionWrapper} pointerEvents={selectedDate ? 'auto' : 'none'}>
+            <Animated.View
+              style={[styles.daySection, daySectionAnimatedStyle]}
+              renderToHardwareTextureAndroid={Platform.OS === 'android'}
+            >
+              {selectedDate && (
+                <>
+                  <View style={styles.daySectionHeader}>
+                    <Text style={[
+                      styles.daySectionTitle,
+                      actionMode === 'edit' && { color: '#E53935' },
+                      actionMode === 'move' && { color: '#FF9800' },
+                      actionMode === 'label' && { color: '#9C27B0' },
+                    ]}>
+                      {movingImages.length > 0
+                        ? `Tap a date to move ${movingImages.length} image${movingImages.length > 1 ? 's' : ''}`
+                        : actionMode === 'edit' && selectedImageIds.size > 0
+                        ? `${selectedImageIds.size} image${selectedImageIds.size > 1 ? 's' : ''} selected for deletion`
+                        : actionMode === 'edit'
+                        ? 'Edit Mode'
+                        : actionMode === 'move' && selectedImageIds.size > 0
+                        ? `${selectedImageIds.size} image${selectedImageIds.size > 1 ? 's' : ''} selected to move`
+                        : actionMode === 'move'
+                        ? 'Move Mode'
+                        : actionMode === 'label' && selectedImageIds.size > 0
+                        ? `${selectedImageIds.size} image${selectedImageIds.size > 1 ? 's' : ''} selected for labeling`
+                        : actionMode === 'label'
+                        ? 'Label Mode'
+                        : formatDayHeader(selectedDate)}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.daySectionClose}
+                      onPress={() => {
+                        if (movingImages.length > 0) {
+                          setMovingImages([]);
+                          setSelectedImageIds(new Set());
+                        } else if ((actionMode === 'edit' || actionMode === 'label') && selectedImageIds.size > 0) {
+                          setSelectedImageIds(new Set());
+                        } else {
+                          setSelectedDate(null);
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={movingImages.length > 0 || ((actionMode === 'edit' || actionMode === 'label') && selectedImageIds.size > 0) ? 'close' : 'chevron-down'}
+                        size={22}
+                        color={theme.text}
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  {filteredDayImages.length === 0 ? (
+                    <ScrollView
+                      style={styles.daySectionList}
+                      contentContainerStyle={styles.daySectionListContent}
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                    >
+                      <View style={styles.daySectionEmpty}>
+                        <Text style={styles.daySectionEmptyText}>
+                          {dayImages.length > 0 && activeFilters.size > 0
+                            ? 'No matching items'
+                            : 'No items for this day'}
+                        </Text>
+                      </View>
+                    </ScrollView>
+                  ) : (
+                    <>
+                      <ScrollView
+                        ref={dayScrollRef}
+                        style={styles.daySectionList}
+                        pagingEnabled
+                        showsVerticalScrollIndicator={false}
+                        scrollEventThrottle={16}
+                        onLayout={(e) => setListHeight(e.nativeEvent.layout.height)}
+                        onScroll={handleScroll}
+                        onMomentumScrollEnd={handleScroll}
+                        onScrollEndDrag={handleScroll}
+                      >
+                        {pages.map((page, pi) => (
+                          <View key={pi} style={[styles.daySectionPage, { height: pageHeight }]}>
+                            {page.map((img, index) => {
+                              const { id, assetId, labelId: imageLabelId } = img;
+                              const isImageSelected = selectedImageIds.has(id);
+                              const imageLabelColor = imageLabelId ? labels.find((l) => l.id === imageLabelId)?.color : null;
+                              return (
+                                <DaySectionImage
+                                  key={id}
+                                  assetId={assetId}
+                                  uri={img.uri}
+                                  isSelected={isImageSelected}
+                                  selectedCount={selectedImageIds.size}
+                                  onPress={() => {
+                                    if (actionMode) {
+                                      setSelectedImageIds((current) => {
+                                        const newSet = new Set(current);
+                                        if (newSet.has(id)) newSet.delete(id);
+                                        else newSet.add(id);
+                                        return newSet;
+                                      });
+                                    } else {
+                                      setSelectedImageIds((current) =>
+                                        current.has(id) ? new Set() : new Set([id])
+                                      );
+                                    }
+                                  }}
+                                  onPlayPress={(imageInfo) => handlePlayPress(imageInfo)}
+                                  onActionPress={() => handleImageAction(id, null)}
+                                  onDeletePress={handleDeleteImage}
+                                  onLabelPress={() => openLabelPicker(id)}
+                                  styles={styles}
+                                  animationIndex={pi * IMAGES_PER_PAGE + index}
+                                  shouldAnimate={imagesShouldAnimate}
+                                  actionMode={actionMode}
+                                  labelColor={imageLabelColor}
+                                />
+                              );
+                            })}
+                          </View>
+                        ))}
+                      </ScrollView>
+                      <View style={styles.pageIndicators}>
+                        {Array.from({ length: totalPages }, (_, i) => (
+                          <PageIndicatorDot key={i} active={i === pageIndex} baseStyle={styles.pageIndicatorDot} />
+                        ))}
+                      </View>
+                    </>
+                  )}
+
+                  <View style={[styles.daySectionActions, filteredDayImages.length === 0 && styles.daySectionActionsEmpty]}>
+                    {filteredDayImages.length > 0 ? (
+                      <>
+                        <TouchableOpacity
+                          style={[styles.actionModeButton, actionMode === 'edit' && styles.actionModeButtonEdit]}
+                          onPress={() => toggleActionMode('edit')}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="trash-outline" size={20} color={actionMode === 'edit' ? '#E53935' : theme.text} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.labelModeButton} onPress={() => toggleActionMode('label')} activeOpacity={0.7}>
+                          <Ionicons name="pricetag-outline" size={20} color={theme.buttonText} />
+                          <Text style={styles.labelModeButtonText}>Label</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.addToDateButton} onPress={handleAddToDate} activeOpacity={0.7}>
+                          <Ionicons name="images-outline" size={20} color={theme.buttonText} />
+                          <Text style={styles.addToDateButtonText}>Add to date</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.actionModeButton, actionMode === 'move' && styles.actionModeButtonMove]}
+                          onPress={() => toggleActionMode('move')}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="swap-horizontal-outline" size={20} color={actionMode === 'move' ? '#FF9800' : theme.text} />
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <TouchableOpacity style={styles.addToDateButtonCentered} onPress={handleAddToDate} activeOpacity={0.7}>
+                        <Ionicons name="images-outline" size={20} color={theme.buttonText} />
+                        <Text style={styles.addToDateButtonText}>Add to date</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </>
+              )}
+            </Animated.View>
+        </View>
       )}
 
       {/* Month/Year Picker Modal */}
@@ -2497,36 +2533,6 @@ export const CalendarScreen = () => {
               <Text style={styles.leftPanelTitle}>Menu</Text>
             </View>
             <View style={styles.leftPanelContent}>
-              <TouchableOpacity
-                style={styles.leftPanelMenuItem}
-                onPress={() => {
-                  setCalendarViewMode('monthly');
-                  setLeftPanelOpen(false);
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="calendar-outline" size={22} color={theme.text} />
-                <Text style={styles.leftPanelMenuItemText}>Monthly</Text>
-                {calendarViewMode === 'monthly' && (
-                  <Ionicons name="checkmark" size={20} color={theme.accent} />
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.leftPanelMenuItem}
-                onPress={() => {
-                  setCalendarViewMode('yearly');
-                  setYearlyViewYear(viewDate.getFullYear());
-                  setSelectedDate(null);
-                  setLeftPanelOpen(false);
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="calendar" size={22} color={theme.text} />
-                <Text style={styles.leftPanelMenuItemText}>Yearly</Text>
-                {calendarViewMode === 'yearly' && (
-                  <Ionicons name="checkmark" size={20} color={theme.accent} />
-                )}
-              </TouchableOpacity>
               <TouchableOpacity style={styles.leftPanelMenuItem} onPress={openAllPhotos} activeOpacity={0.7}>
                 <Ionicons name="images-outline" size={22} color={theme.text} />
                 <Text style={styles.leftPanelMenuItemText}>Gallery</Text>
