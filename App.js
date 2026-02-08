@@ -10,14 +10,7 @@ import {
   PixelRatio,
   Platform,
 } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, withDelay, Easing } from 'react-native-reanimated';
-
-// Spring config for smooth screen transitions on Android
-const SCREEN_SPRING_CONFIG = {
-  damping: 22,
-  stiffness: 200,
-  mass: 0.8,
-};
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, Easing } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -965,35 +958,40 @@ function AppContent() {
   const [settingsZIndex, setSettingsZIndex] = useState(1);
   const prevRouteRef = useRef('Home');
   
-  // Handle screen transitions - using spring for smoother Android performance
+  // Handle screen transitions - slide in (700ms), 100ms pause, then other screen slides out (280ms)
+  const SLIDE_IN_DURATION = 700;
+  const SLIDE_OUT_DURATION = 400;
+  const PAUSE_BEFORE_SLIDE_OUT = 100;
   useEffect(() => {
     const prevRoute = prevRouteRef.current;
-    const timingConfig = { duration: 280, easing: Easing.out(Easing.cubic) };
+    const slideInConfig = { duration: SLIDE_IN_DURATION, easing: Easing.out(Easing.cubic) };
+    const slideOutConfig = { duration: SLIDE_OUT_DURATION, easing: Easing.out(Easing.cubic) };
+    const delayBeforeOut = SLIDE_IN_DURATION + PAUSE_BEFORE_SLIDE_OUT;
     
     if (currentRouteName === 'Calendar') {
       // Calendar slides in from left
-      calendarTranslateX.value = withSpring(0, SCREEN_SPRING_CONFIG);
-      // Settings slides out to right (if coming from Settings) - delayed
+      calendarTranslateX.value = withTiming(0, slideInConfig);
+      // Settings slides out to right (if coming from Settings) - after slide-in + pause
       if (prevRoute === 'Settings') {
         setCalendarZIndex(2);
         setSettingsZIndex(1);
-        settingsTranslateX.value = withDelay(200, withTiming(SCREEN_WIDTH, timingConfig));
+        settingsTranslateX.value = withDelay(delayBeforeOut, withTiming(SCREEN_WIDTH, slideOutConfig));
       } else {
         setCalendarZIndex(2);
         setSettingsZIndex(1);
       }
     } else if (currentRouteName === 'Home') {
       // Both Calendar and Settings slide out
-      calendarTranslateX.value = withTiming(-SCREEN_WIDTH, timingConfig);
-      settingsTranslateX.value = withTiming(SCREEN_WIDTH, timingConfig);
+      calendarTranslateX.value = withTiming(-SCREEN_WIDTH, slideOutConfig);
+      settingsTranslateX.value = withTiming(SCREEN_WIDTH, slideOutConfig);
     } else if (currentRouteName === 'Settings') {
       // Settings slides in from right
-      settingsTranslateX.value = withSpring(0, SCREEN_SPRING_CONFIG);
-      // Calendar slides out to left (if coming from Calendar) - delayed
+      settingsTranslateX.value = withTiming(0, slideInConfig);
+      // Calendar slides out to left (if coming from Calendar) - after slide-in + pause
       if (prevRoute === 'Calendar') {
         setSettingsZIndex(2);
         setCalendarZIndex(1);
-        calendarTranslateX.value = withDelay(200, withTiming(-SCREEN_WIDTH, timingConfig));
+        calendarTranslateX.value = withDelay(delayBeforeOut, withTiming(-SCREEN_WIDTH, slideOutConfig));
       } else {
         setSettingsZIndex(2);
         setCalendarZIndex(1);
