@@ -1,23 +1,16 @@
 import React, { createContext, useContext, useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import NetInfo from '@react-native-community/netinfo';
 import syncService from '../services/SyncService';
-import { useAuth } from './AuthContext';
+import * as calendarStorage from '../services/calendarStorage';
 
 const CalendarContext = createContext(null);
 
-function dateKey(d) {
+export function dateKey(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
 
-function keyToDDMMYYYY(key) {
-  const [y, m, d] = key.split('-');
-  return `${d}${m}${y}`;
-}
-
-// Default labels
 const DEFAULT_LABELS = [
   { id: '1', color: '#E53935', name: 'Important' },
   { id: '2', color: '#43A047', name: 'Family' },
@@ -25,74 +18,72 @@ const DEFAULT_LABELS = [
   { id: '4', color: '#FF9800', name: 'Work' },
 ];
 
+function entriesToImagesByDate(entries) {
+  const byDate = {};
+  entries.forEach((e) => {
+    if (!byDate[e.date]) byDate[e.date] = [];
+    byDate[e.date].push({
+      id: e.id,
+      assetId: e.assetId || null,
+      uri: e.uri || null,
+      labelId: e.labels && e.labels[0] ? e.labels[0] : null,
+      labels: e.labels || [],
+    });
+  });
+  return byDate;
+}
+
 export function CalendarProvider({ children }) {
-  const { user, isAuthenticated } = useAuth();
-  
   const [viewDate, setViewDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
-  const [imagesByDate, setImagesByDate] = useState({});
+  const [calendarEntries, setCalendarEntries] = useState([]);
   const [pendingNavigation, setPendingNavigation] = useState(null);
-  
-  // Labels state (moved from CalendarScreen)
   const [labels, setLabels] = useState(DEFAULT_LABELS);
-  
-  // Sync status: 'idle' | 'syncing' | 'synced' | 'offline' | 'error'
-  const [syncStatus, setSyncStatus] = useState('idle');
   const [isDataLoaded, setIsDataLoaded] = useState(false);
-  
-  // Ref to track if initial load is done
   const initialLoadDone = useRef(false);
-  // Ref to trigger sync after next imagesByDate update (e.g. after delete)
-  const syncAfterNextUpdateRef = useRef(false);
 
-  // Load local data on mount
+  const imagesByDate = useMemo(() => entriesToImagesByDate(calendarEntries), [calendarEntries]);
+
   useEffect(() => {
-    const loadData = async () => {
-      const { imagesByDate: loadedImages, labels: loadedLabels } = await syncService.loadLocalData();
-      setImagesByDate(loadedImages);
-      setLabels(loadedLabels);
+    const load = async () => {
+      const [entries, localData] = await Promise.all([
+        calendarStorage.getAllCalendarImages(),
+        syncService.loadLocalData(),
+      ]);
+      let finalEntries = entries;
+      const oldImages = localData.imagesByDate || {};
+      const hasOldData = Object.keys(oldImages).length > 0;
+      if (hasOldData && entries.length === 0) {
+        const migrated = [];
+        for (const [date, images] of Object.entries(oldImages)) {
+          for (const img of images) {
+            const assetId = img.assetId || null;
+            const uri = img.uri || null;
+            if (assetId || uri) {
+              const entry = await calendarStorage.addCalendarImage({
+                assetId: assetId || undefined,
+                uri: uri || undefined,
+                labels: img.labelId ? [img.labelId] : (img.labels || []),
+                date,
+              });
+              if (entry) migrated.push(entry);
+            }
+          }
+        }
+        finalEntries = migrated;
+        if (migrated.length > 0) {
+          await syncService.saveLocalData({}, localData.labels || DEFAULT_LABELS);
+        }
+      }
+      setCalendarEntries(finalEntries);
+      setLabels(localData.labels || DEFAULT_LABELS);
       setIsDataLoaded(true);
       initialLoadDone.current = true;
     };
-    loadData();
+    load();
   }, []);
-
-  // Listen to sync status changes
-  useEffect(() => {
-    const unsubscribe = syncService.addSyncListener(setSyncStatus);
-    return unsubscribe;
-  }, []);
-
-  // Sync with remote when authenticated and data is loaded
-  useEffect(() => {
-    if (isAuthenticated && isDataLoaded && user?.id) {
-      syncWithRemote();
-    }
-  }, [isAuthenticated, isDataLoaded, user?.id]);
-
-  // Re-sync when connection is restored (offline -> online)
-  useEffect(() => {
-    if (!isAuthenticated || !user?.id || !isDataLoaded) return;
-    const unsubscribe = NetInfo.addEventListener((state) => {
-      if (state.isConnected && state.isInternetReachable !== false) {
-        syncWithRemote();
-      }
-    });
-    return unsubscribe;
-  }, [isAuthenticated, user?.id, isDataLoaded, syncWithRemote]);
-
-  // Save to local storage whenever data changes (after initial load)
-  useEffect(() => {
-    if (initialLoadDone.current) {
-      syncService.saveLocalImages(imagesByDate);
-      if (syncAfterNextUpdateRef.current) {
-        syncAfterNextUpdateRef.current = false;
-        if (isAuthenticated && user?.id) syncWithRemote();
-      }
-    }
-  }, [imagesByDate, isAuthenticated, user?.id, syncWithRemote]);
 
   useEffect(() => {
     if (initialLoadDone.current) {
@@ -100,211 +91,127 @@ export function CalendarProvider({ children }) {
     }
   }, [labels]);
 
-  const syncWithRemote = useCallback(async () => {
-    if (!user?.id) return;
-    
-    const result = await syncService.syncWithRemote(imagesByDate, labels, user.id);
-    if (result.success) {
-      setImagesByDate(result.imagesByDate);
-      setLabels(result.labels);
-    }
-  }, [user?.id, imagesByDate, labels]);
-
-  const triggerSync = useCallback(() => {
-    if (isAuthenticated && user?.id) {
-      syncWithRemote();
-    }
-  }, [isAuthenticated, user?.id, syncWithRemote]);
-
-  const addImagesToDate = useCallback((key, images) => {
-    if (!images.length) return;
-    const ddmmyyyy = keyToDDMMYYYY(key);
-    const timestamp = Date.now();
-    
-    setImagesByDate((prev) => {
-      const list = prev[key] ?? [];
-      const next = images.map((img, i) => {
-        const newImage = {
-          id: `${ddmmyyyy}#${timestamp}_${i}`,
-          uri: img.uri ?? '',
-          assetId: img.assetId ?? null,
-          fileName: img.fileName ?? null,
-          labelId: img.labelId || null,
-          updatedAt: new Date().toISOString(),
-        };
-        
-        // Push to remote in background
-        if (user?.id) {
-          syncService.pushImageChange('add', { ...newImage, dateKey: key }, user.id);
-        }
-        
-        return newImage;
-      });
-      return { ...prev, [key]: [...list, ...next] };
-    });
-  }, [user?.id]);
+  const addImagesToDate = useCallback((key, items) => {
+    if (!items.length) return;
+    const toAdd = items
+      .map((item) => ({
+        assetId: item.assetId || item.id || null,
+        uri: item.uri || null,
+        labels: item.labelId ? [item.labelId] : item.labels || [],
+      }))
+      .filter((item) => item.assetId || item.uri);
+    if (!toAdd.length) return;
+    (async () => {
+      const added = [];
+      for (const item of toAdd) {
+        const entry = await calendarStorage.addCalendarImage({
+          assetId: item.assetId,
+          uri: item.uri,
+          labels: item.labels,
+          date: key,
+        });
+        if (entry) added.push(entry);
+      }
+      if (added.length) setCalendarEntries((prev) => [...prev, ...added]);
+    })();
+  }, []);
 
   const removeImageFromDate = useCallback((key, imageId) => {
-    syncAfterNextUpdateRef.current = true;
-    setImagesByDate((prev) => {
-      const list = prev[key] ?? [];
-      const filtered = list.filter((img) => img.id !== imageId);
-      
-      // Push to remote in background
-      if (user?.id) {
-        syncService.pushImageChange('remove', { id: imageId }, user.id);
-      }
-      
-      if (filtered.length === 0) {
-        const { [key]: _, ...rest } = prev;
-        return rest;
-      }
-      return { ...prev, [key]: filtered };
+    calendarStorage.deleteCalendarImage(imageId).then(() => {
+      setCalendarEntries((prev) => prev.filter((e) => e.id !== imageId));
     });
-  }, [user?.id]);
+  }, []);
+
+  /** Batch delete; use for multi-select so all removals persist in one sync. */
+  const removeImagesFromDate = useCallback((key, imageIds) => {
+    const ids = Array.isArray(imageIds) ? imageIds : Array.from(imageIds);
+    if (!ids.length) return;
+    calendarStorage.deleteCalendarImages(ids).then(() => {
+      setCalendarEntries((prev) => prev.filter((e) => !ids.includes(e.id)));
+    });
+  }, []);
 
   const moveImageToDate = useCallback((fromKey, toKey, imageId) => {
-    if (fromKey === toKey) return;
-    setImagesByDate((prev) => {
-      const fromList = prev[fromKey] ?? [];
-      const imageToMove = fromList.find((img) => img.id === imageId);
-      if (!imageToMove) return prev;
-
-      const newFromList = fromList.filter((img) => img.id !== imageId);
-      
-      const toList = prev[toKey] ?? [];
-      const ddmmyyyy = keyToDDMMYYYY(toKey);
-      const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-      const newImage = {
-        id: `${ddmmyyyy}#${uniqueSuffix}`,
-        uri: imageToMove.uri,
-        assetId: imageToMove.assetId,
-        fileName: imageToMove.fileName,
-        labelId: imageToMove.labelId,
-        updatedAt: new Date().toISOString(),
-      };
-
-      // Push to remote in background
-      if (user?.id) {
-        syncService.pushImageChange('move', {
-          oldId: imageId,
-          newId: newImage.id,
-          toDateKey: toKey,
-        }, user.id);
-      }
-
-      const result = { ...prev, [toKey]: [...toList, newImage] };
-      
-      if (newFromList.length === 0) {
-        delete result[fromKey];
-      } else {
-        result[fromKey] = newFromList;
-      }
-      
-      return result;
+    calendarStorage.updateCalendarImage(imageId, { date: toKey }).then(() => {
+      setCalendarEntries((prev) =>
+        prev.map((e) => (e.id === imageId ? { ...e, date: toKey } : e))
+      );
     });
-  }, [user?.id]);
+  }, []);
+
+  /** Batch move; use for multi-select so all moves persist in one sync. */
+  const moveImagesToDate = useCallback((fromKey, toKey, imageIds) => {
+    const ids = Array.isArray(imageIds) ? imageIds : Array.from(imageIds);
+    if (!ids.length) return;
+    const updates = ids.map((id) => ({ id, date: toKey }));
+    calendarStorage.updateCalendarImages(updates).then(() => {
+      setCalendarEntries((prev) =>
+        prev.map((e) => (e.id && ids.includes(e.id) ? { ...e, date: toKey } : e))
+      );
+    });
+  }, []);
 
   const setImageLabel = useCallback((imageId, labelId) => {
-    setImagesByDate((prev) => {
-      const newState = { ...prev };
-      for (const key of Object.keys(newState)) {
-        const list = newState[key];
-        const index = list.findIndex((img) => img.id === imageId);
-        if (index !== -1) {
-          newState[key] = [...list];
-          newState[key][index] = { 
-            ...list[index], 
-            labelId,
-            updatedAt: new Date().toISOString(),
-          };
-          
-          // Push to remote in background
-          if (user?.id) {
-            syncService.pushImageChange('update', {
-              id: imageId,
-              dateKey: key,
-              labelId,
-            }, user.id);
-          }
-          
-          break;
-        }
-      }
-      return newState;
+    const labelsArr = labelId ? [labelId] : [];
+    calendarStorage.updateCalendarImage(imageId, { labels: labelsArr }).then(() => {
+      setCalendarEntries((prev) =>
+        prev.map((e) => (e.id === imageId ? { ...e, labels: labelsArr } : e))
+      );
     });
-  }, [user?.id]);
+  }, []);
+
+  /** Batch set label; use for multi-select so all label changes persist in one sync. */
+  const setImageLabels = useCallback((imageIds, labelId) => {
+    const ids = Array.isArray(imageIds) ? imageIds : Array.from(imageIds);
+    if (!ids.length) return;
+    const labelsArr = labelId ? [labelId] : [];
+    const updates = ids.map((id) => ({ id, labels: labelsArr }));
+    calendarStorage.updateCalendarImages(updates).then(() => {
+      setCalendarEntries((prev) =>
+        prev.map((e) => (e.id && ids.includes(e.id) ? { ...e, labels: labelsArr } : e))
+      );
+    });
+  }, []);
 
   const removeImageLabel = useCallback((imageId) => {
     setImageLabel(imageId, null);
   }, [setImageLabel]);
 
-  // Label management functions
   const updateLabelName = useCallback((labelId, newName) => {
-    setLabels((prev) => {
-      const updated = prev.map((label) =>
-        label.id === labelId ? { ...label, name: newName } : label
-      );
-      
-      // Push to remote in background
-      const label = updated.find((l) => l.id === labelId);
-      if (user?.id && label) {
-        syncService.pushLabelChange('update', label, user.id);
-      }
-      
-      return updated;
-    });
-  }, [user?.id]);
+    setLabels((prev) =>
+      prev.map((l) => (l.id === labelId ? { ...l, name: newName } : l))
+    );
+  }, []);
 
   const deleteLabel = useCallback((labelId) => {
-    setLabels((prev) => {
-      // Push to remote in background
-      if (user?.id) {
-        syncService.pushLabelChange('remove', { id: labelId }, user.id);
-      }
-      
-      return prev.filter((label) => label.id !== labelId);
+    setLabels((prev) => prev.filter((l) => l.id !== labelId));
+    syncService.saveLocalLabels(labels.filter((l) => l.id !== labelId));
+    const toUpdate = calendarEntries.filter((e) => (e.labels || []).includes(labelId));
+    Promise.all(
+      toUpdate.map((e) => {
+        const nextLabels = (e.labels || []).filter((id) => id !== labelId);
+        return calendarStorage.updateCalendarImage(e.id, { labels: nextLabels });
+      })
+    ).then(() => {
+      setCalendarEntries((prev) =>
+        prev.map((e) => ({ ...e, labels: (e.labels || []).filter((id) => id !== labelId) }))
+      );
     });
-    
-    // Also remove this label from any images that have it
-    setImagesByDate((prev) => {
-      const newState = { ...prev };
-      for (const key of Object.keys(newState)) {
-        newState[key] = newState[key].map((img) =>
-          img.labelId === labelId ? { ...img, labelId: null, updatedAt: new Date().toISOString() } : img
-        );
-      }
-      return newState;
-    });
-  }, [user?.id]);
-
-  const addNewLabel = useCallback(async () => {
-    // Max 7 labels
-    if (labels.length >= 7) return null;
-    
-    const colors = ['#9C27B0', '#00BCD4', '#795548', '#607D8B', '#F44336', '#4CAF50'];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
-    const newId = Date.now().toString();
-    const newLabel = { id: newId, color: randomColor, name: 'New Label' };
-    
-    // Push to remote and get actual ID if authenticated
-    if (user?.id) {
-      const remoteId = await syncService.pushLabelChange('add', newLabel, user.id);
-      if (remoteId) {
-        newLabel.id = remoteId;
-      }
+    if (toUpdate.length === 0) {
+      setCalendarEntries((prev) =>
+        prev.map((e) => ({ ...e, labels: (e.labels || []).filter((id) => id !== labelId) }))
+      );
     }
-    
+  }, [labels, calendarEntries]);
+
+  const addNewLabel = useCallback(() => {
+    if (labels.length >= 7) return null;
+    const colors = ['#9C27B0', '#00BCD4', '#795548', '#607D8B', '#F44336', '#4CAF50'];
+    const newId = Date.now().toString();
+    const newLabel = { id: newId, color: colors[Math.floor(Math.random() * colors.length)], name: 'New Label' };
     setLabels((prev) => [...prev, newLabel]);
     return newLabel.id;
-  }, [user?.id, labels.length]);
-
-  const clearLocalData = useCallback(async () => {
-    await syncService.clearAllLocalData();
-    setImagesByDate({});
-    setLabels(DEFAULT_LABELS);
-    setSyncStatus('idle');
-  }, []);
+  }, [labels.length]);
 
   const value = useMemo(
     () => ({
@@ -319,23 +226,21 @@ export function CalendarProvider({ children }) {
       imagesByDate,
       addImagesToDate,
       removeImageFromDate,
+      removeImagesFromDate,
       moveImageToDate,
+      moveImagesToDate,
       setImageLabel,
+      setImageLabels,
       removeImageLabel,
       pendingNavigation,
       setPendingNavigation,
       dateKey,
-      // Labels
       labels,
       setLabels,
       updateLabelName,
       deleteLabel,
       addNewLabel,
-      // Sync
-      syncStatus,
-      triggerSync,
       isDataLoaded,
-      clearLocalData,
     }),
     [
       viewDate,
@@ -345,18 +250,18 @@ export function CalendarProvider({ children }) {
       imagesByDate,
       addImagesToDate,
       removeImageFromDate,
+      removeImagesFromDate,
       moveImageToDate,
+      moveImagesToDate,
       setImageLabel,
+      setImageLabels,
       removeImageLabel,
       pendingNavigation,
       labels,
       updateLabelName,
       deleteLabel,
       addNewLabel,
-      syncStatus,
-      triggerSync,
       isDataLoaded,
-      clearLocalData,
     ]
   );
 

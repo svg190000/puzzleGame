@@ -32,8 +32,9 @@ import { BlurView } from 'expo-blur';
 import { useTheme } from '../contexts/ThemeContext';
 import { useCalendar } from '../contexts/CalendarContext';
 import { useGame } from '../contexts/GameContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useResolvedUri, requestMediaLibraryPermissions } from '../utils/mediaLibraryUtils';
 import { DifficultyModal } from './DifficultyModal';
+import * as MediaLibrary from 'expo-media-library';
 
 // Constants
 const DAY_SECTION_HEIGHT = 300;
@@ -957,7 +958,8 @@ function PageIndicatorDot({ active, baseStyle }) {
 }
 
 function DaySectionImage({
-  uri,
+  assetId,
+  uri: uriProp,
   isSelected,
   selectedCount,
   onPress,
@@ -971,6 +973,11 @@ function DaySectionImage({
   actionMode,
   labelColor,
 }) {
+  const resolved = useResolvedUri(uriProp ? null : assetId);
+  const uri = uriProp || resolved.uri;
+  const loading = !uriProp && resolved.loading;
+  const error = !uriProp && resolved.error;
+
   // Adjust scale based on selection count: full scale for 1, smaller for multi-select
   const getSelectedScale = () => {
     if (!isSelected) return 1;
@@ -1040,11 +1047,22 @@ function DaySectionImage({
 
   const overlayIcon = getOverlayIcon();
 
+  const canPlay = !!(uri && !error);
+
   return (
     <TouchableOpacity onPress={handlePress} activeOpacity={0.8}>
       <Animated.View style={animatedStyle}>
         <View style={{ position: 'relative' }}>
-          {uri ? (
+          {loading ? (
+            <View style={[styles.daySectionThumb, getBorderStyle(), { backgroundColor: 'rgba(128,128,128,0.2)', justifyContent: 'center', alignItems: 'center' }]}>
+              <Ionicons name="hourglass-outline" size={28} color="rgba(128,128,128,0.6)" />
+            </View>
+          ) : error ? (
+            <View style={[styles.daySectionThumb, getBorderStyle(), { backgroundColor: 'rgba(128,128,128,0.3)', justifyContent: 'center', alignItems: 'center', padding: 8 }]}>
+              <Ionicons name="image-outline" size={24} color="rgba(128,128,128,0.6)" />
+              <Text style={{ fontSize: 10, color: 'rgba(128,128,128,0.8)', marginTop: 4, textAlign: 'center' }}>Image no longer available</Text>
+            </View>
+          ) : uri ? (
             <Image
               source={{ uri }}
               style={[styles.daySectionThumb, getBorderStyle()]}
@@ -1076,7 +1094,12 @@ function DaySectionImage({
                   <Ionicons name={overlayIcon.name} size={32} color={overlayIcon.color} />
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity style={styles.playButton} onPress={onPlayPress} activeOpacity={0.8}>
+                <TouchableOpacity
+                  style={styles.playButton}
+                  onPress={() => canPlay && onPlayPress?.({ uri, assetId })}
+                  activeOpacity={0.8}
+                  disabled={!canPlay}
+                >
                   <Ionicons name={overlayIcon.name} size={32} color={overlayIcon.color} />
                 </TouchableOpacity>
               )}
@@ -1088,12 +1111,16 @@ function DaySectionImage({
   );
 }
 
-function AllPhotosImage({ uri, style, imageStyle, animationIndex, shouldAnimate, labelColor }) {
+function AllPhotosImage({ assetId, uri: uriProp, style, imageStyle, animationIndex, shouldAnimate, labelColor }) {
+  const resolved = useResolvedUri(uriProp ? null : assetId);
+  const uri = uriProp || resolved.uri;
+  const loading = !uriProp && resolved.loading;
+  const error = !uriProp && resolved.error;
   const imageOpacity = useSharedValue(0);
 
   useEffect(() => {
     if (shouldAnimate && animationIndex !== undefined) {
-      const delay = animationIndex * 80; // Slightly faster than day section
+      const delay = animationIndex * 80;
       imageOpacity.value = withDelay(delay, withTiming(1, { duration: 300 }));
     } else {
       imageOpacity.value = 0;
@@ -1106,7 +1133,15 @@ function AllPhotosImage({ uri, style, imageStyle, animationIndex, shouldAnimate,
 
   return (
     <Animated.View style={[style, animatedStyle]}>
-      {uri ? (
+      {loading ? (
+        <View style={[imageStyle, labelColor && { borderColor: labelColor }, { backgroundColor: 'rgba(128,128,128,0.2)', justifyContent: 'center', alignItems: 'center' }]}>
+          <Ionicons name="hourglass-outline" size={24} color="rgba(128,128,128,0.6)" />
+        </View>
+      ) : error ? (
+        <View style={[imageStyle, labelColor && { borderColor: labelColor }, { backgroundColor: 'rgba(128,128,128,0.3)', justifyContent: 'center', alignItems: 'center' }]}>
+          <Ionicons name="image-outline" size={24} color="rgba(128,128,128,0.6)" />
+        </View>
+      ) : uri ? (
         <Image
           source={{ uri }}
           style={[imageStyle, labelColor && { borderColor: labelColor }]}
@@ -1118,6 +1153,29 @@ function AllPhotosImage({ uri, style, imageStyle, animationIndex, shouldAnimate,
         </View>
       )}
     </Animated.View>
+  );
+}
+
+function GalleryPreviewImage({ assetId, uri: uriProp, style, onPress }) {
+  const resolved = useResolvedUri(uriProp ? null : assetId);
+  const uri = uriProp || resolved.uri;
+  const loading = !uriProp && resolved.loading;
+  const error = !uriProp && resolved.error;
+  return (
+    <TouchableWithoutFeedback onPress={onPress}>
+      {loading ? (
+        <View style={[style, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }]}>
+          <Ionicons name="hourglass-outline" size={48} color="rgba(255,255,255,0.6)" />
+        </View>
+      ) : error || !uri ? (
+        <View style={[style, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }]}>
+          <Ionicons name="image-outline" size={48} color="rgba(255,255,255,0.6)" />
+          <Text style={{ color: 'rgba(255,255,255,0.8)', marginTop: 8 }}>Image no longer available</Text>
+        </View>
+      ) : (
+        <Image source={{ uri }} style={style} resizeMode="contain" />
+      )}
+    </TouchableWithoutFeedback>
   );
 }
 
@@ -1136,8 +1194,11 @@ export const CalendarScreen = () => {
     imagesByDate,
     addImagesToDate,
     removeImageFromDate,
+    removeImagesFromDate,
     moveImageToDate,
+    moveImagesToDate,
     setImageLabel,
+    setImageLabels,
     removeImageLabel,
     pendingNavigation,
     setPendingNavigation,
@@ -1148,7 +1209,6 @@ export const CalendarScreen = () => {
     addNewLabel,
   } = useCalendar();
   const { startPuzzleWithImage } = useGame();
-  const { user, isAuthenticated } = useAuth();
 
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
@@ -1175,8 +1235,12 @@ export const CalendarScreen = () => {
   const [actionMode, setActionMode] = useState(null); // 'edit' | 'move' | 'label' | null
   const [movingImages, setMovingImages] = useState([]); // [{ id, uri, fromKey }, ...]
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
-  const [leftPanelView, setLeftPanelView] = useState('menu'); // 'menu' | 'allPhotos'
+  const [leftPanelView, setLeftPanelView] = useState('menu'); // 'menu' | 'allPhotos' | 'albums' | 'albumAssets'
   const [allPhotosReady, setAllPhotosReady] = useState(false);
+  const [albumsList, setAlbumsList] = useState([]);
+  const [selectedAlbum, setSelectedAlbum] = useState(null);
+  const [albumAssets, setAlbumAssets] = useState([]);
+  const [selectedAlbumAssetIds, setSelectedAlbumAssetIds] = useState(new Set());
   const [labelsExpanded, setLabelsExpanded] = useState(false);
   const [labelPickerVisible, setLabelPickerVisible] = useState(false);
   const [labelPickerImageId, setLabelPickerImageId] = useState(null);
@@ -1382,8 +1446,73 @@ export const CalendarScreen = () => {
 
   const backToMenu = useCallback(() => {
     setAllPhotosReady(false);
+    setAlbumsList([]);
+    setSelectedAlbum(null);
+    setAlbumAssets([]);
+    setSelectedAlbumAssetIds(new Set());
     setLeftPanelView('menu');
   }, []);
+
+  const openAddFromAlbum = useCallback(async () => {
+    const granted = await requestMediaLibraryPermissions();
+    if (!granted) {
+      Alert.alert('Permission needed', 'Photo library access is required to add photos from albums.');
+      return;
+    }
+    try {
+      const albums = await MediaLibrary.getAlbumsAsync({ includeSmartAlbums: true });
+      setAlbumsList(albums || []);
+      setSelectedAlbum(null);
+      setAlbumAssets([]);
+      setSelectedAlbumAssetIds(new Set());
+      setLeftPanelView('albums');
+    } catch (e) {
+      Alert.alert('Error', 'Could not load albums.');
+    }
+  }, []);
+
+  const backToAlbumsList = useCallback(() => {
+    setSelectedAlbum(null);
+    setAlbumAssets([]);
+    setSelectedAlbumAssetIds(new Set());
+    setLeftPanelView('albums');
+  }, []);
+
+  const handleAlbumSelect = useCallback(async (album) => {
+    try {
+      const { assets } = await MediaLibrary.getAssetsAsync({
+        album,
+        first: 200,
+        mediaType: MediaLibrary.MediaType.photo,
+      });
+      setSelectedAlbum(album);
+      setAlbumAssets(assets || []);
+      setSelectedAlbumAssetIds(new Set());
+      setLeftPanelView('albumAssets');
+    } catch (e) {
+      Alert.alert('Error', 'Could not load album photos.');
+    }
+  }, []);
+
+  const toggleAlbumAssetSelection = useCallback((assetId) => {
+    setSelectedAlbumAssetIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(assetId)) next.delete(assetId);
+      else next.add(assetId);
+      return next;
+    });
+  }, []);
+
+  const handleAddAlbumAssetsToDate = useCallback(() => {
+    const targetDate = selectedDate || new Date();
+    const key = dateKey(targetDate);
+    const toAdd = Array.from(selectedAlbumAssetIds).map((assetId) => ({ assetId }));
+    if (toAdd.length > 0) {
+      addImagesToDate(key, toAdd);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      backToMenu();
+    }
+  }, [selectedDate, dateKey, addImagesToDate, selectedAlbumAssetIds, backToMenu]);
 
   // Labels section animation effect
   useEffect(() => {
@@ -1421,10 +1550,8 @@ export const CalendarScreen = () => {
         const toKey = dateKey(day.date);
         const fromKey = movingImages[0]?.fromKey;
         const movingCount = movingImages.length;
-        
-        movingImages.forEach((img) => {
-          moveImageToDate(img.fromKey, toKey, img.id);
-        });
+
+        moveImagesToDate(fromKey, toKey, movingImages.map((img) => img.id));
         setMovingImages([]);
         setSelectedImageIds(new Set());
         
@@ -1448,7 +1575,7 @@ export const CalendarScreen = () => {
         setViewDate(new Date(day.date.getFullYear(), day.date.getMonth(), 1));
       }
     },
-    [selectedDate, setSelectedDate, setViewDate, actionMode, movingImages, moveImageToDate, dateKey, imagesByDate]
+    [selectedDate, setSelectedDate, setViewDate, actionMode, movingImages, moveImagesToDate, dateKey, imagesByDate]
   );
 
   const openPicker = useCallback(() => {
@@ -1479,8 +1606,8 @@ export const CalendarScreen = () => {
   const handleAddToDate = useCallback(async () => {
     if (!selectedDate) return;
 
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
+    const granted = await requestMediaLibraryPermissions();
+    if (!granted) {
       Alert.alert('Permission needed', 'Photo library access is required to add images to a date.');
       return;
     }
@@ -1489,38 +1616,30 @@ export const CalendarScreen = () => {
       mediaTypes: ['images'],
       allowsMultipleSelection: true,
       quality: 1,
-      exif: true,
     });
 
     if (!result.canceled && result.assets?.length) {
-      // Get all existing identifiers across all dates in calendar
       const existingAssetIds = new Set(
         Object.values(imagesByDate).flatMap((images) =>
           images.map((img) => img.assetId).filter(Boolean)
         )
       );
-      const existingFileNames = new Set(
+      const existingUris = new Set(
         Object.values(imagesByDate).flatMap((images) =>
-          images.map((img) => img.fileName).filter(Boolean)
+          images.map((img) => img.uri).filter(Boolean)
         )
       );
 
-      // Extract identifiers and filter duplicates
-      let newImages = result.assets
-        .map((asset) => ({
-          uri: asset.uri,
-          assetId: asset.assetId || null,
-          fileName: asset.fileName || null,
-        }))
-        .filter((img) => {
-          if (!img.uri) return false;
-          // Check assetId first (most reliable)
-          if (img.assetId && existingAssetIds.has(img.assetId)) return false;
-          // Fallback to fileName check
-          if (img.fileName && existingFileNames.has(img.fileName)) return false;
-          // Allow if we can't verify
-          return true;
-        });
+      const newImages = result.assets.filter((asset) => {
+        const id = asset.assetId || null;
+        const uri = asset.uri || null;
+        if (id && existingAssetIds.has(id)) return false;
+        if (uri && existingUris.has(uri)) return false;
+        return !!(id || uri);
+      }).map((asset) => ({
+        assetId: asset.assetId || null,
+        uri: asset.uri || null,
+      }));
 
       if (newImages.length > 0) {
         addImagesToDate(dateKey(selectedDate), newImages);
@@ -1566,8 +1685,11 @@ export const CalendarScreen = () => {
   const handleAddConfirm = useCallback(() => {
     if (pendingAddImage && selectedDate) {
       const key = dateKey(selectedDate);
-      addImagesToDate(key, [pendingAddImage]);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const assetId = pendingAddImage.assetId || pendingAddImage.id;
+      if (assetId) {
+        addImagesToDate(key, [{ assetId }]);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
     }
     setAddConfirmVisible(false);
     setPendingAddImage(null);
@@ -1616,18 +1738,15 @@ export const CalendarScreen = () => {
     if (selectedKey && selectedImageIds.size > 0) {
       const currentImages = imagesByDate[selectedKey] || [];
       const remainingCount = currentImages.length - selectedImageIds.size;
-      
-      selectedImageIds.forEach((imageId) => {
-        removeImageFromDate(selectedKey, imageId);
-      });
+
+      removeImagesFromDate(selectedKey, selectedImageIds);
       setSelectedImageIds(new Set());
-      
-      // Exit edit mode if no images remain
+
       if (remainingCount <= 0) {
         setActionMode(null);
       }
     }
-  }, [selectedKey, removeImageFromDate, selectedImageIds, imagesByDate]);
+  }, [selectedKey, removeImagesFromDate, selectedImageIds, imagesByDate]);
 
   const openLabelPicker = useCallback((imageId) => {
     // If multiple images are selected, we'll apply the label to all of them
@@ -1637,34 +1756,26 @@ export const CalendarScreen = () => {
   }, []);
 
   const assignLabelToImage = useCallback((labelId) => {
-    // Apply label to all selected images
     if (selectedImageIds.size > 0) {
-      selectedImageIds.forEach((imageId) => {
-        setImageLabel(imageId, labelId);
-      });
-      setSelectedImageIds(new Set()); // Clear selection after action
+      setImageLabels(selectedImageIds, labelId);
+      setSelectedImageIds(new Set());
     } else if (labelPickerImageId) {
-      // Fallback to single image if no selection
       setImageLabel(labelPickerImageId, labelId);
     }
     setLabelPickerVisible(false);
     setLabelPickerImageId(null);
-  }, [labelPickerImageId, selectedImageIds, setImageLabel]);
+  }, [labelPickerImageId, selectedImageIds, setImageLabel, setImageLabels]);
 
   const removeLabelFromImage = useCallback(() => {
-    // Remove label from all selected images
     if (selectedImageIds.size > 0) {
-      selectedImageIds.forEach((imageId) => {
-        removeImageLabel(imageId);
-      });
-      setSelectedImageIds(new Set()); // Clear selection after action
+      setImageLabels(selectedImageIds, null);
+      setSelectedImageIds(new Set());
     } else if (labelPickerImageId) {
-      // Fallback to single image if no selection
       removeImageLabel(labelPickerImageId);
     }
     setLabelPickerVisible(false);
     setLabelPickerImageId(null);
-  }, [labelPickerImageId, selectedImageIds, removeImageLabel]);
+  }, [labelPickerImageId, selectedImageIds, removeImageLabel, setImageLabels]);
 
   const handleScroll = useCallback(
     (e) => {
@@ -1925,14 +2036,15 @@ export const CalendarScreen = () => {
                     {pages.map((page, pi) => (
                       <View key={pi} style={[styles.daySectionPage, { height: pageHeight }]}>
                         {page.map((img, index) => {
-                          const { id, uri, assetId, fileName, labelId: imageLabelId } = img;
+                          const { id, assetId, labelId: imageLabelId } = img;
                           const isImageSelected = selectedImageIds.has(id);
 
                           const imageLabelColor = imageLabelId ? labels.find((l) => l.id === imageLabelId)?.color : null;
                           return (
                             <DaySectionImage
                               key={id}
-                              uri={uri}
+                              assetId={assetId}
+                              uri={img.uri}
                               isSelected={isImageSelected}
                               selectedCount={selectedImageIds.size}
                               onPress={() => {
@@ -1958,8 +2070,8 @@ export const CalendarScreen = () => {
                                   });
                                 }
                               }}
-                              onPlayPress={() => handlePlayPress({ uri, assetId, fileName })}
-                              onActionPress={() => handleImageAction(id, uri)}
+                              onPlayPress={(imageInfo) => handlePlayPress(imageInfo)}
+                              onActionPress={() => handleImageAction(id, null)}
                               onDeletePress={handleDeleteImage}
                               onLabelPress={() => openLabelPicker(id)}
                               styles={styles}
@@ -2104,7 +2216,7 @@ export const CalendarScreen = () => {
       />
 
       {/* Left Panel */}
-      {leftPanelOpen && leftPanelView === 'menu' && (
+      {leftPanelOpen && (
         <TouchableWithoutFeedback onPress={() => setLeftPanelOpen(false)}>
           <Animated.View style={[styles.leftPanelBackdrop, leftPanelBackdropAnimatedStyle]} />
         </TouchableWithoutFeedback>
@@ -2123,6 +2235,10 @@ export const CalendarScreen = () => {
               <TouchableOpacity style={styles.leftPanelMenuItem} onPress={openAllPhotos} activeOpacity={0.7}>
                 <Ionicons name="images-outline" size={22} color={theme.text} />
                 <Text style={styles.leftPanelMenuItemText}>Gallery</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.leftPanelMenuItem} onPress={openAddFromAlbum} activeOpacity={0.7}>
+                <Ionicons name="albums-outline" size={22} color={theme.text} />
+                <Text style={styles.leftPanelMenuItemText}>Add from album</Text>
               </TouchableOpacity>
 
               <View style={styles.leftPanelDivider} />
@@ -2162,6 +2278,78 @@ export const CalendarScreen = () => {
                 ))}
               </View>
             </View>
+          </>
+        ) : leftPanelView === 'albums' ? (
+          <>
+            <View style={styles.allPhotosHeader}>
+              <TouchableOpacity style={styles.allPhotosBackButton} onPress={backToMenu} activeOpacity={0.7}>
+                <Ionicons name="arrow-back" size={24} color={theme.text} />
+              </TouchableOpacity>
+              <View style={styles.allPhotosHeaderCenter}>
+                <Text style={styles.allPhotosTitle}>Albums</Text>
+                <Text style={styles.allPhotosCount}>{albumsList.length} albums</Text>
+              </View>
+            </View>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
+              {albumsList.map((album) => (
+                <TouchableOpacity
+                  key={album.id}
+                  style={{ paddingVertical: 14, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: theme.border }}
+                  onPress={() => handleAlbumSelect(album)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: theme.text }} numberOfLines={1}>{album.title}</Text>
+                  <Text style={{ fontSize: 13, color: theme.textMuted, marginTop: 2 }}>{album.assetCount ?? 0} photos</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </>
+        ) : leftPanelView === 'albumAssets' ? (
+          <>
+            <View style={styles.allPhotosHeader}>
+              <TouchableOpacity style={styles.allPhotosBackButton} onPress={backToAlbumsList} activeOpacity={0.7}>
+                <Ionicons name="arrow-back" size={24} color={theme.text} />
+              </TouchableOpacity>
+              <View style={styles.allPhotosHeaderCenter}>
+                <Text style={styles.allPhotosTitle}>{selectedAlbum?.title ?? 'Photos'}</Text>
+                <Text style={styles.allPhotosCount}>{selectedAlbumAssetIds.size} selected</Text>
+              </View>
+            </View>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', padding: 8 }}>
+              {albumAssets.map((asset) => {
+                const isSelected = selectedAlbumAssetIds.has(asset.id);
+                return (
+                  <TouchableOpacity
+                    key={asset.id}
+                    style={{ width: '33.33%', padding: 4 }}
+                    onPress={() => toggleAlbumAssetSelection(asset.id)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ position: 'relative', aspectRatio: 1, borderRadius: 8, overflow: 'hidden' }}>
+                      <Image source={{ uri: asset.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      {isSelected && (
+                        <View style={{ position: 'absolute', top: 4, right: 4, width: 24, height: 24, borderRadius: 12, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center' }}>
+                          <Ionicons name="checkmark" size={16} color={theme.buttonText || '#FFF'} />
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            {selectedAlbumAssetIds.size > 0 && (
+              <View style={{ padding: 12, borderTopWidth: 1, borderTopColor: theme.border }}>
+                <TouchableOpacity
+                  style={{ backgroundColor: theme.accent, paddingVertical: 14, borderRadius: 12, alignItems: 'center' }}
+                  onPress={handleAddAlbumAssetsToDate}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: theme.buttonText || '#FFF' }}>
+                    Add {selectedAlbumAssetIds.size} to {selectedDate ? selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'today'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </>
         ) : (
           <>
@@ -2219,6 +2407,7 @@ export const CalendarScreen = () => {
                         onPress={() => setGalleryPreviewIndex(index)}
                       >
                         <AllPhotosImage
+                          assetId={photo.assetId}
                           uri={photo.uri}
                           style={styles.allPhotosImageWrapper}
                           imageStyle={styles.allPhotosImage}
@@ -2358,13 +2547,7 @@ export const CalendarScreen = () => {
             >
               {filteredAllPhotos.map((photo, i) => (
                 <View key={photo.id} style={[styles.galleryPreviewPage, { width: SCREEN_WIDTH }]}>
-                  <TouchableWithoutFeedback onPress={() => setGalleryPreviewIndex(null)}>
-                    <Image
-                      source={{ uri: photo.uri }}
-                      style={styles.galleryPreviewImage}
-                      resizeMode="contain"
-                    />
-                  </TouchableWithoutFeedback>
+                  <GalleryPreviewImage assetId={photo.assetId} uri={photo.uri} style={styles.galleryPreviewImage} onPress={() => setGalleryPreviewIndex(null)} />
                 </View>
               ))}
             </ScrollView>

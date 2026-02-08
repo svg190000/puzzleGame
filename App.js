@@ -9,7 +9,6 @@ import {
   Alert,
   PixelRatio,
   Platform,
-  AppState,
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, withDelay, Easing } from 'react-native-reanimated';
 
@@ -34,10 +33,8 @@ import { LoadingScreen } from './src/components/LoadingScreen';
 import { HomeScreen } from './src/components/HomeScreen';
 import { SettingsScreen } from './src/components/SettingsScreen';
 import { CalendarScreen } from './src/components/CalendarScreen';
-import AuthScreen from './src/components/AuthScreen';
 import { CalendarProvider, useCalendar } from './src/contexts/CalendarContext';
 import { GameProvider } from './src/contexts/GameContext';
-import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { NavigationBar } from './src/components/NavigationBar';
 import { generatePuzzle, shuffleArray } from './src/utils/puzzleUtils';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
@@ -129,38 +126,8 @@ const makeStyles = (theme) =>
 
 function AppContent() {
   const { theme } = useTheme();
-  const { setPendingNavigation, triggerSync } = useCalendar();
-  const { isAuthenticated, loading: authLoading } = useAuth();
+  const { setPendingNavigation } = useCalendar();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const appStateRef = useRef(AppState.currentState);
-  const [showAuthScreen, setShowAuthScreen] = useState(true);
-
-  // Sync when app comes to foreground
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (
-        appStateRef.current.match(/inactive|background/) &&
-        nextAppState === 'active' &&
-        isAuthenticated
-      ) {
-        triggerSync();
-      }
-      appStateRef.current = nextAppState;
-    });
-
-    return () => subscription.remove();
-  }, [isAuthenticated, triggerSync]);
-
-  // Hide auth screen once authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      setShowAuthScreen(false);
-    }
-  }, [isAuthenticated]);
-
-  const handleSkipAuth = useCallback(() => {
-    setShowAuthScreen(false);
-  }, []);
 
   const HEADER_HEIGHT = 100;
   const HOLDER_HEIGHT = 140;
@@ -1049,16 +1016,6 @@ function AppContent() {
     setCurrentRouteName(routeName);
   }, []);
 
-  // Show auth screen if not authenticated and not skipped
-  if (showAuthScreen && !isAuthenticated && !authLoading) {
-    return (
-      <>
-        <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
-        <AuthScreen onSkip={handleSkipAuth} />
-      </>
-    );
-  }
-
   return (
     <>
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
@@ -1222,11 +1179,9 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
-        <AuthProvider>
-          <CalendarProvider>
-            <AppContent />
-          </CalendarProvider>
-        </AuthProvider>
+        <CalendarProvider>
+          <AppContent />
+        </CalendarProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );
