@@ -293,6 +293,7 @@ const makeStyles = (theme) =>
       right: 0,
       height: DAY_SECTION_HEIGHT,
       overflow: 'hidden',
+      zIndex: 10,
     },
     daySection: {
       height: DAY_SECTION_HEIGHT,
