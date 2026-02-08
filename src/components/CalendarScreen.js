@@ -40,6 +40,7 @@ import * as MediaLibrary from 'expo-media-library';
 const DAY_SECTION_HEIGHT = 300;
 const SWIPE_THRESHOLD = 60;
 const IMAGES_PER_PAGE = 3;
+const FILTER_UNLABELED = '__unlabeled__';
 
 // Spring config for smooth animations on Android
 const SPRING_CONFIG = {
@@ -51,6 +52,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CELL_SIZE = (SCREEN_WIDTH - 32) / 7;
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // Utility functions
 function chunk(arr, size) {
@@ -536,6 +538,128 @@ const makeStyles = (theme) =>
     },
     pickerMonthChipTextActive: {
       color: theme.buttonText,
+    },
+    // Yearly calendar view
+    yearlyYearRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 20,
+      gap: 24,
+    },
+    yearlyYearBtn: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: theme.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    yearlyYearText: {
+      fontSize: 28,
+      fontWeight: '800',
+      color: theme.text,
+      minWidth: 80,
+      textAlign: 'center',
+    },
+    yearlyScroll: {
+      flex: 1,
+    },
+    yearlyScrollContent: {
+      paddingBottom: 24,
+    },
+    yearlyMonthGrid: {
+      paddingHorizontal: 16,
+    },
+    yearlyMonthRow: {
+      flexDirection: 'row',
+      width: '100%',
+      gap: 10,
+      marginBottom: 10,
+    },
+    yearlyMonthCell: {
+      flex: 1,
+      minWidth: 0,
+      paddingVertical: 8,
+      paddingHorizontal: 6,
+      borderRadius: 12,
+      backgroundColor: theme.surfaceAlt,
+      alignItems: 'center',
+    },
+    yearlyMonthCellLabel: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.text,
+      marginBottom: 4,
+    },
+    yearlyMonthWeekdayRow: {
+      flexDirection: 'row',
+      width: '100%',
+      justifyContent: 'space-between',
+      marginBottom: 2,
+      paddingHorizontal: 2,
+    },
+    yearlyMonthWeekday: {
+      fontSize: 9,
+      fontWeight: '600',
+      color: theme.textMuted,
+      flex: 1,
+      textAlign: 'center',
+    },
+    yearlyMonthDayGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      width: '100%',
+      justifyContent: 'flex-start',
+      alignContent: 'flex-start',
+    },
+    yearlyMonthDayCellWrapper: {
+      width: `${100 / 7}%`,
+      aspectRatio: 1,
+      maxHeight: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    yearlyMonthDayCell: {
+      fontSize: 10,
+      fontWeight: '500',
+      color: theme.text,
+    },
+    yearlyMonthDayCellMuted: {
+      color: theme.textMuted,
+      opacity: 0.6,
+    },
+    yearlyMonthDayCellTodayBox: {
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 4,
+      minWidth: 14,
+      minHeight: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    yearlyMonthDayCellTodayText: {
+      fontWeight: '700',
+      color: theme.text,
+      fontSize: 10,
+    },
+    yearlyMonthFilterSection: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: 4,
+      paddingTop: 4,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      gap: 3,
+      minHeight: 10,
+    },
+    yearlyMonthFilterIndicator: {
+      width: 5,
+      height: 5,
+      borderRadius: 2.5,
     },
     // Label Picker Modal
     labelPickerBackdrop: {
@@ -1236,6 +1360,8 @@ export const CalendarScreen = () => {
   const [movingImages, setMovingImages] = useState([]); // [{ id, uri, fromKey }, ...]
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const [leftPanelView, setLeftPanelView] = useState('menu'); // 'menu' | 'allPhotos' | 'albums' | 'albumAssets'
+  const [calendarViewMode, setCalendarViewMode] = useState('monthly'); // 'monthly' | 'yearly'
+  const [yearlyViewYear, setYearlyViewYear] = useState(() => new Date().getFullYear());
   const [allPhotosReady, setAllPhotosReady] = useState(false);
   const [albumsList, setAlbumsList] = useState([]);
   const [selectedAlbum, setSelectedAlbum] = useState(null);
@@ -1252,10 +1378,14 @@ export const CalendarScreen = () => {
   const dayScrollRef = useRef(null);
   const galleryPreviewScrollRef = useRef(null);
 
-  // Filter day images based on active label filters
+  // Filter day images based on active label filters (including Unlabeled)
   const filteredDayImages = useMemo(() => {
     if (activeFilters.size === 0) return dayImages;
-    return dayImages.filter((img) => img.labelId && activeFilters.has(img.labelId));
+    return dayImages.filter(
+      (img) =>
+        (activeFilters.has(FILTER_UNLABELED) && !img.labelId) ||
+        (img.labelId && activeFilters.has(img.labelId))
+    );
   }, [dayImages, activeFilters]);
   
   const pages = useMemo(() => chunk(filteredDayImages, IMAGES_PER_PAGE), [filteredDayImages]);
@@ -1287,7 +1417,11 @@ export const CalendarScreen = () => {
   // Gallery: apply same label filters as day view
   const filteredAllPhotos = useMemo(() => {
     if (activeFilters.size === 0) return allPhotos;
-    return allPhotos.filter((img) => img.labelId && activeFilters.has(img.labelId));
+    return allPhotos.filter(
+      (img) =>
+        (activeFilters.has(FILTER_UNLABELED) && !img.labelId) ||
+        (img.labelId && activeFilters.has(img.labelId))
+    );
   }, [allPhotos, activeFilters]);
 
   // Create a lookup map for image labels by ID
@@ -1840,6 +1974,14 @@ export const CalendarScreen = () => {
             {activeFilters.size > 0 && (
               <View style={styles.filterIndicatorContainer}>
                 {Array.from(activeFilters).map((filterId) => {
+                  if (filterId === FILTER_UNLABELED) {
+                    return (
+                      <View
+                        key={filterId}
+                        style={[styles.filterIndicatorDot, { backgroundColor: theme.textMuted }]}
+                      />
+                    );
+                  }
                   const filterLabel = labels.find((l) => l.id === filterId);
                   return filterLabel ? (
                     <View
@@ -1855,6 +1997,8 @@ export const CalendarScreen = () => {
         </View>
       </View>
 
+      {calendarViewMode === 'monthly' ? (
+        <>
       {/* Month Title */}
       <TouchableOpacity style={styles.monthTitleTouchable} onPress={openPicker} activeOpacity={0.7}>
         <Text style={styles.monthTitle}>
@@ -1903,12 +2047,10 @@ export const CalendarScreen = () => {
                   const filteredLabelData = activeFilters.size > 0
                     ? uniqueLabelData.filter((l) => activeFilters.has(l.id))
                     : uniqueLabelData;
-                  
-                  // Check if there are unlabeled images (only show if no filters active)
-                  const hasUnlabeledImages = activeFilters.size === 0 && dayImagesForCell.some((img) => !img.labelId);
-                  
-                  // Determine if we should show indicators
-                  const showIndicators = filteredLabelData.length > 0 || hasUnlabeledImages;
+                  const hasUnlabeledImages = dayImagesForCell.some((img) => !img.labelId);
+                  const showUnlabeledIndicator =
+                    hasUnlabeledImages && (activeFilters.size === 0 || activeFilters.has(FILTER_UNLABELED));
+                  const showIndicators = filteredLabelData.length > 0 || showUnlabeledIndicator;
                   
                   return (
                     <TouchableOpacity
@@ -1937,8 +2079,8 @@ export const CalendarScreen = () => {
                                 style={[styles.dateImageIndicator, { backgroundColor: labelData.color }]}
                               />
                             ))}
-                            {hasUnlabeledImages && (
-                              <View style={styles.dateImageIndicator} />
+                            {showUnlabeledIndicator && (
+                              <View style={[styles.dateImageIndicator, { backgroundColor: theme.textMuted }]} />
                             )}
                           </View>
                         )}
@@ -2156,6 +2298,133 @@ export const CalendarScreen = () => {
           )}
         </Animated.View>
       </View>
+        </>
+      ) : (
+        <>
+      {/* Yearly view: year selector + 3×4 month grid */}
+      <View style={styles.yearlyYearRow}>
+        <TouchableOpacity
+          style={styles.yearlyYearBtn}
+          onPress={() => setYearlyViewYear((y) => Math.max(1970, y - 1))}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="chevron-back" size={24} color={theme.text} />
+        </TouchableOpacity>
+        <Text style={styles.yearlyYearText}>{yearlyViewYear}</Text>
+        <TouchableOpacity
+          style={styles.yearlyYearBtn}
+          onPress={() => setYearlyViewYear((y) => Math.min(2100, y + 1))}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="chevron-forward" size={24} color={theme.text} />
+        </TouchableOpacity>
+      </View>
+      <ScrollView style={styles.yearlyScroll} contentContainerStyle={styles.yearlyScrollContent} showsVerticalScrollIndicator={false}>
+      <View style={styles.yearlyMonthGrid}>
+        {[0, 1, 2, 3].map((rowIndex) => {
+          const weeksForRow = [
+            getCalendarWeeks(yearlyViewYear, rowIndex * 3),
+            getCalendarWeeks(yearlyViewYear, rowIndex * 3 + 1),
+            getCalendarWeeks(yearlyViewYear, rowIndex * 3 + 2),
+          ];
+          const maxWeeks = Math.max(...weeksForRow.map((w) => w.length));
+          return (
+            <View key={rowIndex} style={styles.yearlyMonthRow}>
+              {[0, 1, 2].map((colIndex) => {
+                const idx = rowIndex * 3 + colIndex;
+                const label = MONTHS_SHORT[idx];
+                const weeks = weeksForRow[colIndex];
+                const paddedDays = [];
+                for (let r = 0; r < maxWeeks; r++) {
+                  if (r < weeks.length) {
+                    paddedDays.push(...weeks[r]);
+                  } else {
+                    paddedDays.push(...Array(7).fill({ empty: true }));
+                  }
+                }
+                return (
+                <TouchableOpacity
+                  key={label}
+                  style={styles.yearlyMonthCell}
+                  onPress={() => {
+                    setViewDate(new Date(yearlyViewYear, idx, 1));
+                    setCalendarViewMode('monthly');
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.yearlyMonthCellLabel}>{label}</Text>
+                  <View style={styles.yearlyMonthWeekdayRow}>
+                    {WEEKDAYS.map((d, i) => (
+                      <Text key={i} style={styles.yearlyMonthWeekday}>
+                        {d}
+                      </Text>
+                    ))}
+                  </View>
+                  <View style={styles.yearlyMonthDayGrid}>
+                    {paddedDays.map((day, i) => (
+                      <View key={i} style={styles.yearlyMonthDayCellWrapper}>
+                        {day.empty ? null : !day.isCurrentMonth ? null : day.isToday ? (
+                          <View style={styles.yearlyMonthDayCellTodayBox}>
+                            <Text style={[styles.yearlyMonthDayCell, styles.yearlyMonthDayCellTodayText]}>
+                              {day.day}
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text style={styles.yearlyMonthDayCell}>
+                            {day.day}
+                          </Text>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                  <View style={styles.yearlyMonthFilterSection}>
+                    {(() => {
+                      const lastDay = new Date(yearlyViewYear, idx + 1, 0).getDate();
+                      let allImagesInMonth = [];
+                      for (let d = 1; d <= lastDay; d++) {
+                        const key = dateKey(new Date(yearlyViewYear, idx, d));
+                        allImagesInMonth = allImagesInMonth.concat(imagesByDate[key] || []);
+                      }
+                      const uniqueLabelData = allImagesInMonth.length
+                        ? [...new Map(
+                            allImagesInMonth
+                              .map((img) => {
+                                const label = img.labelId ? labels.find((l) => l.id === img.labelId) : null;
+                                return label ? [label.id, label.color] : null;
+                              })
+                              .filter(Boolean)
+                          ).entries()].map(([id, color]) => ({ id, color }))
+                        : [];
+                      const filteredLabelData = activeFilters.size > 0
+                        ? uniqueLabelData.filter((l) => activeFilters.has(l.id))
+                        : uniqueLabelData;
+                      const hasUnlabeled = allImagesInMonth.some((img) => !img.labelId);
+                      const showUnlabeled = hasUnlabeled && (activeFilters.size === 0 || activeFilters.has(FILTER_UNLABELED));
+                      return (
+                        <>
+                          {filteredLabelData.map((labelData) => (
+                            <View
+                              key={labelData.id}
+                              style={[styles.yearlyMonthFilterIndicator, { backgroundColor: labelData.color }]}
+                            />
+                          ))}
+                          {showUnlabeled && (
+                            <View style={[styles.yearlyMonthFilterIndicator, { backgroundColor: theme.textMuted }]} />
+                          )}
+                        </>
+                      );
+                    })()}
+                  </View>
+                </TouchableOpacity>
+                );
+              })}
+            </View>
+          );
+        })}
+      </View>
+      </ScrollView>
+        </>
+      )}
 
       {/* Month/Year Picker Modal */}
       <Modal visible={pickerVisible} transparent animationType="fade" onRequestClose={() => setPickerVisible(false)}>
@@ -2228,9 +2497,35 @@ export const CalendarScreen = () => {
               <Text style={styles.leftPanelTitle}>Menu</Text>
             </View>
             <View style={styles.leftPanelContent}>
-              <TouchableOpacity style={styles.leftPanelMenuItem} onPress={() => setLeftPanelOpen(false)} activeOpacity={0.7}>
+              <TouchableOpacity
+                style={styles.leftPanelMenuItem}
+                onPress={() => {
+                  setCalendarViewMode('monthly');
+                  setLeftPanelOpen(false);
+                }}
+                activeOpacity={0.7}
+              >
                 <Ionicons name="calendar-outline" size={22} color={theme.text} />
-                <Text style={styles.leftPanelMenuItemText}>Calendar</Text>
+                <Text style={styles.leftPanelMenuItemText}>Monthly</Text>
+                {calendarViewMode === 'monthly' && (
+                  <Ionicons name="checkmark" size={20} color={theme.accent} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.leftPanelMenuItem}
+                onPress={() => {
+                  setCalendarViewMode('yearly');
+                  setYearlyViewYear(viewDate.getFullYear());
+                  setSelectedDate(null);
+                  setLeftPanelOpen(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="calendar" size={22} color={theme.text} />
+                <Text style={styles.leftPanelMenuItemText}>Yearly</Text>
+                {calendarViewMode === 'yearly' && (
+                  <Ionicons name="checkmark" size={20} color={theme.accent} />
+                )}
               </TouchableOpacity>
               <TouchableOpacity style={styles.leftPanelMenuItem} onPress={openAllPhotos} activeOpacity={0.7}>
                 <Ionicons name="images-outline" size={22} color={theme.text} />
@@ -2373,6 +2668,14 @@ export const CalendarScreen = () => {
                   {activeFilters.size > 0 && (
                     <View style={styles.filterIndicatorContainer}>
                       {Array.from(activeFilters).map((filterId) => {
+                        if (filterId === FILTER_UNLABELED) {
+                          return (
+                            <View
+                              key={filterId}
+                              style={[styles.filterIndicatorDot, { backgroundColor: theme.textMuted }]}
+                            />
+                          );
+                        }
                         const filterLabel = labels.find((l) => l.id === filterId);
                         return filterLabel ? (
                           <View
@@ -2506,6 +2809,27 @@ export const CalendarScreen = () => {
                     </TouchableOpacity>
                   );
                 })}
+                <TouchableOpacity
+                  style={styles.filterOption}
+                  onPress={() => {
+                    setActiveFilters((prev) => {
+                      const newFilters = new Set(prev);
+                      if (newFilters.has(FILTER_UNLABELED)) {
+                        newFilters.delete(FILTER_UNLABELED);
+                      } else {
+                        newFilters.add(FILTER_UNLABELED);
+                      }
+                      return newFilters;
+                    });
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.filterColorDot, { backgroundColor: theme.textMuted }]} />
+                  <Text style={styles.filterOptionText}>Unlabeled</Text>
+                  <View style={[styles.filterCheckbox, activeFilters.has(FILTER_UNLABELED) && styles.filterCheckboxActive]}>
+                    {activeFilters.has(FILTER_UNLABELED) && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                  </View>
+                </TouchableOpacity>
                 {activeFilters.size > 0 && (
                   <TouchableOpacity
                     style={styles.filterClearButton}
