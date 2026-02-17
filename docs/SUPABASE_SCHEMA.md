@@ -1,7 +1,5 @@
 # Supabase schema (original setup)
 
-This doc describes the database tables used by the app and how to revert the DB if you previously added Google Photos columns.
-
 ## Tables the app uses
 
 ### `calendar_images`
